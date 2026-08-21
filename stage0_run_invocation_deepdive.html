@@ -1,0 +1,799 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Stage 0 Deep-Dive — Run Invocation (Ohio Capitation Decomposition)</title>
+  <style>
+    body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; max-width: 1080px; margin: 0 auto; line-height: 1.55; color: #212121; background: #fff; }
+    h1 { color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 6px; }
+    h2 { color: #283593; margin-top: 22px; }
+    h3 { color: #3949ab; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; }
+    th, td { border: 1px solid #c5cae9; padding: 6px 8px; vertical-align: top; }
+    th { background: #e8eaf6; text-align: left; }
+    tr:nth-child(even) td { background: #f5f5f5; }
+    code, pre { font-family: Consolas, "Courier New", monospace; background: #f5f5f5; padding: 2px 4px; }
+    pre { padding: 10px; overflow: auto; }
+    .plain { background: #eef1fb; border-left: 4px solid #3949ab; padding: 12px 16px; margin: 10px 0 16px; }
+    .tag { display: inline-block; color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 10pt; margin-right: 6px; }
+    .tag.c { background: #2e7d32; }
+    .tag.i { background: #1565c0; }
+    .tag.u { background: #e65100; }
+    .small { font-size: 10pt; color: #424242; }
+    @media print {
+      table, pre, .plain { break-inside: avoid; page-break-inside: avoid; }
+      h2, h3 { break-after: avoid; page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Stage 0 Deep-Dive — Run Invocation (“how a capitation run starts”)</h1>
+
+  <h2>1. Header meta block</h2>
+  <table>
+    <tr><th>Engagement</th><td>Gainwell Ohio CEF Architecture Assessment <span class="tag c">C</span></td></tr>
+    <tr><th>Scope (this stage only)</th><td>Stage 0: Run Invocation — how the system receives a request to calculate capitation for a given scope and initiates downstream processing (fan-out). Primary repository focus: <code>mms-cms-cef</code>. <span class="tag c">C</span></td></tr>
+    <tr><th>Date</th><td>2026-08-21 <span class="tag c">C</span></td></tr>
+    <tr><th>Grounding statement</th><td>This document is grounded in the knowledge graph built from the ingested Ohio repositories (including <code>mms-cms-cef</code>) plus available database DDL. All non-trivial claims are tagged and tied to retrieved nodes/source snippets; missing expected artifacts are explicitly called out. <span class="tag c">C</span></td></tr>
+  </table>
+
+  <h2>2. Executive Summary</h2>
+  <div class="plain">
+    Stage 0 begins a capitation run by collecting run-scoping inputs (e.g., eligible org/sponsor selection, program selection, capitation date, reconciliation options) in the QNXT Administrator web wizard and then submitting those inputs into the QNXT/QFrame “agent” execution infrastructure via proxies. Evidence in this graph confirms the UI wizard pages exist and that downstream provider-level fan-out is performed in the CapitationSetup ASC by building provider lists and sending <code>CapProviderRequestMessageType</code> messages through <code>Q.Proxy.CapProviderProxy</code>. However, several hypothesized Stage-0 components (e.g., <code>CapSubmitAgent</code>, <code>XSLTCapSubmit.xslt</code>, and the PlanIntegration process catalog tables/rows) were not found in the retrieved graph content for this run and remain open questions. <span class="tag i">c</span>
+  </div>
+
+  <h2>3. Execution Approaches</h2>
+  <table>
+    <tr>
+      <th>Approach</th>
+      <th>Entry point</th>
+      <th>Key artifacts</th>
+      <th>Evidence tag</th>
+    </tr>
+    <tr>
+      <td>UI (QNXT Administrator WebForms wizard)</td>
+      <td>WebForms pages under <code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/</code> <span class="tag c">C</span></td>
+      <td>
+        <code>CreateCAPPaymentsW0.aspx</code> (Step 1), <code>CreateCAPPaymentsWiz.aspx</code> (Step 2), <code>CreateCAPPaymentsWiz2.aspx</code> (Step 3) and their code-behind classes in namespace <code>Q.PaymentManager</code>. <span class="tag c">C</span>
+      </td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Scheduled (QTaskScheduler / HPA Scheduler)</td>
+      <td>Search performed for <code>QTaskScheduler</code> and scheduler-related terms; no concrete scheduler-to-capitation submission linkage was retrieved in the provided evidence set. <span class="tag u">!</span></td>
+      <td>Expected under <code>components/QNXT/UI/QTaskScheduler/</code> and/or an “HPA Scheduler.csproj”; not confirmed in retrieved snippets. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td>Queue/batch (Distribution Hub / MessageProcessorEngine / Service Broker)</td>
+      <td>Infrastructure components exist (e.g., <code>DistributionHub.cs</code>, <code>MessageProcessorEngine.cs</code>), but the specific capitation submission routing path (Distribution Hub vs Service Broker vs other) was not confirmed from the retrieved call trees/snippets. <span class="tag i">c</span></td>
+      <td>
+        <code>Q.QFrame.Portal.MessageProcessorEngine</code> logging methods; <code>DistributionHub.cs</code> present. <span class="tag c">C</span>
+      </td>
+      <td><span class="tag i">c</span></td>
+    </tr>
+    <tr>
+      <td>Other (SQL Agent job / CLI / MSMQ listener)</td>
+      <td>No additional invocation approach was confirmed in the retrieved evidence set. <span class="tag u">!</span></td>
+      <td>None found. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>4. Solution/Project Inventory</h2>
+  <table>
+    <tr>
+      <th>Layer</th>
+      <th>Solution/Project (hypothesis list verified against graph where possible)</th>
+      <th>Status</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td>UI</td>
+      <td>QNXT WebApp (HPAALL) — QPaymentManager wizard pages</td>
+      <td>Verified <span class="tag c">C</span></td>
+      <td>WebFormPage nodes for <code>CreateCAPPaymentsW0.aspx</code>, <code>CreateCAPPaymentsWiz.aspx</code>, <code>CreateCAPPaymentsWiz2.aspx</code> under <code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/</code>. <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Agents (QFrame)</td>
+      <td><code>CapSubmitAgent</code>, <code>CapDataAgent</code>, <code>CapGlobalAgent</code>, <code>CapPcpAgent</code> (expected)</td>
+      <td>Not confirmed in retrieved evidence set <span class="tag u">!</span></td>
+      <td>Searches were executed for these names; no source snippets for these agents were included in the retrieved set. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td>ASCs (COTS QNXT)</td>
+      <td><code>QCSI ASC CapitationSetup</code> (CapProviderActivity)</td>
+      <td>Verified <span class="tag c">C</span></td>
+      <td><code>components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProviderActivity.cs</code> methods retrieved. <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>ASCs (Ohio custom / CA_Extensions)</td>
+      <td><code>QCSI ASC PostCapitationBatchAgent</code></td>
+      <td>Verified <span class="tag c">C</span></td>
+      <td><code>components/CA_Extensions/ASCs/Capitation/Src/QCSI ASC PostCapitationBatchAgent/QCSI ASC PostCapitationBatchAgent.csproj</code>. <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Proxies</td>
+      <td><code>CapSubmitProxy</code>, <code>CapitationBatchProcessProxy</code></td>
+      <td>Verified <span class="tag c">C</span></td>
+      <td><code>components/QNXT/Proxies/Payment/Src/QCSI Payment Proxy/CapSubmitProxy.cs</code>, <code>CapitationBatchProcessProxy.cs</code>. <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>QFrame Infrastructure</td>
+      <td><code>MessageProcessorEngine</code>, Distribution Hub service</td>
+      <td>Verified (presence) <span class="tag c">C</span></td>
+      <td><code>components/QFrame/Infrastructure/Common/Src/QCSI Process Execution/MessageProcessorEngine.cs</code>; <code>components/QFrame/Infrastructure/Common/Src/WindowsService/Distribution Hub/DistributionHub.cs</code>. <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Scheduler</td>
+      <td><code>QTaskScheduler</code> / “HPA Scheduler.csproj” (expected)</td>
+      <td>Not confirmed in retrieved evidence set <span class="tag u">!</span></td>
+      <td>Search executed for <code>QTaskScheduler</code>; no scheduler project/page source was retrieved in the provided snippets. <span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>5. UI Screens Deep Dive</h2>
+
+  <h3>5.1 Screen: CreateCAPPaymentsW0 (Wizard Step 1)</h3>
+  <table>
+    <tr><th>Purpose</th><td>Select eligible organizations/sponsors (including “nonstandard sponsors”) as part of the capitation payment creation wizard. <span class="tag c">C</span></td></tr>
+    <tr><th>Page / code-behind</th><td><code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/CreateCAPPaymentsW0.aspx</code> inherits <code>Q.PaymentManager.CreateCAPPaymentsW0Cls</code> with code-behind <code>CreateCAPPaymentsW0.aspx.cs</code>. <span class="tag c">C</span></td></tr>
+    <tr>
+      <th>Key controls (markup)</th>
+      <td>
+        <ul>
+          <li>Checkbox: <code>chkNonStdOrg</code> (“Process Nonstandard Sponsors”), <code>AutoPostBack="True"</code>, handler <code>chkNonStdOrg_CheckedChanged</code>. <span class="tag c">C</span></li>
+          <li>DataGrid: <code>dgOrgList</code> with a “Select” template column containing per-row checkbox <code>chkSelect</code> whose value binds to <code>eligibleorgid</code>. <span class="tag c">C</span></li>
+          <li>Header “Select All” checkbox <code>chkSelectAllOrg</code> calling JavaScript <code>fnChkAll</code> and <code>fnSetCheckAllFlag</code>. <span class="tag c">C</span></li>
+          <li>Hidden field: <code>hdnFlagCheckAll</code>. <span class="tag c">C</span></li>
+          <li>Next button: <code>btNext</code> with server handler <code>btNext_ServerClick</code>. <span class="tag c">C</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Data loading / Page_Load</th>
+      <td>Not confirmed from retrieved snippets; only a sort handler was retrieved for this page’s code-behind. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <th>User actions &amp; server handlers</th>
+      <td>
+        <ul>
+          <li>Sorting: <code>dgOrgList_SortCommand</code> sorts a DataView from <code>Session["PayMgr_CreateCAPP_GridOrgs"]</code> using table index <code>Q.Tables.ELIGIBILITYORG_ENTITY</code>, then rebinds and calls <code>CheckOrgs(dvResults)</code>. <span class="tag c">C</span></li>
+          <li>Next: <code>btNext_ServerClick</code> is referenced in markup but its implementation was not retrieved in the provided evidence set. <span class="tag u">!</span></li>
+          <li>Nonstandard toggle: <code>chkNonStdOrg_CheckedChanged</code> referenced in markup; implementation not retrieved. <span class="tag u">!</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Validation</th>
+      <td>Client-side selection helpers exist (JS functions referenced), but server-side validation logic for required selections was not retrieved. <span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h3>5.2 Screen: CreateCAPPaymentsWiz (Wizard Step 2)</h3>
+  <table>
+    <tr><th>Purpose</th><td>Select carrier/program rows for capitation payment creation (Step indicator shows “2” active). <span class="tag c">C</span></td></tr>
+    <tr><th>Page / code-behind</th><td><code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/CreateCAPPaymentsWiz.aspx</code> inherits <code>Q.PaymentManager.CreateCAPPaymentsWizCls</code> with code-behind <code>CreateCAPPaymentsWiz.aspx.cs</code>. <span class="tag c">C</span></td></tr>
+    <tr>
+      <th>Key controls (markup)</th>
+      <td>
+        <ul>
+          <li>DataGrid: <code>dgCarrierList</code> with per-row checkbox <code>chkSelect</code> whose value binds to <code>programid</code>. <span class="tag c">C</span></li>
+          <li>Client onload calls: <code>setradiocheck()</code>, <code>ShowProvMem()</code>, <code>fnChkClicked()</code>, <code>fnCheckSel()</code> (from included JS). <span class="tag c">C</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Data loading / Page_Load</th>
+      <td>Not confirmed from retrieved snippets; only a sort handler was retrieved for this page’s code-behind. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <th>User actions &amp; server handlers</th>
+      <td>
+        <ul>
+          <li>Sorting: <code>dgCarrierList_SortCommand</code> sorts a DataView from <code>Session["PayMgr_CreateCapp_complds"]</code> using table index <code>Q.Tables.PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</code>, rebinds, and re-checks selected rows from <code>Session["PayMgr_CreateCapp_Selected"]</code>. It also restores <code>txtDate.Text</code> from <code>Session["PayMgr_CreateCapp_Date"]</code>. <span class="tag c">C</span></li>
+          <li>Submit/Next: Not confirmed; no “Next/Finish” handler implementation was retrieved for this page. <span class="tag u">!</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Validation</th>
+      <td>Required field indicator exists (“Carrier*”), but server-side enforcement was not retrieved. <span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h3>5.3 Screen: CreateCAPPaymentsWiz2 (Wizard Step 3)</h3>
+  <table>
+    <tr><th>Purpose</th><td>Final step showing “Capitation Payments” results grid and capturing additional run options via hidden fields and client scripts. <span class="tag c">C</span></td></tr>
+    <tr><th>Page / code-behind</th><td><code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/CreateCAPPaymentsWiz2.aspx</code> inherits <code>Q.PaymentManager.CreateCAPPaymentsWiz2Cls</code> with code-behind <code>CreateCAPPaymentsWiz2.aspx.cs</code>. <span class="tag c">C</span></td></tr>
+    <tr>
+      <th>Key controls (markup)</th>
+      <td>
+        <ul>
+          <li>Hidden fields: <code>hdnRevMon</code>, <code>hdnRecMon</code>, <code>hdnSummary</code>, <code>hdnContracts</code>, <code>hdnrecprov</code>, <code>hdnforrestart</code>, <code>hdnScaling</code>, <code>hdnScalingval</code>, and (in one retrieved variant) <code>hdnAdvReconRun</code>. <span class="tag c">C</span></li>
+          <li>DataGrid: <code>dgResults</code> with per-row checkbox <code>chkSelect</code> whose value concatenates <code>paymentid~batchid~pkey</code>. <span class="tag c">C</span></li>
+          <li>Client onload calls include: <code>reconprov()</code>, <code>summary()</code>, <code>recMon()</code>, <code>contcapt()</code>, <code>scaling()</code>, <code>CallPopup()</code>, and in one variant <code>RevMon()</code>. <span class="tag c">C</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Data loading / Page_Load</th>
+      <td>Not confirmed from retrieved snippets; only a sort handler was retrieved for this page’s code-behind. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <th>User actions &amp; server handlers</th>
+      <td>
+        <ul>
+          <li>Sorting: <code>dgResults_SortCommand</code> sorts a DataView from <code>Session["PayMgr_CreateCapp_RestartResults"]</code> using table index <code>Q.Tables.PAYMENT</code>, rebinds, and re-checks selected rows from <code>Session["PayMgr_CreateCapp_SelectedRestartResults"]</code>. <span class="tag c">C</span></li>
+          <li>Final submit (“Finish/Create/Restart”): Not confirmed; no click handler for final submission was retrieved in the provided evidence set. <span class="tag u">!</span></li>
+        </ul>
+      </td>
+    </tr>
+    <tr>
+      <th>Validation</th>
+      <td>Client-side functions suggest conditional UI logic for reconciliation/provider/summary/review-months, but server-side validation and mapping into the submission message were not retrieved. <span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>6. Wizard / Trigger Flow</h2>
+  <ol>
+    <li>Step 1 (<code>CreateCAPPaymentsW0.aspx</code>): user optionally toggles “Process Nonstandard Sponsors” and selects one or more eligible orgs via <code>dgOrgList</code> checkboxes; proceeds via “Next”. <span class="tag i">c</span></li>
+    <li>Step 2 (<code>CreateCAPPaymentsWiz.aspx</code>): user selects carrier/program rows via <code>dgCarrierList</code> checkboxes (value = <code>programid</code>); proceeds to Step 3. <span class="tag i">c</span></li>
+    <li>Step 3 (<code>CreateCAPPaymentsWiz2.aspx</code>): user reviews capitation payments grid and (via client-side logic + hidden fields) chooses options such as reconciliation/provider/summary/review-months/scaling/advanced recon run; final submission should invoke a proxy/agent chain. The exact server-side submit handler and message construction were not retrieved. <span class="tag u">!</span></li>
+  </ol>
+
+  <h2>7. Operational Modes</h2>
+  <table>
+    <tr>
+      <th>Mode (hypothesis)</th>
+      <th>Description</th>
+      <th>What selects it</th>
+      <th>Parameters generated</th>
+      <th>Downstream effect</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td>Create Months</td>
+      <td>Expected “create capitation for month X” behavior.</td>
+      <td>Not confirmed in retrieved UI code-behind; cap date is present in downstream message usage.</td>
+      <td>CapDate (first-of-month normalization observed downstream).</td>
+      <td>Provider list built for program and cap date.</td>
+      <td><span class="tag i">c</span> inferred from CapProviderActivity normalizing <code>message.Capitation.CapDate</code> to first of month and using it to build provider lists.</td>
+    </tr>
+    <tr>
+      <td>Reconcile Months</td>
+      <td>Reconciliation run where recon date is computed from cap date and “ReconMonths”.</td>
+      <td>Message field <code>message.Capitation.DoRecon</code> and <code>message.Capitation.ReconMonths</code>.</td>
+      <td><code>recondate = CalcDate(capdate, ReconMonths)</code> when DoRecon=Y.</td>
+      <td>Provider list queries use both capdate and recondate; affects inclusion window.</td>
+      <td><span class="tag c">C</span> confirmed in <code>CapProviderActivity.BuildPCPList</code> and <code>BuildCapGlobalProviderList</code> where recondate is calculated when DoRecon=Y.</td>
+    </tr>
+    <tr>
+      <td>Multiple Retroactive Months</td>
+      <td>Expected ability to run multiple retro months.</td>
+      <td>Not found in retrieved code; UI has hidden fields (e.g., <code>hdnRevMon</code>) but server-side mapping not retrieved.</td>
+      <td>Unknown.</td>
+      <td>Unknown.</td>
+      <td><span class="tag u">!</span> searched for “retro”, “RevMon”, “retro months” and did not retrieve server-side implementation tying it to messages.</td>
+    </tr>
+    <tr>
+      <td>Reconcile Providers</td>
+      <td>Expected provider-specific reconciliation mode.</td>
+      <td>UI includes hidden field <code>hdnrecprov</code> and client function <code>reconprov()</code>, but server-side behavior not retrieved.</td>
+      <td>Unknown.</td>
+      <td>Unknown.</td>
+      <td><span class="tag u">!</span> markup indicates the concept, but no server-side handler/message mapping was retrieved.</td>
+    </tr>
+    <tr>
+      <td>Advanced Recon Run</td>
+      <td>Flag indicating an “advanced recon” run variant.</td>
+      <td>Message field <code>message.Capitation.IsAdvancedReconRun</code> and UI hidden field <code>hdnAdvReconRun</code>.</td>
+      <td>Downstream passes <code>isadvreconrun</code> as “Y/N” into ProviderService calls.</td>
+      <td>Provider list retrieval uses the advanced recon flag.</td>
+      <td><span class="tag c">C</span> confirmed in <code>CapProviderActivity.BuildProviderList</code>/<code>BlanketProviderList</code> and message mapping in <code>ConvertToProvMessages</code>.</td>
+    </tr>
+  </table>
+
+  <h2>8. Post-Submit Execution Chain</h2>
+
+  <h3>8.1 Confirmed downstream fan-out: Program-scope message → Provider-scope messages</h3>
+  <table>
+    <tr>
+      <th>Step</th>
+      <th>Class / method</th>
+      <th>Input</th>
+      <th>Processing</th>
+      <th>Output / routing</th>
+      <th>DB access</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td><code>Q.ServiceComponents.Capitation.Setup.CapProviderActivity.BuildPCPList(CapSubmitRequestMessageType)</code><br/>
+          <span class="small">file: <code>components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProviderActivity.cs</code></span></td>
+      <td><code>CapSubmitRequestMessageType message</code> containing <code>message.Program.Id</code>, <code>message.Capitation.CapDate</code>, <code>message.Capitation.DoRecon</code>, <code>message.Capitation.ReconMonths</code>, <code>message.Capitation.EligibleOrgId</code>, and optional <code>message.AffiliateId</code>. <span class="tag c">C</span></td>
+      <td>
+        Normalizes cap date to first of month; computes recon date if DoRecon=Y; calls <code>BuildProviderList</code> to retrieve providers; converts provider rows into provider request messages. <span class="tag c">C</span>
+      </td>
+      <td>
+        Sends an array of <code>CapProviderRequestMessageType</code> via <code>Q.Proxy.CapProviderProxy.ProcessMessage(provMessages)</code>. <span class="tag c">C</span>
+      </td>
+      <td>
+        Indirect: builds SQL filter string for affiliations (<code>affiliationid in (SELECT ...)</code>) and calls ProviderService methods (DB objects behind ProviderService not visible here). <span class="tag i">c</span>
+      </td>
+      <td><span class="tag c">C</span> confirmed by retrieved methods <code>BuildPCPList</code>, <code>BuildProviderList</code>, and proxy call in <code>BuildPCPList</code>.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>Q.ServiceComponents.Capitation.Setup.CapProviderActivity.BuildProviderList(CapSubmitRequestMessageType, string capdate, string recondate)</code></td>
+      <td>Same message plus computed dates. <span class="tag c">C</span></td>
+      <td>
+        Builds affiliation filter when <code>message.AffiliateId</code> is present; optionally overrides cap date via <code>CheckCapDate</code> when program caps exist; sets <code>isadvreconrun</code> from <code>message.Capitation.IsAdvancedReconRun</code>; calls <code>ProviderService.CapProviderList(...)</code>. <span class="tag c">C</span>
+      </td>
+      <td>Returns a <code>DataTable</code> of providers. <span class="tag c">C</span></td>
+      <td>ProviderService call (DB objects not shown). <span class="tag u">!</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>CapProviderActivity.BuildProviderList</code>.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>Q.ServiceComponents.Capitation.Setup.CapProviderActivity.ConvertToProvMessages(DataTable, CapSubmitRequestMessageType, recondate, reviewdate, advreconrun)</code></td>
+      <td>Provider DataTable and the original submission message. <span class="tag c">C</span></td>
+      <td>
+        For each provider row, checks “provider on hold” via <code>GetProviderOnHold(affiliateid, capdate)</code>; if not on hold, constructs <code>CapProviderRequestMessageType</code> with header fields copied from the submission message (CapDate, DoRecon, EligibleOrgId, FundId, IsCapitatedOnly, DoGlobal, IsSummary conditional, LogInfo, ProgramId, ReconDate, ReviewDate, IsAdvancedReconRun, Capitationtype) and adds affiliation list via <code>GetAffiliations(affiliateid)</code>. <span class="tag c">C</span>
+      </td>
+      <td>Returns array of provider request messages. <span class="tag c">C</span></td>
+      <td>ProviderService calls for on-hold and affiliations; ProcessLog writes audit/warning states. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>ConvertToProvMessages</code>, <code>GetProviderOnHold</code>, <code>GetAffiliations</code>.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>Q.ServiceComponents.Capitation.Setup.CapProviderActivity.BlanketProviderList(...)</code> (global provider list path)</td>
+      <td>Submission message and computed dates. <span class="tag c">C</span></td>
+      <td>Calls <code>ProviderService.BlankCapProviderList</code>, then converts and sends provider messages via <code>Q.Proxy.CapProviderProxy</code>. <span class="tag c">C</span></td>
+      <td>Provider request messages sent to provider processing pipeline. <span class="tag c">C</span></td>
+      <td>ProviderService call; ProcessLog writes. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>BlanketProviderList</code>.</td>
+    </tr>
+  </table>
+
+  <h3>8.2 Hypothesized upstream chain (UI Submit → CapSubmitAgent → XSLT fan-out → proxies → CapProgramAgent …)</h3>
+  <div class="plain">
+    The prior analysis hypothesized a Stage-0 chain beginning with UI submit invoking <code>CapSubmitAgent.ProcessMessage</code>, applying <code>XSLTCapSubmit.xslt</code> to split into per-program messages, then routing via a one-way proxy (e.g., <code>CapitationBatchProcessProxy</code>) into downstream agents (<code>CapProgramAgent</code>, <code>CapData</code>, <code>CapGlobalAgent</code>, <code>CapPcpAgent</code>). In the retrieved evidence set for this run, the proxies exist (<code>CapSubmitProxy</code>, <code>CapitationBatchProcessProxy</code>), but the specific agents and XSLT artifacts were not retrieved, so this chain cannot be confirmed end-to-end here. <span class="tag u">!</span>
+  </div>
+
+  <h3>8.3 Relationship to “already-confirmed entry paths” (IAdvCap.Run / IBuildCapEnrolls)</h3>
+  <table>
+    <tr>
+      <th>Artifact</th>
+      <th>What it shows</th>
+      <th>How it relates to Stage 0</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>Q.QCSI_Capitation.IBuildCapEnrolls.Build_PCP_Enrollments()</code></td>
+      <td>Builds enrollment recordset using SQL that references <code>m_XMLMessage.capdate</code>, <code>m_XMLMessage.recondate</code>, <code>m_XMLMessage.programid</code>, <code>m_XMLMessage.affiliateid</code>, and <code>m_XMLMessage.affils</code>. <span class="tag c">C</span></td>
+      <td>Represents a later-stage activity that consumes run-scoping parameters (capdate/recondate/program/provider/affiliation filter) that Stage 0 must have produced and propagated into the message payload. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> confirmed by retrieved snippet <code>components/QFrame/Payment/Src/Activities/QCSI_Capitation/IBuildCapEnrolls.vb</code>.</td>
+    </tr>
+    <tr>
+      <td><code>Q.QCSI_Capitation.IAdvCap.Run(ByRef String)</code> (expected)</td>
+      <td>Call tree was requested, but no source snippet for <code>IAdvCap.Run</code> was included in the retrieved evidence set. <span class="tag u">!</span></td>
+      <td>Cannot reconcile into a single coherent picture without the missing source/call tree output. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> searched for <code>IAdvCap</code> and requested call tree; not present in provided snippets.</td>
+    </tr>
+  </table>
+
+  <h2>9. Transformations</h2>
+  <table>
+    <tr>
+      <th>Transformation</th>
+      <th>Location</th>
+      <th>Input</th>
+      <th>Output</th>
+      <th>Logic summary</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>XSLTCapSubmit.xslt</code> (hypothesized)</td>
+      <td>Expected in capitation agent folders</td>
+      <td>Cap submit request message</td>
+      <td>Per-program messages</td>
+      <td>Not found in retrieved graph content for this run. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> search executed for <code>XSLTCapSubmit</code>; no XSLT file snippet/node was provided.</td>
+    </tr>
+    <tr>
+      <td>Other XSLT in capitation folders</td>
+      <td>Unknown</td>
+      <td>Unknown</td>
+      <td>Unknown</td>
+      <td>No XSLT transformations were confirmed in retrieved evidence set. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>10. Database Objects Inventory (Stage 0 only)</h2>
+  <div class="plain">
+    The provided DDL snippet content in this run is dominated by non-capitation SharePoint-related databases (e.g., <code>WSS_Content_Temp</code>) and does not include the expected PlanIntegration DDL for process/agent catalogs or process log/state tables. As a result, Stage-0 database object inventory for PlanIntegration cannot be confirmed from the retrieved evidence set. <span class="tag u">!</span>
+  </div>
+
+  <table>
+    <tr>
+      <th>Database</th>
+      <th>Object</th>
+      <th>Type</th>
+      <th>Read/Write</th>
+      <th>Purpose (Stage 0)</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td>Unknown (via QFrame EventLogQueries)</td>
+      <td><code>CQuery.EventLogQueries.EVENTLOG_WRITE_APPLICATION_EVENT</code></td>
+      <td>Query/command (logical)</td>
+      <td>Write</td>
+      <td>Fallback logging when process log write fails in MessageProcessorEngine. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>MessageProcessorEngine.LogMessage</code> calling <code>dataLocator.ExecuteCommand(new CQuery(...))</code>.</td>
+    </tr>
+    <tr>
+      <td>Unknown</td>
+      <td><code>process</code>, <code>processstep</code>, <code>agent</code>, <code>processlogheader</code>, <code>processlogdetail</code>, <code>processstate</code> (hypothesized PlanIntegration tables)</td>
+      <td>Tables</td>
+      <td>Read/Write</td>
+      <td>Process chain catalog and run logging/state.</td>
+      <td><span class="tag u">!</span> not found in retrieved DDL/snippets for this run; expected under PLANINTEGRATION/PLANINTEGRATION_ARCHIVE DDL.</td>
+    </tr>
+  </table>
+
+  <h3>10.1 DB objects referenced by retrieved Stage-0-adjacent code</h3>
+  <table>
+    <tr>
+      <th>Code artifact</th>
+      <th>DB objects referenced</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>IBuildCapEnrolls.Build_PCP_Enrollments()</code></td>
+      <td>
+        Tables referenced in SQL string: <code>affiliation</code>, <code>contractinfo</code>, <code>contract</code>, <code>capitation</code>, <code>memberpcp</code>, <code>enrollkeys</code>, <code>benefitplan</code>, <code>policyplans</code>, <code>orgpolicy</code>, <code>provider</code>, <code>provmemo</code>, <code>memo</code>, <code>capvoucher</code>, <code>payment</code>, <code>member</code>, <code>entity</code>. <span class="tag c">C</span>
+      </td>
+      <td><span class="tag c">C</span> confirmed by the SQL text in the retrieved snippet.</td>
+    </tr>
+    <tr>
+      <td><code>CapProviderActivity</code> (CapitationSetup ASC)</td>
+      <td>Uses ProviderService methods (<code>CapProviderList</code>, <code>BlankCapProviderList</code>, <code>ProviderOnHold</code>, <code>PayToAffiliationidsByAffiliateid</code>) which likely query provider/affiliation data, but underlying SQL objects are not visible in retrieved snippets. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> confirmed that ProviderService methods are called; underlying DB objects remain unknown.</td>
+    </tr>
+  </table>
+
+  <h2>11. Process Chain Configuration</h2>
+  <table>
+    <tr>
+      <th>Hypothesized chain/catalog row</th>
+      <th>What was searched</th>
+      <th>Result</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>ADV_CAP_PROC</code> step 0 = <code>CapProgramAgent</code></td>
+      <td>Search for chain name and agent name in code/config; DDL for process tables.</td>
+      <td>Not confirmed in retrieved evidence set. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> no PlanIntegration DDL/data retrieved; no constants/strings shown.</td>
+    </tr>
+    <tr>
+      <td><code>ADV_CAP_BATCH</code> step 0 = <code>CapitationBatchProcessAgent</code></td>
+      <td>Search for <code>CapitationBatchProcessAgent</code> and proxy.</td>
+      <td>Proxy exists; agent mapping/chain row not confirmed. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> proxy method exists (<code>CapitationBatchProcessProxy.ProcessMessage</code>), but no chain configuration rows are visible.</td>
+    </tr>
+    <tr>
+      <td><code>ADV_CAP_BATCH</code> steps 1-2 = <code>PostCapSplitPayment</code> / <code>PostCapFundAllocation</code> (inactive)</td>
+      <td>Search for these agent names and project.</td>
+      <td>Custom ASC project contains <code>PostCapitationFundAllocationAgent.cs</code> and <code>PostCapitationSplitPaymentAgent.cs</code>, but “inactive” status and chain steps are not verifiable without DB data. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> project file lists these compile items; chain rows not present.</td>
+    </tr>
+    <tr>
+      <td><code>CapProvProc</code> step 0 = <code>CapitationCreateAgent</code></td>
+      <td>Search for agent name.</td>
+      <td>Not confirmed in retrieved evidence set. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><code>CapReStartProc</code> step 0 = <code>CapitationRestartAgent</code></td>
+      <td>Search for agent name.</td>
+      <td>Not confirmed in retrieved evidence set. <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>12. Parameters &amp; Message Schema</h2>
+
+  <h3>12.1 Confirmed message fields used in Stage-0 fan-out (CapSubmitRequestMessageType → CapProviderRequestMessageType)</h3>
+  <table>
+    <tr>
+      <th>Parameter</th>
+      <th>Where observed</th>
+      <th>Meaning in Stage 0</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>message.Program.Id</code></td>
+      <td><code>CapProviderActivity.BuildProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Program scope for which providers are selected and provider messages are generated. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> used in ProviderService calls and copied into provider header <code>ProgramId</code>.</td>
+    </tr>
+    <tr>
+      <td><code>message.Program.FundId</code></td>
+      <td><code>ConvertToProvMessages</code></td>
+      <td>Fund identifier propagated to provider message header. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> assigned to <code>provMsg.CapitationHeader.FundId</code>.</td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.CapDate</code></td>
+      <td><code>BuildPCPList</code>, <code>BuildCapGlobalProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Capitation month date; normalized to first of month in BuildPCPList. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> normalization and propagation shown in code.</td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.DoRecon</code></td>
+      <td><code>BuildPCPList</code>, <code>BuildCapGlobalProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Whether reconciliation is enabled; controls recon date calculation and is copied to provider header. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.ReconMonths</code></td>
+      <td><code>BuildPCPList</code>, <code>BuildCapGlobalProviderList</code></td>
+      <td>Number of months used by <code>CalcDate</code> to compute recon date. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.EligibleOrgId</code></td>
+      <td><code>BuildProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Selected eligible org/sponsor scope; used in provider list retrieval and copied to provider header. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.AffiliateId</code></td>
+      <td><code>BuildProviderList</code>, <code>BlanketProviderList</code>, <code>BuildCapGlobalProviderList</code></td>
+      <td>Optional affiliate/provider filter; used to build an affiliation subquery filter string. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> builds <code>affiliationid in (SELECT ... WHERE affiliateid = '...')</code>.</td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.IsAdvancedReconRun</code></td>
+      <td><code>BuildProviderList</code>, <code>BlanketProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Advanced recon flag; passed as “Y/N” to ProviderService and copied to provider header. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.DoGlobal</code>, <code>message.Capitation.IsSummary</code></td>
+      <td><code>ConvertToProvMessages</code></td>
+      <td>Controls provider header flags <code>IsGlobal</code> and conditional <code>IsSummary</code>. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.IsCapitatedOnly</code></td>
+      <td><code>ConvertToProvMessages</code></td>
+      <td>Propagated to provider header; likely affects downstream selection/processing. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>message.Capitation.Capitationtype</code></td>
+      <td><code>BuildProviderList</code>, <code>ConvertToProvMessages</code></td>
+      <td>Capitation type passed to ProviderService and copied to provider header. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+  </table>
+
+  <h3>12.2 Hypothesized Stage-0 submit message types</h3>
+  <table>
+    <tr>
+      <th>Type / artifact</th>
+      <th>Status</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td><code>XMLAdvCap</code></td>
+      <td>Not confirmed in retrieved evidence set <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> search executed for <code>XMLAdvCap</code>; no retrieved snippet/node shown.</td>
+    </tr>
+    <tr>
+      <td><code>CapSubmitMessage</code></td>
+      <td>Not confirmed in retrieved evidence set <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> search executed; no retrieved snippet/node shown.</td>
+    </tr>
+    <tr>
+      <td><code>CapSubmitRequestMessageType</code></td>
+      <td>Confirmed as a type used by CapitationSetup ASC <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> appears in method signatures in <code>CapProviderActivity</code> and in <code>CapSubmitProxy</code> signature.</td>
+    </tr>
+  </table>
+
+  <h2>13. Scheduler Integration</h2>
+  <div class="plain">
+    Scheduler integration (QTaskScheduler / HPA Scheduler) was requested, but no scheduler project files, task definitions, or code paths invoking capitation submission were retrieved in the provided evidence set. Therefore, whether scheduled tasks invoke the same proxy/agent entry point as the UI cannot be confirmed here. <span class="tag u">!</span>
+  </div>
+
+  <h2>14. Flow Diagrams</h2>
+
+  <h3>Figure 1 — Complete Stage 0 flow (approaches converging)</h3>
+  <pre class="mermaid">
+flowchart TD
+  UI0["UI Wizard Step 1: CreateCAPPaymentsW0.aspx"] -->|"Next (btNext_ServerClick)"| UI1["UI Wizard Step 2: CreateCAPPaymentsWiz.aspx"]
+  UI1 -->|"Next/Continue (not retrieved)"| UI2["UI Wizard Step 3: CreateCAPPaymentsWiz2.aspx"]
+  UI2 -->|"Final Submit (not retrieved)"| SubmitProxy["Proxy: CapSubmitProxy.ProcessMessage(...)"]
+  Sched["Scheduler (QTaskScheduler)"] -->|"Invoke capitation run (not confirmed)"| SubmitProxy
+  Queue["Queue/Batch (Distribution Hub / MPE)"] -->|"Deliver message (not confirmed)"| SubmitProxy
+  SubmitProxy -->|"Downstream processing (not confirmed)"| CapSetup["ASC: CapitationSetup CapProviderActivity"]
+  CapSetup -->|"Build provider list + convert"| ProvMsgs["CapProviderRequestMessageType[]"]
+  ProvMsgs -->|"Send"| ProvProxy["Proxy: CapProviderProxy.ProcessMessage(...)"]
+  ProvProxy -->|"Hand-off to Stage 1 (membership build)"| Stage1["Stage 1a: Membership build (not retrieved)"]
+  </pre>
+
+  <h3>Figure 2 — UI wizard navigation</h3>
+  <pre class="mermaid">
+flowchart LR
+  W0["CreateCAPPaymentsW0.aspx (Step 1)"] -->|"Next"| W1["CreateCAPPaymentsWiz.aspx (Step 2)"]
+  W1 -->|"Next"| W2["CreateCAPPaymentsWiz2.aspx (Step 3)"]
+  W2 -->|"Submit/Finish (not retrieved)"| End["Run submitted to backend (not confirmed)"]
+  </pre>
+
+  <h3>Figure 3 — Message fan-out pattern (confirmed portion)</h3>
+  <pre class="mermaid">
+flowchart TD
+  CapSubmit["CapSubmitRequestMessageType (program-scope)"] -->|"BuildProviderList / BlanketProviderList"| ProvList["Provider DataTable"]
+  ProvList -->|"ConvertToProvMessages"| ProvMsgArr["CapProviderRequestMessageType[]"]
+  ProvMsgArr -->|"CapProviderProxy.ProcessMessage"| Downstream["Provider-level processing pipeline (Stage 1+)"]
+  </pre>
+
+  <h2>15. Error Handling &amp; Robustness</h2>
+  <table>
+    <tr>
+      <th>Area</th>
+      <th>Observed behavior</th>
+      <th>Evidence</th>
+    </tr>
+    <tr>
+      <td>ASC exception handling (provider list build)</td>
+      <td><code>CapProviderActivity.BuildProviderList</code>, <code>BlanketProviderList</code>, <code>GetProviderOnHold</code>, and <code>GetAffiliations</code> catch <code>QServiceException</code> and general <code>Exception</code>, write ERROR states to ProcessLog, and rethrow as <code>ActivityServiceComponentException</code>. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed in the retrieved methods’ catch blocks.</td>
+    </tr>
+    <tr>
+      <td>Provider “on hold” handling</td>
+      <td>If provider is on hold, the provider is skipped; a warning is traced and an AUDIT detail state is written (“Provider On Hold : &lt;affiliateid&gt;”). <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>ConvertToProvMessages</code>.</td>
+    </tr>
+    <tr>
+      <td>Process log robustness in MessageProcessorEngine</td>
+      <td><code>MessageProcessorEngine.LogState</code> attempts to write to process log via <code>m_processLog.CreatePLDetailState</code>; on failure it falls back to writing an application event via <code>LogMessage</code>. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed in <code>MessageProcessorEngine.LogState</code> and <code>LogMessage</code>.</td>
+    </tr>
+    <tr>
+      <td>Transactions / idempotency</td>
+      <td>No explicit transaction boundaries or idempotency keys for Stage-0 submission were confirmed in retrieved UI submit handlers (not retrieved). <span class="tag u">!</span></td>
+      <td><span class="tag u">!</span> submit handlers not present in evidence set.</td>
+    </tr>
+  </table>
+
+  <h2>16. Evidence Table</h2>
+  <table>
+    <tr>
+      <th>Claim</th>
+      <th>Evidence (qualified name / file)</th>
+      <th>Tag</th>
+    </tr>
+    <tr>
+      <td>The capitation UI wizard pages exist under QPaymentManager (Step 1/2/3).</td>
+      <td>WebFormPage nodes and markup for <code>CreateCAPPaymentsW0.aspx</code>, <code>CreateCAPPaymentsWiz.aspx</code>, <code>CreateCAPPaymentsWiz2.aspx</code> in <code>components/QNXT/UI/Webapp/HPAALL/HPA/QPaymentManager/</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Step 1 has Next button bound to server handler <code>btNext_ServerClick</code>.</td>
+      <td><code>CreateCAPPaymentsW0.aspx</code> markup shows <code>onserverclick="btNext_ServerClick"</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Step 1 supports “Process Nonstandard Sponsors” via <code>chkNonStdOrg_CheckedChanged</code>.</td>
+      <td><code>CreateCAPPaymentsW0.aspx</code> markup shows checkbox with handler <code>chkNonStdOrg_CheckedChanged</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Step 2 program selection uses checkbox values bound to <code>programid</code>.</td>
+      <td><code>CreateCAPPaymentsWiz.aspx</code> WebFormBinding: checkbox value <code>DataBinder.Eval(...,"programid")</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Step 3 includes hidden fields suggesting recon/summary/review-months/scaling options.</td>
+      <td><code>CreateCAPPaymentsWiz2.aspx</code> markup includes <code>hdnRevMon</code>, <code>hdnRecMon</code>, <code>hdnSummary</code>, <code>hdnrecprov</code>, <code>hdnScaling</code>, etc.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Provider-level fan-out is implemented in CapitationSetup ASC by building provider lists and sending provider messages via <code>CapProviderProxy</code>.</td>
+      <td><code>CapProviderActivity.BuildPCPList</code>, <code>BuildProviderList</code>, <code>ConvertToProvMessages</code>, <code>BlanketProviderList</code> in <code>CapProviderActivity.cs</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Reconciliation months are supported via <code>DoRecon</code> and <code>ReconMonths</code> to compute recon date.</td>
+      <td><code>CapProviderActivity.BuildPCPList</code> and <code>BuildCapGlobalProviderList</code> compute <code>recondate = CalcDate(capdate, message.Capitation.ReconMonths)</code> when <code>DoRecon</code>=Y.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>Advanced recon run flag is propagated and passed to ProviderService calls.</td>
+      <td><code>CapProviderActivity.BuildProviderList</code>/<code>BlanketProviderList</code> set <code>isadvreconrun</code> from <code>message.Capitation.IsAdvancedReconRun</code>; <code>ConvertToProvMessages</code> sets <code>IsAdvancedReconRun</code> on provider header.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td>MessageProcessorEngine logs process states and falls back to application event log on failure.</td>
+      <td><code>MessageProcessorEngine.LogState</code> and <code>LogMessage</code> in <code>components/QFrame/Infrastructure/Common/Src/QCSI Process Execution/MessageProcessorEngine.cs</code>.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>XSLTCapSubmit.xslt</code> fan-out was not found in retrieved evidence set.</td>
+      <td>Search executed for <code>XSLTCapSubmit</code>; no XSLT node/snippet provided.</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td>PlanIntegration process catalog/log/state tables were not confirmed from DDL in this run.</td>
+      <td>Retrieved DDL snippet content shows unrelated databases (e.g., <code>WSS_Content_Temp</code>); no PLANINTEGRATION DDL present.</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+  </table>
+
+  <h2>17. Open Questions</h2>
+  <ol>
+    <li>What is the exact server-side submit handler on <code>CreateCAPPaymentsWiz2.aspx</code> that constructs the capitation submission message and invokes <code>CapSubmitProxy</code> (or another proxy)? Look next in <code>CreateCAPPaymentsWiz2.aspx.cs</code> for button click handlers and calls to <code>Q.Proxy.CapSubmitProxy</code>. <span class="tag u">!</span></li>
+    <li>Does the UI submit invoke <code>CapSubmitAgent</code> (QFrame agent) or directly call an ASC/service? Search for <code>CapSubmitAgent</code> class and for <code>CapSubmitProxy.Invoke</code> target configuration. <span class="tag u">!</span></li>
+    <li>Is there an XSLT-based fan-out (<code>XSLTCapSubmit.xslt</code>) from one request to per-program messages? Search for XSLT assets under capitation agent folders and for XSLT invocation code. <span class="tag u">!</span></li>
+    <li>Which infrastructure component performs routing/dispatch for capitation messages (Distribution Hub vs Service Broker vs other)? Trace <code>Invoke(...)</code> implementation for proxies (e.g., base proxy class) and any queue configuration. <span class="tag u">!</span></li>
+    <li>Scheduler integration: do QTaskScheduler tasks call the same proxy/agent entry point as UI? Look in <code>components/QNXT/UI/QTaskScheduler/</code> and any “HPA Scheduler” project for capitation task definitions. <span class="tag u">!</span></li>
+    <li>PlanIntegration DDL and runtime data: confirm existence and database placement of <code>process</code>, <code>processstep</code>, <code>agent</code>, <code>processlogheader</code>, <code>processlogdetail</code>, <code>processstate</code>, and whether capitation uses <code>Plandata_Parallel.dbo.processlog</code> as previously reported. Look for PLANINTEGRATION DDL files and any code references to fully qualified table names. <span class="tag u">!</span></li>
+    <li>Operational modes “Multiple Retroactive Months” and “Reconcile Providers”: confirm server-side mapping from UI hidden fields (<code>hdnRevMon</code>, <code>hdnrecprov</code>) into message fields and downstream behavior. <span class="tag u">!</span></li>
+    <li>Reconcile the “IAdvCap.Run” entry path with the agent/proxy path: retrieve <code>IAdvCap.vb</code>/<code>cAdvCap.vb</code> and call trees to show how Stage 0 hands off into Stage 1 activities. <span class="tag u">!</span></li>
+  </ol>
+
+  <h2>18. Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Definition</th><th>Evidence</th></tr>
+    <tr>
+      <td>Run</td>
+      <td>A single execution instance of capitation processing for a defined scope (program(s), dates, and optional provider/affiliation filters) that produces downstream work items/messages. <span class="tag i">c</span></td>
+      <td><span class="tag i">c</span> inferred from the presence of submission messages and downstream fan-out into provider messages.</td>
+    </tr>
+    <tr>
+      <td>Agent (QFrame agent)</td>
+      <td>A backend processing component invoked by the QFrame process execution infrastructure to handle a message and perform a step in a configured process chain. <span class="tag i">c</span></td>
+      <td><span class="tag i">c</span> inferred from <code>MessageProcessorEngine</code> and proxy patterns; specific capitation agents not retrieved here.</td>
+    </tr>
+    <tr>
+      <td>ASC (Activity Service Component)</td>
+      <td>A QNXT service component that encapsulates business logic and is invoked by other layers (agents, UI, proxies). Example: CapitationSetup ASC’s <code>CapProviderActivity</code>. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed by <code>components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProviderActivity.cs</code>.</td>
+    </tr>
+    <tr>
+      <td>Proxy</td>
+      <td>A client-side wrapper that invokes backend processing for a message type (often via QFrame infrastructure). Examples: <code>CapSubmitProxy</code>, <code>CapitationBatchProcessProxy</code>. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed by <code>CapSubmitProxy.ProcessMessage</code> and <code>CapitationBatchProcessProxy.ProcessMessage</code> calling <code>Invoke</code>.</td>
+    </tr>
+    <tr>
+      <td>Fan-out</td>
+      <td>Splitting a higher-level request into multiple downstream messages (e.g., one per provider) to enable parallel or distributed processing. <span class="tag c">C</span></td>
+      <td><span class="tag c">C</span> confirmed by <code>ConvertToProvMessages</code> producing an array of provider messages and sending them via <code>CapProviderProxy</code>.</td>
+    </tr>
+    <tr>
+      <td>Distribution Hub</td>
+      <td>A Windows service component in the QFrame infrastructure that likely participates in message distribution/hosting; specific capitation routing usage not confirmed here. <span class="tag i">c</span></td>
+      <td><span class="tag c">C</span> presence confirmed by <code>DistributionHub.cs</code>; capitation linkage not confirmed.</td>
+    </tr>
+    <tr>
+      <td>Stage 1a (membership build)</td>
+      <td>The next stage after Stage 0 that consumes provider-scoped messages to build member enrollment sets used for capitation calculation. <span class="tag i">c</span></td>
+      <td><span class="tag i">c</span> inferred from <code>IBuildCapEnrolls.Build_PCP_Enrollments</code> consuming capdate/recondate/program/provider/affiliation parameters.</td>
+    </tr>
+  </table>
+
+  <hr/>
+  <div class="small">Generated by csharp-doc-agent (knowledge-graph grounded) — Gainwell Ohio CEF Architecture Assessment</div>
+
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</body>
+</html>
