@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capitation Stage 0 — Run Invocation Deep Dive (mms-cms-cef-r23)</title>
+<style>
+body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; line-height: 1.6; margin: 2em; color: #212121; }
+h1 { color: #1a237e; border-bottom: 3px solid #1a237e; padding-bottom: 0.3em; }
+h2 { color: #283593; border-bottom: 1px solid #c5cae9; padding-bottom: 0.2em; margin-top: 2em; }
+h3 { color: #3949ab; margin-top: 1.5em; }
+h4 { color: #3949ab; margin-top: 1em; }
+table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+th, td { border: 1px solid #bdbdbd; padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background-color: #e8eaf6; font-weight: 600; }
+tr:nth-child(even) { background-color: #f5f5f5; }
+code, pre { font-family: 'Consolas', 'Courier New', monospace; background-color: #f5f5f5; padding: 2px 4px; border-radius: 3px; }
+pre { padding: 1em; overflow-x: auto; border: 1px solid #e0e0e0; }
+.tag-confirmed { display: inline-block; background: #2e7d32; color: white; padding: 1px 6px; border-radius: 10px; font-size: 9pt; font-weight: 600; }
+.tag-inferred { display: inline-block; background: #1565c0; color: white; padding: 1px 6px; border-radius: 10px; font-size: 9pt; font-weight: 600; }
+.tag-unknown { display: inline-block; background: #e65100; color: white; padding: 1px 6px; border-radius: 10px; font-size: 9pt; font-weight: 600; }
+.meta-block { background: #e8eaf6; border-left: 4px solid #1a237e; padding: 1em; margin-bottom: 2em; }
+.diagram-container { margin: 1.5em 0; padding: 1em; border: 1px solid #c5cae9; background: #fafafa; }
+.diagram-title { font-weight: 600; color: #283593; margin-bottom: 0.5em; }
+.evidence { font-size: 9pt; color: #616161; font-style: italic; }
+.note { background: #fff3e0; border-left: 4px solid #e65100; padding: 0.5em 1em; margin: 1em 0; }
+.glossary-term { font-weight: 600; color: #1a237e; }
+@media print {
+  table, .diagram-container, pre { page-break-inside: avoid; }
+  body { margin: 1em; }
+}
+</style>
+</head>
+<body>
+
+<h1>Capitation Stage 0 — Run Invocation Deep Dive (mms-cms-cef-r23)</h1>
+
+<!-- 1. Header Meta Block -->
+<div class="meta-block">
+<p><strong>Engagement:</strong> Gainwell Ohio CEF Architecture Assessment (MSS)</p>
+<p><strong>Role:</strong> Senior .NET Engineer — Independent Code-Level Architecture Trace</p>
+<p><strong>Scope:</strong> Stage 0 — Run Invocation only. Restricted to <code>mms-cms-cef-r23</code> repository.</p>
+<p><strong>Date:</strong> 2026-07-24</p>
+<p><strong>Grounding Statement:</strong> Every factual claim in this document is anchored to a file:line reference in the repository. Claims are tagged as <span class="tag-confirmed">CONFIRMED</span> (directly evidenced), <span class="tag-inferred">INFERRED</span> (reasoned from evidence), or <span class="tag-unknown">UNKNOWN</span> (not found after searching). No concepts are assumed — all terms are defined in the Glossary.</p>
+</div>
+
+<!-- 2. Executive Summary -->
+<h2>1. Executive Summary</h2>
+<p>
+Stage 0 — Run Invocation is the trigger mechanism that initiates a capitation payment calculation cycle. It accepts a user's request specifying which Managed Care Programs to process, for which month (capitation date), with optional reconciliation parameters and provider/affiliation filters. The request can be submitted via the <strong>QNXT Administrator Web UI</strong> ("Create Capitation Payments" wizard), or <strong>scheduled via Windows Task Scheduler</strong> using the <code>QTaskScheduler</code> library. Upon submission, the system constructs typed message objects (<code>CapSubmitRequestMessageType</code>), dispatches them through the <code>BulkProxy</code>/<code>OneWayProxy</code> infrastructure (which routes to either the QEnterprise Distribution Hub via HTTP POST, SQL Service Broker queue, or direct agent bypass), and the messages flow through an agent chain: <code>CapProgramAgent</code> → <code>CapProviderActivity.BuildProgramCapitation()</code> → provider list construction → XSLT fan-out per-provider — producing per-provider <code>CapProviderMessage</code> payloads that hand off to Stage 1 (Calculation).
+</p>
+
+<!-- 3. Execution Approaches -->
+<h2>2. Execution Approaches</h2>
+<table>
+<tr><th>Approach</th><th>Entry Point</th><th>How It Works</th><th>Key .sln Files</th></tr>
+<tr>
+<td><strong>1. UI Submit</strong><br>(Immediate Execution)</td>
+<td><code>CreateCAPPaymentsWiz2.aspx.cs</code> → <code>btFinish_Click()</code></td>
+<td>User completes 3-step wizard, clicks "Finish". Code constructs <code>CapSubmitRequestMessageType[]</code> array and calls <code>CapSubmitProxy.ProcessMessage()</code> which dispatches via <code>BulkProxy.Invoke()</code>.</td>
+<td>QNXTALL.sln, CAPSubmit.sln, QCSI Proxy Payment.sln, QCSI ASC CapitationSetup.sln</td>
+</tr>
+<tr>
+<td><strong>2. UI Schedule</strong><br>(Deferred Execution)</td>
+<td><code>CreateCAPPaymentsWiz2.aspx.cs</code> → <code>btSched_Click()</code></td>
+<td>User completes wizard, clicks "Schedule". Code builds XML config, saves it as a <code>.xml</code> file, then creates a Windows Scheduled Task pointing the <code>Scheduler.exe</code> at that XML file. The scheduler parses the XML and invokes the same proxy chain.</td>
+<td>QNXTALL.sln, QTaskScheduler.sln, QCSI Proxy Payment.sln</td>
+</tr>
+<tr>
+<td><strong>3. Restart Previous Run</strong></td>
+<td><code>CreateCAPPaymentsWiz2.aspx.cs</code> → <code>btFinish_Click()</code> (Restart branch)</td>
+<td>User selects "Restart Previous Run" option and picks from a grid of previously-failed runs. Code constructs <code>CapReStartRequestMessageType[]</code> and calls <code>CapReStartProxy.ProcessMessage()</code> (process log type: <code>CapReStartProc</code>).</td>
+<td>QNXTALL.sln, QCSI Proxy Payment.sln, QCSI ASC Capitation.sln</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CreateCAPPaymentsWiz2.aspx.cs:352 (btFinish_Click), :722 (btSched_Click), :374 (Restart branch)</p>
+
+<!-- 4. Complete .sln Inventory -->
+<h2>3. Complete .sln Inventory</h2>
+
+<h3>3.1 UI Solutions</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th><th>Approach</th></tr>
+<tr><td><code>components/QNXT/UI/Webapp/HPAALL/QNXTALL.sln</code></td><td>Contains the 3-page wizard UI (CreateCAPPaymentsW0, Wiz, Wiz2) — the primary user-facing entry point</td><td>All approaches</td></tr>
+<tr><td><code>components/QNXT/UI/QTaskScheduler/QTaskScheduler.sln</code></td><td>Windows Task Scheduler COM interop library used by Schedule approach to create OS-level scheduled tasks</td><td>Schedule only</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<h3>3.2 Agent Solutions (Stage 0 Chain)</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th></tr>
+<tr><td><code>components/QNXT/Agents/Capitation/Src/CapSubmit/CAPSubmit.sln</code></td><td>Contains <code>CapSubmitAgent.cs</code> — XSLT fan-out of single request into per-program messages (used in legacy non-typed-message path)</td></tr>
+<tr><td><code>components/QNXT/Agents/Capitation/Src/CapData/CapData.sln</code></td><td>Contains <code>CapData.cs</code> (CapDataAgent) — enriches message with program-specific capitation configuration from DB</td></tr>
+<tr><td><code>components/QNXT/Agents/Capitation/Src/CapGlobal/CAPGlobal.sln</code></td><td>Contains <code>CapGlobalAgent.cs</code> — builds global provider list and applies XSLTCapGlobal.xslt fan-out per-provider</td></tr>
+<tr><td><code>components/QNXT/Agents/Capitation/Src/CapPcp/CapPcp.sln</code></td><td>Contains <code>CapPcpAgent.cs</code> — builds PCP provider list and applies XSLTCapPcp.xslt fan-out per-provider</td></tr>
+<tr><td><code>components/QNXT/Agents/Capitation/Src/SelectAffiliations/SelectCapAffiliations.sln</code></td><td>Affiliation selection logic for capitation</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<h3>3.3 ASC (Application Service Component) Solutions</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th></tr>
+<tr><td><code>components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/QCSI ASC CapitationSetup.sln</code></td><td>Contains <code>CapProgramAgent.cs</code> + <code>CapProviderActivity.cs</code> — the core Stage 0 orchestration: loads program caps, builds provider lists, dispatches per-provider messages</td></tr>
+<tr><td><code>components/QNXT/ASCs/Capitation/Src/QCSI ASC Capitation/QCSI ASC Capitation.sln</code></td><td>Contains full capitation calculation VB.NET library (IAdvCap, cAdvCap, mCapQueries etc.) — Stage 0 reads parameters via <code>IAdvCap.vb</code></td></tr>
+<tr><td><code>components/CA_Extensions/ASCs/Capitation/Src/QCSI ASC PostCapitationBatchAgent/QCSI ASC PostCapitationBatchAgent.sln</code></td><td>Post-capitation agents (PostCapSplitPayment, PostCapFundAllocation) — configured but <strong>inactive</strong> in Stage 0</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<h3>3.4 QFrame Payment Layer</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th></tr>
+<tr><td><code>components/QFrame/Payment/Src/Activities/QCSI_Capitation/QCSI_Capitation.sln</code></td><td>Contains <code>IAdvCap.vb</code> — the interface defining capitation parameters (programid, capdate, recondate, etc.)</td></tr>
+<tr><td><code>components/QFrame/Payment/Src/LDL/QCSI Payment DAL.sln</code></td><td>Payment Data Access Layer — database queries for capitation</td></tr>
+<tr><td><code>components/QFrame/Payment/Src/QService/QCSI Payment Service.sln</code></td><td>Payment service wrapper</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<h3>3.5 Proxy Solutions</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th></tr>
+<tr><td><code>components/QNXT/Proxies/Payment/Src/QCSI Payment Proxy/QCSI Proxy Payment.sln</code></td><td>Contains <code>CapSubmitProxy.cs</code>, <code>CapitationBatchProcessProxy.cs</code>, <code>CapReStartProxy.cs</code> — the dispatch proxies that route messages to the infrastructure</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<h3>3.6 Infrastructure Solutions</h3>
+<table>
+<tr><th>.sln File Path</th><th>Purpose in Stage 0</th></tr>
+<tr><td><code>components/QFrame/Infrastructure/Common/Src/QCSI Internal Proxy/QCSI Internal Proxy.sln</code></td><td>Contains <code>OneWayProxy.cs</code> and <code>BulkProxy.cs</code> — the base proxy infrastructure that handles all three dispatch modes (HTTP to Distribution Hub, Service Broker queue, or Direct Agent bypass)</td></tr>
+<tr><td><code>components/QFrame/Infrastructure/Common/Src/WebService/Distribution Hub/DistributionHub.sln</code></td><td>QEnterprise Distribution Hub web service — receives HTTP-posted messages and routes to target agents</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — Files verified in workspace</p>
+
+<!-- 5. UI Screens Deep Dive -->
+<h2>4. UI Screens Deep Dive</h2>
+
+<h3>4.1 Step 1: CreateCAPPaymentsW0.aspx — Nonstandard Sponsors Selection</h3>
+<p><strong>Purpose:</strong> First step of the wizard. Allows the user to optionally include "Nonstandard Sponsors" (eligibility organizations) in the capitation run.</p>
+
+<h4>Controls on Page:</h4>
+<table>
+<tr><th>Control</th><th>Type</th><th>Purpose</th></tr>
+<tr><td><code>pnlTrail</code></td><td>Panel</td><td>Breadcrumb: "Payment Manager > Create Capitation Payments"</td></tr>
+<tr><td>Steps indicator (1-2-3)</td><td>HTML Table</td><td>Shows current position in wizard (Step 1 active)</td></tr>
+<tr><td><code>chkNonStdOrg</code></td><td>Checkbox (AutoPostBack)</td><td>"Process Nonstandard Sponsors" — when checked, loads the org grid</td></tr>
+<tr><td><code>dgOrgList</code></td><td>DataGrid</td><td>Lists nonstandard eligibility organizations with columns: Select (checkbox), Name, SecondaryID, Address1, Address2, City, State</td></tr>
+<tr><td><code>chkSelectAllOrg</code></td><td>Checkbox (client-side)</td><td>"Select All" — selects/deselects all orgs in grid</td></tr>
+<tr><td><code>btNext</code></td><td>Button</td><td>Navigates to Step 2</td></tr>
+<tr><td><code>btCancel</code></td><td>Button</td><td>Clears all PayMgr_ session variables and returns to Payment Manager home</td></tr>
+</table>
+
+<h4>Data Loading (Page_Load):</h4>
+<ul>
+<li>On first load (!IsPostBack): calls <code>CPayMgrUI.ProcessRequest("LoadNonStdEligOrg", null, null)</code> to retrieve nonstandard eligibility organizations <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsW0.aspx.cs:56</span></li>
+<li>Result stored in session: <code>Session["PayMgr_CreateCAPP_GridOrgs"]</code></li>
+<li>Data bound to <code>dgOrgList</code> from table <code>Q.Tables.ELIGIBILITYORG_ENTITY</code>, sorted by <code>fullname ASC</code></li>
+</ul>
+
+<h4>User Actions:</h4>
+<ul>
+<li><strong>Check "Process Nonstandard Sponsors"</strong>: triggers <code>chkNonStdOrg_CheckedChanged()</code> — re-loads the org grid or clears it <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsW0.aspx.cs:231</span></li>
+<li><strong>Click "Next"</strong>: <code>btNext_ServerClick()</code> — stores checked org selections in session, then navigates to <code>createcapp1</code> (Step 2) <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsW0.aspx.cs:214</span></li>
+<li><strong>Click "Cancel"</strong>: clears all <code>PayMgr_</code> session variables, navigates to <code>paymgriframe</code></li>
+</ul>
+
+<h3>4.2 Step 2: CreateCAPPaymentsWiz.aspx — Program Selection &amp; Options</h3>
+<p><strong>Purpose:</strong> The core configuration step where the user selects which Carrier/Programs to run capitation for, specifies the processing month, optionally selects a provider, and chooses the operational mode.</p>
+
+<h4>Controls on Page:</h4>
+<table>
+<tr><th>Control</th><th>Type</th><th>Purpose</th></tr>
+<tr><td>Steps indicator (1-2-3)</td><td>HTML Table</td><td>Step 2 highlighted as active</td></tr>
+<tr><td><code>dgCarrierList</code></td><td>DataGrid</td><td>Lists Carrier/Programs with columns: Select (checkbox), Carrier Name, Program Name. Data comes from <code>Q.Tables.PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</code></td></tr>
+<tr><td><code>chkSelectAllOrg</code></td><td>Checkbox (header)</td><td>"Select All" programs</td></tr>
+<tr><td><code>txtDate</code></td><td>TextBox</td><td><strong>Processing Month</strong> (MM/DD/YYYY) — the capitation date. Defaults to current date.</td></tr>
+<tr><td><code>txtProv</code></td><td>TextBox</td><td><strong>Provider</strong> name — optional filter. Opens provider/member search popup.</td></tr>
+<tr><td><code>btSearch</code></td><td>Button</td><td>Triggers provider/member search popup</td></tr>
+<tr><td><code>rdbListType</code></td><td>RadioButtonList</td><td><strong>Options</strong> — the 5 operational modes (see Section 6)</td></tr>
+<tr><td><code>btBack</code></td><td>Button</td><td>Returns to Step 1</td></tr>
+<tr><td><code>btNext</code></td><td>Button</td><td>Validates and navigates to Step 3. Disabled until at least one program is checked.</td></tr>
+<tr><td><code>btCancel</code></td><td>Button</td><td>Clears session, returns home</td></tr>
+</table>
+
+<h4>Data Loading (Page_Load):</h4>
+<ul>
+<li>On first load: calls <code>CPayMgrUI.ProcessRequest("LoadCarrierMod", aparams2, null)</code> with parameters: <code>eligorg</code>, <code>eligorgcount</code>, <code>eligibleorgid</code> (from Step 1 selections) <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz.aspx.cs:143</span></li>
+<li>Result table: <code>Q.Tables.PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</code> — sorted by <code>carrname, progname ASC</code></li>
+<li>Each row exposes <code>programid</code> as the checkbox value, plus <code>carrname</code> and <code>progname</code> display columns</li>
+</ul>
+
+<h4>User Actions:</h4>
+<ul>
+<li><strong>Select programs</strong>: checkboxes populate <code>ProgId</code> hidden field with <code>#</code>-separated programids</li>
+<li><strong>Set Processing Month</strong>: stored in <code>Session["PayMgr_CreateCapp_Date"]</code></li>
+<li><strong>Search Provider</strong>: opens popup, stores <code>hdnProviderId</code> as affiliateid</li>
+<li><strong>Select Option</strong>: stores in <code>Session["PayMgr_CreateCapp_Optvalue"]</code></li>
+<li><strong>Click "Next"</strong>: calls <code>btNext_ServerClick()</code> — validates date is not empty, stores all values in session, navigates to Step 3 <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz.aspx.cs (postback handler)</span></li>
+</ul>
+
+<h3>4.3 Step 3: CreateCAPPaymentsWiz2.aspx — Confirmation &amp; Execution</h3>
+<p><strong>Purpose:</strong> Final confirmation step where user sets reconciliation parameters, reviews selections, and either submits immediately or schedules for later execution.</p>
+
+<h4>Controls on Page:</h4>
+<table>
+<tr><th>Control</th><th>Type</th><th>Purpose</th></tr>
+<tr><td>Steps indicator (1-2-3)</td><td>HTML Table</td><td>Step 3 highlighted as active</td></tr>
+<tr><td><code>cbContCapitated</code></td><td>Checkbox</td><td>"Capitated Contracts Only" — filters to only capitated contracts. Default: checked.</td></tr>
+<tr><td><code>cbReconProv</code></td><td>Checkbox</td><td>"Reconcile Providers" — enables reconciliation parameters</td></tr>
+<tr><td><code>cbSummaryOnly</code></td><td>Checkbox</td><td>"Summary Only" — generates summary without detail processing</td></tr>
+<tr><td><code>ddlRecMonths</code></td><td>DropDownList</td><td><strong>Reconciliation Months</strong> — how many months back to reconcile</td></tr>
+<tr><td><code>ddlRevMonths</code></td><td>DropDownList</td><td><strong>Review Months</strong> — how many months for review lookback</td></tr>
+<tr><td><code>dgResults</code></td><td>DataGrid</td><td>For "Restart Previous Run" mode — shows previously failed runs from <code>Q.Tables.PAYMENT</code></td></tr>
+<tr><td><code>btFinish</code></td><td>Button</td><td><strong>"Finish"</strong> — immediately submits the capitation run</td></tr>
+<tr><td><code>btSched</code></td><td>Button</td><td><strong>"Schedule"</strong> — creates a Windows scheduled task for deferred execution</td></tr>
+<tr><td><code>btBack</code></td><td>Button</td><td>Returns to Step 2</td></tr>
+<tr><td><code>btCancel</code></td><td>Button</td><td>Clears session, returns home</td></tr>
+<tr><td><code>txtDescription</code></td><td>TextBox</td><td>Optional description for the scheduled task</td></tr>
+</table>
+
+<h4>Data Loading (Page_Load):</h4>
+<ul>
+<li>Calls <code>CPayMgrUI.ProcessRequest("LoadRestartRun", aparams2, null)</code> to populate restart grid — parameters include <code>eligorg</code>, <code>eligibleorgid</code>, <code>programid</code>, <code>firstday</code>, <code>lastday</code> <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:274</span></li>
+<li>Also calls <code>CPayMgrUI.ProcessRequest("LoadProgrambyProgramid", Param, null)</code> per program to get <code>fundid</code> <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:475</span></li>
+<li>Checks <code>objRouter.HasOptions(optSchedule)</code> to enable/disable Schedule button <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:92</span></li>
+</ul>
+
+<!-- 6. Wizard Flow -->
+<h2>5. Wizard Flow (Step by Step)</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 1: UI Wizard Page Navigation</div>
+<pre>
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Payment Manager Home                               │
+│                    (paymgriframe)                                     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ User clicks "Create Capitation Payments"
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  STEP 1: CreateCAPPaymentsW0.aspx                                    │
+│  ─────────────────────────────────                                   │
+│  □ Process Nonstandard Sponsors                                      │
+│  ┌─────────────────────────────────────────────┐                     │
+│  │ DataGrid: Nonstandard Sponsors              │                     │
+│  │ [✓] Name | SecondaryID | Address | City     │                     │
+│  └─────────────────────────────────────────────┘                     │
+│  [Next]  [Cancel]                                                    │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ btNext → NavigateUrl("createcapp1")
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  STEP 2: CreateCAPPaymentsWiz.aspx                                   │
+│  ─────────────────────────────────                                   │
+│  ┌─────────────────────────────────────────────┐                     │
+│  │ DataGrid: Carrier/Program Selection         │                     │
+│  │ [✓] Carrier Name | Program Name             │                     │
+│  └─────────────────────────────────────────────┘                     │
+│  Processing Month*: [MM/DD/YYYY] 📅                                  │
+│  Provider: [____________] [Search]                                   │
+│  Options*:                                                           │
+│    ○ Complete Run        ○ PCPs Only                                 │
+│    ○ Global Contracts    ○ Management Contracts                      │
+│    ○ Restart Previous Run                                            │
+│  [Back]  [Next]  [Cancel]                                            │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ btNext → NavigateUrl("createcapp2")
+                               ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  STEP 3: CreateCAPPaymentsWiz2.aspx                                  │
+│  ──────────────────────────────────                                  │
+│  [✓] Capitated Contracts Only                                        │
+│  [ ] Reconcile Providers → Recon Months [▼] Review Months [▼]       │
+│  [ ] Summary Only                                                    │
+│  ┌──────────────────────────────────────┐ (if Restart mode)          │
+│  │ DataGrid: Previous Runs to Restart  │                             │
+│  └──────────────────────────────────────┘                            │
+│  [Back]  [Finish]  [Schedule]  [Cancel]                              │
+└────────────────┬─────────────────────┬──────────────────────────────┘
+                 │                     │
+    btFinish_Click()           btSched_Click()
+                 │                     │
+                 ▼                     ▼
+    ┌────────────────────┐   ┌──────────────────────────┐
+    │ Immediate Submit   │   │ Create XML Config        │
+    │ via CapSubmitProxy │   │ Create Windows Task      │
+    │ or CapReStartProxy │   │ (QTaskScheduler library) │
+    └────────────────────┘   └──────────────────────────┘
+</pre>
+</div>
+
+<!-- 7. Operational Modes -->
+<h2>6. Operational Modes (Five Options)</h2>
+<table>
+<tr><th>#</th><th>Mode</th><th>UI Selection</th><th>Key Parameters Set</th><th>Downstream Effect</th></tr>
+<tr>
+<td>1</td>
+<td><strong>Complete Run</strong></td>
+<td>RadioButton: "Complete Run" (default)</td>
+<td><code>DoGlobal=N</code> first pass (PCP), then <code>DoGlobal=Y</code> second pass (Global). Both <code>GenerateMessages(false)</code> and <code>GenerateMessages(true)</code> called.</td>
+<td>Produces messages for BOTH PCP and Global provider lists. Two separate proxy submissions.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>PCPs Only</strong></td>
+<td>RadioButton: "PCPs Only"</td>
+<td><code>DoGlobal=N</code>. Only <code>GenerateMessages(false)</code> called.</td>
+<td>Only PCP providers processed. <code>CapPcpAgent</code> path only.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Global Contracts Only</strong></td>
+<td>RadioButton: "Global Contracts Only"</td>
+<td><code>DoGlobal=Y</code>. Only <code>GenerateMessages(true)</code> called.</td>
+<td>Only Global (blanket) providers processed. <code>CapGlobalAgent</code> path only.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Management Contracts Only</strong></td>
+<td>RadioButton: "Management Contracts Only"</td>
+<td><code>Capitationtype=MGT</code> (vs default <code>CAP</code>). Only <code>GenerateMessages(true)</code> called (same as Global path).</td>
+<td>Filters to management contract type. Uses same Global agent path with different capitation type filter.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Restart Previous Run</strong></td>
+<td>RadioButton: "Restart Previous Run"</td>
+<td>Constructs <code>CapReStartRequestMessageType[]</code> with <code>PaymentId</code> from selected grid rows. <code>ReStarting=Y</code>.</td>
+<td>Invokes <code>CapReStartProxy</code> (process log type: <code>CapReStartProc</code>) instead of <code>CapSubmitProxy</code>. Resumes from point of failure.</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CreateCAPPaymentsWiz.aspx:Lines 504-512 (RadioButtonList definition), CreateCAPPaymentsWiz2.aspx.cs:435-445 (mode branching)</p>
+
+<!-- 8. Post-Submit Execution Chain -->
+<h2>7. Post-Submit Execution Chain (Step by Step)</h2>
+
+<h3>7.1 UI to Proxy (Immediate Submit path)</h3>
+
+<table>
+<tr><th>Step</th><th>Class</th><th>Method</th><th>File:Line</th><th>What Happens</th></tr>
+<tr>
+<td>1</td>
+<td><code>CreateCAPPaymentsWiz2Cls</code></td>
+<td><code>btFinish_Click()</code></td>
+<td>CreateCAPPaymentsWiz2.aspx.cs:352</td>
+<td>Determines mode. For non-restart: calls <code>GenerateMessages(bool isGlobal)</code> once or twice depending on mode.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>CreateCAPPaymentsWiz2Cls</code></td>
+<td><code>GenerateMessages(bool isGlobal)</code></td>
+<td>CreateCAPPaymentsWiz2.aspx.cs:454</td>
+<td>Constructs <code>CapSubmitRequestMessageType[]</code> array (one per program×eligOrg combination). Sets: Program.Id, Program.FundId, Capitation.CapDate, Capitation.DoGlobal, Capitation.DoRecon, Capitation.ReconMonths, Capitation.ReviewMonths, Capitation.IsCapitatedOnly, Capitation.IsSummary, Capitation.Capitationtype, AffiliateId. Reads registry key <code>Software\TriZetto\QNXT\{version}\Capitation\LogInfo</code>.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>CreateCAPPaymentsWiz2Cls</code></td>
+<td><code>GenerateMessages()</code> continued</td>
+<td>CreateCAPPaymentsWiz2.aspx.cs:634</td>
+<td>Gets <code>IQcsiSession</code> from <code>CQServiceRouter</code>. Creates <code>new CapSubmitProxy(sess)</code>. Calls <code>CreateCapProxy.ProcessMessage(CreateCapRequest)</code>.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>CapSubmitProxy</code></td>
+<td><code>ProcessMessage(CapSubmitRequestMessageType[])</code></td>
+<td>CapSubmitProxy.cs:36</td>
+<td>Inherits from <code>BulkProxy</code> (process log type: <code>ADV_CAP_PROC</code>). Calls <code>Invoke(inputMessages)</code>.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>BulkProxy</code></td>
+<td><code>Invoke(QEnterpriseMessageType[])</code></td>
+<td>BulkProxy.cs:80</td>
+<td>Three routing paths based on configuration:<br>
+<strong>a)</strong> If <code>ByPassQEnterprise</code> registry set: calls <code>MessageProcessorEngine.ProcessRequest()</code> directly<br>
+<strong>b)</strong> If <code>ServiceBrokerEnabled</code>: calls <code>data.EnqueueMessage(message, "BulkMessage")</code> — SQL Service Broker<br>
+<strong>c)</strong> Otherwise: HTTP POST to Distribution Hub URL via <code>Globals.HTTPPostXML()</code></td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — BulkProxy.cs:80-130, OneWayProxy.cs:70-100</p>
+
+<h3>7.2 Agent Chain (After message reaches QEnterprise/Agent infrastructure)</h3>
+
+<table>
+<tr><th>Step</th><th>Agent Class</th><th>Method</th><th>File</th><th>Input</th><th>Processing</th><th>Output/Routing</th></tr>
+<tr>
+<td>6</td>
+<td><code>CapProgramAgent</code></td>
+<td><code>ProcessMessage(IQcsiSession, string)</code></td>
+<td>CapProgramAgent.cs:39</td>
+<td>Serialized <code>CapSubmitRequestMessageType</code> XML</td>
+<td>Deserializes message via <code>CUtility.GetObject()</code>. Creates <code>CapProviderActivity(session, headerId, detailId)</code>. Calls <code>cap.BuildProgramCapitation(message)</code>.</td>
+<td>Delegates to CapProviderActivity</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>CapProviderActivity</code></td>
+<td><code>BuildProgramCapitation(string)</code></td>
+<td>CapProviderActivity.cs:119</td>
+<td>Original message string</td>
+<td>Calls <code>LoadProgramAndCaps(programid, capitationtype)</code> to read program cap configuration from DB. If caps exist: branches based on <code>DoGlobal</code> flag.</td>
+<td>If DoGlobal=Y → <code>BuildCapGlobalProviderList()</code>; else → <code>BuildPCPList()</code></td>
+</tr>
+<tr>
+<td>8a</td>
+<td><code>CapProviderActivity</code></td>
+<td><code>BuildCapGlobalProviderList()</code></td>
+<td>CapProviderActivity.cs:153</td>
+<td><code>CapSubmitRequestMessageType</code></td>
+<td>Calculates <code>recondate</code> and <code>reviewdate</code> from capdate-ReconMonths/ReviewMonths. Builds affiliation filter. Calls <code>BlanketProviderList()</code> to query provider list from DB. Produces per-provider messages.</td>
+<td>Per-provider messages dispatched to next agent in chain</td>
+</tr>
+<tr>
+<td>8b</td>
+<td><code>CapProviderActivity</code></td>
+<td><code>BuildPCPList()</code></td>
+<td>CapProviderActivity.cs (PCP path)</td>
+<td><code>CapSubmitRequestMessageType</code></td>
+<td>Similar to Global but queries PCP-specific providers</td>
+<td>Per-provider messages dispatched to next agent in chain</td>
+</tr>
+</table>
+
+<div class="note">
+<strong>Legacy Agent Path (non-typed-message flow):</strong> The older agent chain (<code>CapSubmitAgent</code> → <code>CapDataAgent</code> → <code>CapGlobalAgent</code> → <code>CapPcpAgent</code>) still exists in the codebase but the modern typed-message path through <code>CapProgramAgent</code>/<code>CapProviderActivity</code> handles the orchestration in a single ASC. The legacy agents are still invoked if messages are routed through the Distribution Hub XML pipeline rather than the typed BulkProxy path. <span class="tag-inferred">INFERRED</span> — Both paths exist; routing depends on ByPassQEnterprise and ServiceBroker config.
+</div>
+
+<h3>7.3 Legacy Agent Chain Detail (XML Pipeline Path)</h3>
+<table>
+<tr><th>Step</th><th>Agent</th><th>File</th><th>Input XML Root</th><th>Processing</th><th>Output</th></tr>
+<tr>
+<td>A</td>
+<td><code>CapSubmitAgent</code></td>
+<td>CapSubmitAgent.cs:33</td>
+<td><code>&lt;CapSubmitMessage&gt;</code></td>
+<td>Reads <code>headerId</code>, <code>detailId</code>. Loads <code>XSLTCapSubmit.xslt</code>. XSLT iterates <code>//ProgramList/Program</code> and produces one <code>&lt;CapProgramMessage&gt;</code> per program.</td>
+<td>Multi-payload XML with <code>&lt;PayLoadList&gt;</code> containing one <code>&lt;PayLoad&gt;</code> per program</td>
+</tr>
+<tr>
+<td>B</td>
+<td><code>CapDataAgent</code></td>
+<td>CapData.cs:38</td>
+<td><code>&lt;CapProgramMessage&gt;</code></td>
+<td>Reads <code>headerId</code>, <code>detailId</code>, <code>programid</code>. Creates <code>CapProviderActivity</code>. Calls <code>cap.XmlProgramAndCaps(programid)</code> to fetch program cap config. Appends <code>&lt;ProgramCaps&gt;</code> element to message.</td>
+<td>Enriched <code>&lt;CapProgramMessage&gt;</code> with <code>&lt;ProgramCaps&gt;</code> child</td>
+</tr>
+<tr>
+<td>C</td>
+<td><code>CapGlobalAgent</code></td>
+<td>CapGlobalAgent.cs:38</td>
+<td><code>&lt;CapProgramMessage&gt;</code> (enriched)</td>
+<td>Creates <code>CapProviderActivity</code>. Calls <code>cap.BuildCapGlobalProviderList(message)</code> — queries global providers. Loads <code>XSLTCapGlobal.xslt</code>. XSLT iterates <code>//ProviderList/Provider</code> producing one <code>&lt;CapProviderMessage&gt;</code> per provider.</td>
+<td>Multi-payload XML: one <code>&lt;CapProviderMessage&gt;</code> per global provider → Stage 1</td>
+</tr>
+<tr>
+<td>D</td>
+<td><code>CapPcpAgent</code></td>
+<td>CapPcpAgent.cs:38</td>
+<td><code>&lt;CapProgramMessage&gt;</code> (enriched)</td>
+<td>Creates <code>CapProviderActivity</code>. Calls <code>cap.BuildCapPCPProviderList(message)</code> — queries PCP providers. Loads <code>XSLTCapPcp.xslt</code>. XSLT iterates <code>//ProviderList/Provider</code> producing one <code>&lt;CapProviderMessage&gt;</code> per provider.</td>
+<td>Multi-payload XML: one <code>&lt;CapProviderMessage&gt;</code> per PCP provider → Stage 1</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CapSubmitAgent.cs:60, CapData.cs:72, CapGlobalAgent.cs:70-79, CapPcpAgent.cs:70-79</p>
+
+<!-- 9. XSLT Transformations -->
+<h2>8. XSLT Transformations</h2>
+
+<h3>8.1 XSLTCapSubmit.xslt</h3>
+<p><strong>Location:</strong> <code>components/QNXT/Agents/Capitation/Src/CapSubmit/XSLTCapSubmit.xslt</code></p>
+<p><strong>Purpose:</strong> Splits a single multi-program submission into one message per program (fan-out).</p>
+<table>
+<tr><th>Input</th><th>Output</th><th>Logic</th></tr>
+<tr>
+<td><code>&lt;CapSubmitMessage headerId="" detailId=""&gt;</code> containing <code>&lt;ProgramList&gt;&lt;Program id="" fundid=""/&gt;...&lt;/ProgramList&gt;</code></td>
+<td><code>&lt;ProcessName&gt;&lt;ProgramCapitation/&gt;&lt;PayLoadList&gt;&lt;PayLoad&gt;&lt;CapProgramMessage&gt;...&lt;/PayLoad&gt;...&lt;/PayLoadList&gt;&lt;/ProcessName&gt;</code></td>
+<td><code>xsl:for-each select="//ProgramList/Program"</code> — produces one <code>&lt;CapProgramMessage&gt;</code> per program, carrying forward the <code>headerId</code>, <code>detailId</code>, <code>session</code>, <code>Capitation</code> node, and the specific <code>Program/@id</code> + <code>@fundid</code>. Also copies <code>AffilList</code>.</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — XSLTCapSubmit.xslt:1-35</p>
+
+<h3>8.2 XSLTCapGlobal.xslt</h3>
+<p><strong>Location:</strong> <code>components/QNXT/Agents/Capitation/Src/CapGlobal/XSLTCapGlobal.xslt</code></p>
+<p><strong>Purpose:</strong> Splits a single program message into one message per global provider (fan-out).</p>
+<table>
+<tr><th>Input</th><th>Output</th><th>Logic</th></tr>
+<tr>
+<td><code>&lt;CapProgramMessage&gt;</code> containing <code>&lt;ProviderList&gt;&lt;Provider payee="" affiliateid=""/&gt;...&lt;/ProviderList&gt;</code></td>
+<td>One <code>&lt;CapProviderMessage&gt;</code> per provider in <code>&lt;PayLoadList&gt;</code></td>
+<td><code>xsl:for-each select="//ProviderList/Provider"</code> — produces <code>&lt;CapProviderMessage&gt;</code> with <code>&lt;CapitationHeader&gt;</code> (carrying <code>isglobal="Y"</code>, <code>programid</code>, <code>fundid</code>, <code>capdate</code>, <code>reviewdate</code>, <code>recondate</code>, <code>dorecon</code>, <code>iscapitatedonly</code>, <code>headerId</code>, <code>detailId</code>, <code>issummary</code>, <code>username</code>) + <code>&lt;Provider payee="" affiliateid=""/&gt;</code> + <code>&lt;ProgramCaps&gt;</code>.</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — XSLTCapGlobal.xslt:1-40</p>
+
+<h3>8.3 XSLTCapPcp.xslt</h3>
+<p><strong>Location:</strong> <code>components/QNXT/Agents/Capitation/Src/CapPcp/XSLTCapPcp.xslt</code></p>
+<p><strong>Purpose:</strong> Identical structure to XSLTCapGlobal.xslt but sets <code>isglobal="N"</code>.</p>
+<table>
+<tr><th>Input</th><th>Output</th><th>Logic</th></tr>
+<tr>
+<td>Same as CapGlobal</td>
+<td>One <code>&lt;CapProviderMessage&gt;</code> per PCP provider</td>
+<td>Same logic as CapGlobal but with <code>isglobal="N"</code> — marks these as PCP (non-global) provider messages for downstream Stage 1 calculation path.</td>
+</tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — XSLTCapPcp.xslt:1-40</p>
+
+<!-- 10. Database Objects Inventory -->
+<h2>9. Database Objects Inventory (Stage 0)</h2>
+
+<h3>9.1 PlanIntegration Database</h3>
+<table>
+<tr><th>Object</th><th>Type</th><th>R/W</th><th>Purpose</th><th>Evidence</th></tr>
+<tr><td><code>process</code></td><td>Table</td><td>READ</td><td>Process chain catalog — keyed by <code>logtype</code>. Maps process log types (ADV_CAP_PROC, ADV_CAP_BATCH, CapProvProc, CapReStartProc) to their chain definitions.</td><td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs (logType parameter), ProxyHelper references</td></tr>
+<tr><td><code>processstep</code></td><td>Table</td><td>READ</td><td>Step order within a chain — each row defines which agent to invoke at which step, with an active/inactive flag</td><td><span class="tag-inferred">INFERRED</span> from process chain config in HTML reference document + code references to process log types</td></tr>
+<tr><td><code>agent</code></td><td>Table</td><td>READ</td><td>Agent-to-assembly mapping — maps agent names to their .NET assembly + class for reflection-based instantiation</td><td><span class="tag-inferred">INFERRED</span> from process chain config + MessageProcessorEngine usage</td></tr>
+<tr><td><code>processlogheader</code></td><td>Table</td><td>WRITE</td><td>Run audit log — one row per capitation run start. Created by <code>cProcessLog.CreatePLHeader()</code></td><td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs:148 — <code>procLog.CreatePLHeader(m_session, ...STARTED, m_processLogType, 1, "")</code></td></tr>
+<tr><td><code>processlogdetail</code></td><td>Table</td><td>WRITE</td><td>Per-step detail log within a run</td><td><span class="tag-confirmed">CONFIRMED</span> CapProviderActivity.cs — <code>this.ProcessLog.CreatePLDetailState()</code></td></tr>
+<tr><td><code>processstate</code></td><td>Table</td><td>WRITE</td><td>Live run-state and error capture. Written via <code>CreatePLDetailState()</code> with various <code>StateStageEnum</code> values (AUDIT, etc.)</td><td><span class="tag-confirmed">CONFIRMED</span> CapProviderActivity.cs:131,135,163,169</td></tr>
+</table>
+
+<h3>9.2 QNXT / Plandata Database</h3>
+<table>
+<tr><th>Object</th><th>Type</th><th>R/W</th><th>Purpose</th><th>Evidence</th></tr>
+<tr><td><code>ELIGIBILITYORG_ENTITY</code> (view/table)</td><td>View</td><td>READ</td><td>Nonstandard eligibility organizations — loaded on Step 1 via "LoadNonStdEligOrg"</td><td><span class="tag-confirmed">CONFIRMED</span> CreateCAPPaymentsW0.aspx.cs:62 — <code>Tables[Q.Tables.ELIGIBILITYORG_ENTITY]</code></td></tr>
+<tr><td><code>PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</code> (view)</td><td>View</td><td>READ</td><td>Carrier/Program list with program details — loaded on Step 2 via "LoadCarrierMod"</td><td><span class="tag-confirmed">CONFIRMED</span> CreateCAPPaymentsWiz.aspx.cs:71 — <code>Tables[Q.Tables.PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY]</code></td></tr>
+<tr><td><code>PROGRAM</code> (table)</td><td>Table</td><td>READ</td><td>Program fund lookup — queried per program to get <code>fundid</code> via "LoadProgrambyProgramid"</td><td><span class="tag-confirmed">CONFIRMED</span> CreateCAPPaymentsWiz2.aspx.cs:477 — <code>Tables[Q.Tables.PROGRAM]</code></td></tr>
+<tr><td><code>PAYMENT</code> (table)</td><td>Table</td><td>READ</td><td>Previous capitation payment runs — queried for Restart mode grid via "LoadRestartRun"</td><td><span class="tag-confirmed">CONFIRMED</span> CreateCAPPaymentsWiz2.aspx.cs:963 — <code>Tables[Q.Tables.PAYMENT]</code></td></tr>
+<tr><td><code>affiliation</code> (table)</td><td>Table</td><td>READ</td><td>Affiliation list — queried with subquery <code>SELECT affiliationid FROM affiliation WHERE affiliateid = '...' AND payflag &lt;&gt; 0</code></td><td><span class="tag-confirmed">CONFIRMED</span> CapProviderActivity.cs:179 — inline SQL string</td></tr>
+<tr><td>Program Cap configuration (table/proc)</td><td>Table</td><td>READ</td><td>Columns: effdate, termdate, splitmonthday, ageday, firsthalfpercent, sechalfpercent, capmethod, useageday, usetruecap — loaded by <code>GetProgramCapList(programid, captype)</code></td><td><span class="tag-confirmed">CONFIRMED</span> CapProviderActivity.cs:62-100</td></tr>
+</table>
+
+<h3>9.3 Service Requests (CPayMgrUI.ProcessRequest calls)</h3>
+<table>
+<tr><th>Request Name</th><th>Called From</th><th>Parameters</th><th>Returns</th></tr>
+<tr><td><code>"LoadNonStdEligOrg"</code></td><td>W0 Page_Load</td><td>None</td><td>DataSet with ELIGIBILITYORG_ENTITY table</td></tr>
+<tr><td><code>"LoadCarrierMod"</code></td><td>Wiz Page_Load</td><td>eligorg, eligorgcount, eligibleorgid</td><td>DataSet with PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</td></tr>
+<tr><td><code>"LoadProgrambyProgramid"</code></td><td>Wiz2 GenerateMessages()</td><td>programid</td><td>DataSet with PROGRAM table (for fundid)</td></tr>
+<tr><td><code>"LoadRestartRun"</code></td><td>Wiz2 BuildRestartGrid()</td><td>eligorg, eligibleorgid, programid, firstday, lastday</td><td>DataSet with PAYMENT table rows</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — All calls verified in respective .aspx.cs files</p>
+
+<!-- 11. Process Chain Configuration -->
+<h2>10. Process Chain Configuration</h2>
+<p>The following chains are configured in PlanIntegration and are relevant to Stage 0:</p>
+<table>
+<tr><th>Chain (logtype)</th><th>Step</th><th>Agent Name</th><th>Assembly</th><th>Active</th><th>Invoked By</th></tr>
+<tr><td><code>ADV_CAP_PROC</code></td><td>0</td><td>CapProgramAgent</td><td><code>ClaimAD.QCSI.ASC.CapitationSetup v5.0.31.00</code></td><td>Yes</td><td><code>CapSubmitProxy</code> (process log type = "ADV_CAP_PROC")</td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>0</td><td>CapitationBatchProcessAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td><td><code>CapitationBatchProcessProxy</code></td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>1</td><td>PostCapSplitPayment</td><td><code>QCSI ASC PostCapitationBatchAgent v5.1001.0.0</code></td><td><strong>No</strong></td><td>Would follow after step 0 if active</td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>2</td><td>PostCapFundAllocation</td><td><code>QCSI ASC PostCapitationBatchAgent v5.1001.0.0</code></td><td><strong>No</strong></td><td>Would follow after step 1 if active</td></tr>
+<tr><td><code>CapProvProc</code></td><td>0</td><td>CapitationCreateAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td><td>Per-provider messages from Stage 0 fan-out</td></tr>
+<tr><td><code>CapReStartProc</code></td><td>0</td><td>CapitationRestartAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td><td><code>CapReStartProxy</code> (process log type = "CapReStartProc")</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CapSubmitProxy.cs:20 (PROCESS_LOG_TYPE = "ADV_CAP_PROC"), CapitationBatchProcessProxy.cs:18 (PROCESS_LOG_TYPE = "ADV_CAP_BATCH"), CapReStartProxy.cs:20 (PROCESS_LOG_TYPE = "CapReStartProc")</p>
+
+<!-- 12. Parameters & Message Schema -->
+<h2>11. Parameters &amp; Message Schema</h2>
+
+<h3>11.1 CapSubmitRequestMessageType (Typed Message)</h3>
+<p>This is the .NET serializable message object constructed by <code>GenerateMessages()</code> and sent through <code>CapSubmitProxy</code>:</p>
+<pre>
+CapSubmitRequestMessageType {
+    headerId          : string   — Process log header GUID
+    detailId          : string   — Process log detail GUID  
+    Program           : CapProgramMessageType {
+        Id            : string   — Program GUID (from PROGRAM table)
+        FundId        : string   — Fund ID associated with program
+    }
+    Capitation        : CapitationMessageType {
+        CapDate       : DateTime — The month being calculated (from txtDate)
+        DoGlobal      : YesNoType (Y/N) — Whether to process global providers
+        DoRecon       : YesNoType (Y/N) — Whether reconciliation is enabled
+        ReconMonths   : long     — Number of months to look back for reconciliation
+        ReviewMonths  : long     — Number of review months
+        IsCapitatedOnly : YesNoType (Y/N) — Filter to capitated contracts only
+        IsSummary     : YesNoType (Y/N) — Summary-only mode
+        Capitationtype: CapitationTypeType (CAP/MGT) — Capitation vs Management
+        EligibleOrgId : string   — Selected nonstandard org ID
+        LogInfo       : YesNoType (Y/N) — Verbose logging (from registry)
+    }
+    AffiliateId       : string   — Provider/affiliate filter (affiliateid for subquery)
+}
+</pre>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CreateCAPPaymentsWiz2.aspx.cs:480-630 (message construction code)</p>
+
+<h3>11.2 CapSubmitMessage XML (Legacy Path)</h3>
+<pre>
+&lt;CapSubmitMessage headerId="..." detailId="..."&gt;
+    &lt;session&gt;...&lt;/session&gt;
+    &lt;Capitation capdate="..." dorecon="..." reconmonths="..." 
+               reviewmonths="..." iscapitatedonly="..." issummary="..." 
+               username="..." doglobal="..."/&gt;
+    &lt;ProgramList&gt;
+        &lt;Program id="..." fundid="..."/&gt;
+        &lt;Program id="..." fundid="..."/&gt;
+    &lt;/ProgramList&gt;
+    &lt;AffilList&gt;
+        &lt;Affiliation AffiliationId="..."/&gt;
+    &lt;/AffilList&gt;
+&lt;/CapSubmitMessage&gt;
+</pre>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — XSLTCapSubmit.xslt (uses these exact XPath expressions: //CapSubmitMessage/@headerId, //ProgramList/Program, //CapSubmitMessage/session, //CapSubmitMessage/Capitation, //CapSubmitMessage/AffilList)</p>
+
+<h3>11.3 CapReStartRequestMessageType (Restart Path)</h3>
+<pre>
+CapReStartRequestMessageType {
+    CapitationHeader : {
+        PaymentId    : string   — GUID of the failed payment to restart
+        ReStarting   : YesNoType.Y
+    }
+}
+</pre>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CreateCAPPaymentsWiz2.aspx.cs:388-394</p>
+
+<h3>11.4 Scheduler XML (Schedule Path)</h3>
+<pre>
+&lt;Capitation DoRecon="true|false" ReconMonths="0-12" ReviewMonths="0-12" 
+            CapType="Complete Run|PCPs only|..." Affiliations="affiliateid" 
+            CapDate="MM/DD/YYYY" Programs="guid1,guid2,..." 
+            fundid="guid1,guid2,..." Eligibleorgids="guid1,guid2,..." 
+            RestartList="" IsCapitatedOnly="0|1" IsSummary="0|1"&gt;
+    &lt;QCSI Envid="environment_id"/&gt;
+&lt;/Capitation&gt;
+</pre>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — CreateCAPPaymentsWiz2.aspx.cs:740 (XML template string), :760-850 (attribute population)</p>
+
+<!-- 13. QTaskScheduler Integration -->
+<h2>12. QTaskScheduler Integration</h2>
+
+<h3>How Scheduling Works</h3>
+<ol>
+<li><strong>User clicks "Schedule" button</strong> on Step 3 → <code>btSched_Click()</code> is invoked <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:722</span></li>
+<li><strong>CreateXML()</strong> is called — builds an XML document containing all capitation parameters (programs, dates, options, org IDs) <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:729</span></li>
+<li><strong>Session stores XML</strong> — sets <code>Session["XMLDom"]</code> and <code>Session["Screen"] = "CreateCAP"</code>; opens a scheduling popup (<code>hdnPopup.Value="1"</code>) <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:732-734</span></li>
+<li><strong>SaveXML()</strong> (in popup flow) — saves the XML to a file at <code>\\HPAALL\HPA\QPaymentManager\PayMgrXml\Capitation_YYYYMMDD_HHMM.xml</code> <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:867</span></li>
+<li><strong>Windows Task Scheduler</strong> — uses <code>QTaskScheduler.ScheduledTasks</code> COM interop library to:
+   <ul>
+   <li>Create a new task (named "AT{n}" with incrementing suffix)</li>
+   <li>Set <code>ApplicationName</code> = Scheduler.exe path (from registry key: <code>SOFTWARE\TriZetto\QNXT\{version}\Scheduler\Path</code>)</li>
+   <li>Set <code>Parameters</code> = path to saved XML file</li>
+   <li>Set <code>Comment</code> = "Payment Manager Scheduler"</li>
+   <li>Set <code>Flags</code> = <code>TaskFlags.DeleteWhenDone</code> (self-deleting after execution)</li>
+   <li>Add trigger: <code>RunOnceTrigger</code> set to tomorrow (current date + 1 day)</li>
+   <li>Save the task</li>
+   </ul>
+   <span class="tag-confirmed">CONFIRMED</span> <span class="evidence">CreateCAPPaymentsWiz2.aspx.cs:900-960</span>
+</li>
+<li><strong>At scheduled time</strong> — Windows Task Scheduler launches <code>Scheduler.exe</code> with the XML file as argument. The scheduler parses the XML and invokes the same proxy chain (CapSubmitProxy or CapitationBatchProcessProxy) <span class="tag-inferred">INFERRED</span> — The Scheduler.exe itself is not in the repo (it's a deployed binary); this inference is based on the XML structure matching the message parameters and the registry key path.</li>
+</ol>
+
+<h3>QTaskScheduler Library Classes</h3>
+<table>
+<tr><th>Class</th><th>File</th><th>Purpose</th></tr>
+<tr><td><code>Scheduler</code></td><td>Scheduler.cs</td><td>Deprecated V1 wrapper. Just wraps <code>TaskList</code>. Provided for backward compatibility.</td></tr>
+<tr><td><code>ScheduledTasks</code></td><td>ScheduledTasks.cs</td><td>Main class — COM interop to Windows Task Scheduler (<code>ITaskScheduler</code>). Methods: <code>GetTaskNames()</code>, <code>CreateTask(name)</code>, <code>OpenTask(name)</code>, <code>DeleteTask(name)</code>.</td></tr>
+<tr><td><code>Task</code></td><td>Task.cs</td><td>Represents a single scheduled task. Properties: <code>ApplicationName</code>, <code>Parameters</code>, <code>Comment</code>, <code>Flags</code>, <code>Triggers</code>. Methods: <code>Save()</code>, <code>Close()</code>.</td></tr>
+<tr><td><code>TaskList</code></td><td>TaskList.cs</td><td>Collection of tasks with <code>TargetComputer</code> property.</td></tr>
+<tr><td><code>Trigger</code> / <code>TriggerList</code></td><td>Trigger.cs / TriggerList.cs</td><td>Defines when a task runs (RunOnceTrigger, etc.).</td></tr>
+<tr><td><code>TaskSchedulerInterop</code></td><td>TaskSchedulerInterop.cs</td><td>P/Invoke COM interop definitions for <code>ITaskScheduler</code>, <code>ITask</code>, <code>IEnumWorkItems</code>.</td></tr>
+</table>
+<p class="evidence"><span class="tag-confirmed">CONFIRMED</span> — All files exist in components/QNXT/UI/QTaskScheduler/</p>
+
+<!-- 14. Flow Diagrams -->
+<h2>13. Flow Diagrams</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 2: Complete Stage 0 Execution Flow (All Approaches)</div>
+<pre>
+                    ┌──────────────────────────┐
+                    │   ENTRY POINTS           │
+                    └──────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  UI: "Finish"   │  │  UI: "Schedule" │  │  Restart Mode   │
+│  (Immediate)    │  │  (Deferred)     │  │  (Re-run)       │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ GenerateMessages│  │  CreateXML()    │  │ CapReStartProxy │
+│ (constructs     │  │  SaveXML()      │  │ .ProcessMessage │
+│  CapSubmit      │  │  Create Win     │  │ (PaymentId,     │
+│  RequestMsg[])  │  │  Scheduled Task │  │  ReStarting=Y)  │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ CapSubmitProxy  │  │ At scheduled    │  │ BulkProxy.      │
+│ .ProcessMessage │  │ time:           │  │ Invoke()        │
+│ (ADV_CAP_PROC)  │  │ Scheduler.exe   │  │ (CapReStartProc)│
+└────────┬────────┘  │ parses XML →    │  └────────┬────────┘
+         │           │ same proxy call │           │
+         │           └────────┬────────┘           │
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │      BulkProxy.Invoke()       │
+              │  (Base infrastructure class)  │
+              └───────────────┬───────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│ ByPassQEnterprise│  │ ServiceBroker   │  │ HTTP POST to    │
+│ = true          │  │ Enabled = true  │  │ Distribution    │
+│ ─────────────── │  │ ─────────────── │  │ Hub             │
+│ MessageProcessor│  │ data.Enqueue    │  │ ─────────────── │
+│ Engine          │  │ Message()       │  │ Globals.HTTP    │
+│ .ProcessRequest │  │ (SQL SSB Queue) │  │ PostXML()       │
+└────────┬────────┘  └────────┬────────┘  └────────┬────────┘
+         │                    │                    │
+         └────────────────────┼────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │    Message Processing Engine   │
+              │  (Reads PlanIntegration DB:    │
+              │   process → processstep →     │
+              │   agent → assembly mapping)   │
+              └───────────────┬───────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │  CapProgramAgent              │
+              │  .ProcessMessage()            │
+              │  (QCSI ASC CapitationSetup)   │
+              └───────────────┬───────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │  CapProviderActivity          │
+              │  .BuildProgramCapitation()    │
+              │  → LoadProgramAndCaps()       │
+              │  → Reads cap config from DB   │
+              └───────────────┬───────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+         DoGlobal=Y│                   │DoGlobal=N
+                    ▼                   ▼
+    ┌──────────────────────┐  ┌──────────────────────┐
+    │ BuildCapGlobal       │  │ BuildPCPList()       │
+    │ ProviderList()       │  │                      │
+    │ → Query global provs │  │ → Query PCP provs   │
+    │ → XSLT fan-out       │  │ → XSLT fan-out      │
+    │   (XSLTCapGlobal)    │  │   (XSLTCapPcp)      │
+    └──────────┬───────────┘  └──────────┬───────────┘
+               │                         │
+               └────────────┬────────────┘
+                            │
+                            ▼
+              ┌───────────────────────────────┐
+              │  Per-Provider Messages         │
+              │  (CapProviderMessage)          │
+              │  ─────────────────────────     │
+              │  → Hand-off to Stage 1        │
+              │  (CapitationCreateAgent /      │
+              │   CapProvProc chain)           │
+              └───────────────────────────────┘
+</pre>
+</div>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 3: Message Fan-Out Pattern</div>
+<pre>
+SINGLE USER REQUEST (1 message)
+    │
+    │  User selects: 3 programs, Processing Month = 07/2026
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  CapSubmitProxy creates 3 CapSubmitRequestMessages  │
+│  (one per program × eligOrg combination)            │
+│                                                     │
+│  Message[0]: Program=MCP-A, CapDate=07/01/2026     │
+│  Message[1]: Program=MCP-B, CapDate=07/01/2026     │
+│  Message[2]: Program=MCP-C, CapDate=07/01/2026     │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           │ BulkProxy dispatches each
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  CapProgramAgent processes EACH message separately  │
+│  → CapProviderActivity loads program cap config     │
+│  → Queries provider list for that program           │
+│                                                     │
+│  Program MCP-A: 50 global providers found           │
+│  Program MCP-B: 30 global providers found           │
+│  Program MCP-C: 45 global providers found           │
+└──────────────────────────┬──────────────────────────┘
+                           │
+                           │ XSLT per-provider fan-out
+                           ▼
+┌─────────────────────────────────────────────────────┐
+│  125 CapProviderMessages produced                   │
+│  (50 + 30 + 45 individual provider calculations)   │
+│                                                     │
+│  Each message contains:                             │
+│  - programid, fundid                                │
+│  - capdate, recondate, reviewdate                   │
+│  - Provider payee + affiliateid                     │
+│  - ProgramCaps configuration                        │
+│  - isglobal flag                                    │
+│                                                     │
+│  → Each dispatched to Stage 1 (CapProvProc chain)   │
+└─────────────────────────────────────────────────────┘
+</pre>
+</div>
+
+<!-- 15. Error Handling & Robustness -->
+<h2>14. Error Handling &amp; Robustness</h2>
+
+<table>
+<tr><th>Aspect</th><th>Assessment</th><th>Evidence</th></tr>
+<tr>
+<td><strong>Submit failure handling</strong></td>
+<td>Basic try/catch in <code>GenerateMessages()</code>. On success: shows message "3715" (Process Succeeded). On failure: shows message "3717" (Process Failed). No retry logic.</td>
+<td><span class="tag-confirmed">CONFIRMED</span> CreateCAPPaymentsWiz2.aspx.cs:640-650</td>
+</tr>
+<tr>
+<td><strong>Transaction wrapping</strong></td>
+<td><strong>Not present</strong> in Stage 0 code. The <code>BulkProxy.Invoke()</code> iterates messages and posts them one by one. If posting fails mid-array, previously posted messages are already dispatched — no rollback. <span style="color: #c62828; font-weight: bold;">RISK: Partial submission possible.</span></td>
+<td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs:118-130 — no BEGIN TRAN, no TransactionScope</td>
+</tr>
+<tr>
+<td><strong>Process logging</strong></td>
+<td>The <code>BulkProxy</code> creates a <code>processlogheader</code> entry with state STARTED before dispatching. <code>CapProviderActivity</code> writes AUDIT-level detail states throughout execution. This provides observability into where a run failed.</td>
+<td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs:148, CapProviderActivity.cs:131-169</td>
+</tr>
+<tr>
+<td><strong>Agent error handling</strong></td>
+<td>All agents (CapSubmitAgent, CapDataAgent, CapGlobalAgent, CapPcpAgent) have try/catch blocks that only <code>Console.WriteLine(e.Message)</code> — errors are logged to console but execution may continue with empty/partial results. <span style="color: #c62828; font-weight: bold;">RISK: Silent failures possible.</span></td>
+<td><span class="tag-confirmed">CONFIRMED</span> CapSubmitAgent.cs:79, CapGlobalAgent.cs:86, CapPcpAgent.cs:86</td>
+</tr>
+<tr>
+<td><strong>Idempotency</strong></td>
+<td>Stage 0 itself is <strong>not idempotent</strong> — resubmitting creates new <code>processlogheader</code> entries and dispatches duplicate provider messages. There is no deduplication check. The "Restart Previous Run" mode exists specifically because re-running isn't safe otherwise.</td>
+<td><span class="tag-inferred">INFERRED</span> — No duplicate check logic found in CapSubmitProxy or BulkProxy</td>
+</tr>
+<tr>
+<td><strong>Distribution Hub failure</strong></td>
+<td><code>Globals.HTTPPostXML()</code> returns false on failure → throws <code>QApplicationException</code>. This propagates up to the UI as "Process Failed" message. However, messages already posted before the failure are still queued.</td>
+<td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs:125-128, OneWayProxy.cs:89-92</td>
+</tr>
+<tr>
+<td><strong>Service Broker failure</strong></td>
+<td>If <code>EnqueueMessage()</code> fails, exception propagates. The Service Broker path wraps all messages in a single <code>QEnterpriseEnvelope</code> — so this is more atomic than the HTTP path.</td>
+<td><span class="tag-confirmed">CONFIRMED</span> BulkProxy.cs:143-164</td>
+</tr>
+</table>
+
+<!-- 16. Evidence Table -->
+<h2>15. Evidence Table</h2>
+<table>
+<tr><th>Claim</th><th>File:Line</th><th>Tag</th></tr>
+<tr><td>CapSubmitAgent applies XSLT fan-out per program</td><td>CapSubmitAgent.cs:60</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>XSLTCapSubmit.xslt iterates //ProgramList/Program</td><td>XSLTCapSubmit.xslt:10</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapitationBatchProcessProxy uses ADV_CAP_BATCH log type</td><td>CapitationBatchProcessProxy.cs:18</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapSubmitProxy uses ADV_CAP_PROC log type</td><td>CapSubmitProxy.cs:20</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapReStartProxy uses CapReStartProc log type</td><td>CapReStartProxy.cs:20</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>BulkProxy has three dispatch paths (bypass, SSB, HTTP)</td><td>BulkProxy.cs:96-130</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>OneWayProxy has three dispatch paths (bypass, SSB, HTTP)</td><td>OneWayProxy.cs:65-100</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>ByPassQEnterprise uses MessageProcessorEngine directly</td><td>OneWayProxy.cs:78, BulkProxy.cs:98</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>ServiceBrokerEnabled reads from AppSettings config</td><td>BulkProxy.cs:48, OneWayProxy.cs:39</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapProgramAgent calls CapProviderActivity.BuildProgramCapitation</td><td>CapProgramAgent.cs:53</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapProviderActivity.LoadProgramAndCaps reads cap config</td><td>CapProviderActivity.cs:55-100</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapProviderActivity.BuildCapGlobalProviderList builds provider list</td><td>CapProviderActivity.cs:153</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapGlobalAgent loads XSLTCapGlobal.xslt</td><td>CapGlobalAgent.cs:73</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapPcpAgent loads XSLTCapPcp.xslt</td><td>CapPcpAgent.cs:73</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>XSLTCapGlobal sets isglobal="Y"</td><td>XSLTCapGlobal.xslt:19</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>XSLTCapPcp sets isglobal="N"</td><td>XSLTCapPcp.xslt:19</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Step 1 loads ELIGIBILITYORG_ENTITY via "LoadNonStdEligOrg"</td><td>CreateCAPPaymentsW0.aspx.cs:56</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Step 2 loads carriers via "LoadCarrierMod"</td><td>CreateCAPPaymentsWiz.aspx.cs:143</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Step 3 loads restart runs via "LoadRestartRun"</td><td>CreateCAPPaymentsWiz2.aspx.cs:274</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Step 3 reads fundid via "LoadProgrambyProgramid"</td><td>CreateCAPPaymentsWiz2.aspx.cs:475</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Schedule button creates Windows Task via QTaskScheduler</td><td>CreateCAPPaymentsWiz2.aspx.cs:900-960</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Scheduler path reads from registry: SOFTWARE\TriZetto\QNXT\{version}\Scheduler\Path</td><td>CreateCAPPaymentsWiz2.aspx.cs:908-910</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Scheduled task configured as DeleteWhenDone with RunOnceTrigger</td><td>CreateCAPPaymentsWiz2.aspx.cs:952-955</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CreateCAPPaymentsWiz2 uses QTaskScheduler namespace (imported)</td><td>CreateCAPPaymentsWiz2.aspx.cs:21</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Affiliation query uses inline SQL with affiliateid filter</td><td>CapProviderActivity.cs:179</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>processlogheader created with STARTED state before dispatch</td><td>BulkProxy.cs:148</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>CapProviderActivity writes AUDIT detail states</td><td>CapProviderActivity.cs:131,135</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+<tr><td>Scheduler.cs is deprecated wrapper</td><td>Scheduler.cs:12</td><td><span class="tag-confirmed">CONFIRMED</span></td></tr>
+</table>
+
+<!-- 17. Open Questions -->
+<h2>16. Open Questions (Require SME Input)</h2>
+<ol>
+<li><strong>Scheduler.exe binary:</strong> The <code>Scheduler.exe</code> application that parses the scheduled XML and invokes the proxy chain is referenced by registry path but its source code is not present in mms-cms-cef-r23. Where is it built from? Is it a COTS binary or custom? <span class="tag-unknown">UNKNOWN</span> — Searched all .sln and .exe references in workspace; not found.</li>
+<li><strong>CPayMgrUI.ProcessRequest routing:</strong> The <code>CPayMgrUI</code> object (from <code>Q.ServiceRouter</code>) handles all data loading requests ("LoadNonStdEligOrg", "LoadCarrierMod", etc.). The actual stored procedures or SQL behind these named requests are not visible in Stage 0 UI code — they are likely defined in the Payment QService or LDL layer config. <span class="tag-unknown">UNKNOWN</span> — Need to trace CPayMgrUI configuration to identify exact SQL.</li>
+<li><strong>GetProgramCapList implementation:</strong> <code>CapProviderActivity.GetProgramCapList(programid, captype)</code> returns a DataTable with cap configuration. The actual SQL/stored procedure is not visible in the .cs file — it's likely in a base class or DAL layer. <span class="tag-unknown">UNKNOWN</span> — Would need to trace into ActivityServiceComponent base class.</li>
+<li><strong>BlanketProviderList implementation:</strong> The provider query that generates the fan-out list is called in <code>CapProviderActivity</code> but the SQL is in the base class hierarchy. <span class="tag-unknown">UNKNOWN</span></li>
+<li><strong>SQL Agent Jobs:</strong> Are there any SQL Agent jobs that trigger capitation runs outside of the UI/Scheduler path? <span class="tag-unknown">UNKNOWN</span> — No SQL Agent configuration found in repo.</li>
+<li><strong>optSchedule option ID:</strong> The variable <code>optSchedule</code> controls whether the Schedule button is enabled — what is its numeric value and where is it configured? <span class="tag-unknown">UNKNOWN</span> — Appears to be a QNXT security option but its definition was not found.</li>
+<li><strong>Distribution Hub config.xml:</strong> Referenced in BulkProxy.cs for bulk message configuration (<code>_distributionHubUrl + "config.xml"</code>). This config defines how bulk messages are processed. <span class="tag-unknown">UNKNOWN</span> — Runtime configuration not in repo.</li>
+</ol>
+
+<!-- 18. Glossary -->
+<h2>17. Glossary</h2>
+<table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td class="glossary-term">ASC (Application Service Component)</td><td>A .NET class library that encapsulates business logic for a specific domain. ASCs are invoked by agents and contain the actual processing code. Example: <code>QCSI ASC CapitationSetup</code> contains <code>CapProviderActivity</code>.</td></tr>
+<tr><td class="glossary-term">Agent</td><td>A lightweight .NET class (inherits from <code>QFrameAgent</code>) that receives an XML or typed message, processes it, and optionally routes the result to the next agent in the chain. Agents are the unit of orchestration in QFrame.</td></tr>
+<tr><td class="glossary-term">BulkProxy</td><td>Infrastructure base class for dispatching arrays of typed messages to the processing infrastructure. Handles process logging, serialization, and routing (Distribution Hub vs Service Broker vs Direct).</td></tr>
+<tr><td class="glossary-term">ByPassQEnterprise</td><td>A registry-configurable flag. When set, messages skip the Distribution Hub and are processed directly by <code>MessageProcessorEngine</code> in-process. Used for debugging or single-server deployments.</td></tr>
+<tr><td class="glossary-term">Capitation</td><td>A payment model where a health plan pays a fixed per-member-per-month (PMPM) amount to providers, regardless of services rendered. The capitation "run" calculates these payments.</td></tr>
+<tr><td class="glossary-term">Capitation Date (CapDate)</td><td>The month for which capitation payments are being calculated. Always the first of a month (e.g., 07/01/2026).</td></tr>
+<tr><td class="glossary-term">CPayMgrUI</td><td>A service router object that maps named requests (like "LoadCarrierMod") to data access operations. Acts as a facade between UI code and the database.</td></tr>
+<tr><td class="glossary-term">Distribution Hub</td><td>The QEnterprise message routing web service. Receives HTTP-posted XML messages and routes them to the appropriate agent chain based on process log type.</td></tr>
+<tr><td class="glossary-term">Fan-out</td><td>The pattern of splitting a single request into multiple independent messages for parallel processing. Stage 0 fans out: 1 request → N programs → M providers per program.</td></tr>
+<tr><td class="glossary-term">Global Provider (Global Contract)</td><td>A provider with a "blanket" capitation arrangement — they receive capitation for all members in a program, regardless of PCP assignment.</td></tr>
+<tr><td class="glossary-term">IQcsiSession</td><td>Interface representing an authenticated user session. Carries environment ID, username, and is required for all service calls.</td></tr>
+<tr><td class="glossary-term">MCP (Managed Care Plan/Program)</td><td>A specific Medicaid managed care program (e.g., CareSource, Molina). Each MCP has a unique <code>programid</code> in the system.</td></tr>
+<tr><td class="glossary-term">MessageProcessorEngine</td><td>QFrame component that processes messages directly by looking up the process chain (from PlanIntegration DB), instantiating the appropriate agent via reflection, and calling <code>ProcessMessage()</code>.</td></tr>
+<tr><td class="glossary-term">OneWayProxy</td><td>Base class for fire-and-forget single-message dispatch. Used by <code>CapitationBatchProcessProxy</code>. Similar to BulkProxy but for single messages.</td></tr>
+<tr><td class="glossary-term">PCP (Primary Care Provider)</td><td>A provider with member-specific capitation — they receive capitation only for their assigned members.</td></tr>
+<tr><td class="glossary-term">PlanIntegration</td><td>The SQL Server database that stores QFrame process configuration: chains, steps, agents, assemblies, and process execution logs.</td></tr>
+<tr><td class="glossary-term">Process Chain</td><td>A configured sequence of agents (identified by <code>logtype</code>) that messages flow through. Example: <code>ADV_CAP_PROC</code> → step 0 = <code>CapProgramAgent</code>.</td></tr>
+<tr><td class="glossary-term">Process Log Type</td><td>A string identifier (e.g., "ADV_CAP_PROC") that maps to a process chain definition in PlanIntegration. Used by proxies to route messages to the correct agent chain.</td></tr>
+<tr><td class="glossary-term">QFrame</td><td>The .NET infrastructure framework underlying QNXT/HealthPAS. Provides message routing, agent orchestration, service components, and proxy patterns.</td></tr>
+<tr><td class="glossary-term">QNXT / HealthPAS</td><td>The COTS (Commercial Off-The-Shelf) healthcare administration platform by TriZetto/Cognizant. QNXT is the claims adjudication system; HealthPAS is the broader platform name.</td></tr>
+<tr><td class="glossary-term">QTaskScheduler</td><td>A .NET library providing COM interop with Windows Task Scheduler. Used to create deferred execution tasks for capitation runs.</td></tr>
+<tr><td class="glossary-term">Reconciliation (Recon)</td><td>The process of re-calculating capitation for prior months where retroactive changes occurred (new enrollments, terminations, corrections). Controlled by <code>ReconMonths</code> parameter.</td></tr>
+<tr><td class="glossary-term">Service Broker (SSB)</td><td>SQL Server Service Broker — a message queuing system built into SQL Server. When enabled, messages are enqueued to a SQL queue rather than HTTP-posted to the Distribution Hub.</td></tr>
+<tr><td class="glossary-term">XSLT</td><td>Extensible Stylesheet Language Transformations — XML transformation language used to split/reshape messages in the agent pipeline. Stage 0 uses three XSLT files for fan-out logic.</td></tr>
+</table>
+
+<hr>
+<p style="text-align: center; color: #616161; font-size: 10pt;">
+Generated by GitHub Copilot — Gainwell Ohio CEF Architecture Assessment — 2026-07-24
+</p>
+
+</body>
+</html>
