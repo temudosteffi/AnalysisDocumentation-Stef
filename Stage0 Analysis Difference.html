@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Copilot Difference for Stage 0</title>
+<style>
+body { font-family: "Segoe UI", sans-serif; line-height: 1.5; max-width: 1200px; margin: 0 auto; padding: 24px; color: #263238; background: #f7f8fa; }
+h1 { color: #17324d; border-bottom: 4px solid #d97732; padding-bottom: 10px; }
+h2 { color: #17324d; margin-top: 30px; border-bottom: 1px solid #c7d2dc; padding-bottom: 5px; }
+h3 { color: #315d78; margin-top: 22px; }
+.summary { background: #e8f0f5; border-left: 5px solid #315d78; padding: 14px 18px; }
+.warning { background: #fff3e2; border-left: 5px solid #d97732; padding: 14px 18px; }
+table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; background: #fff; }
+th, td { border: 1px solid #c7d2dc; padding: 8px 10px; text-align: left; vertical-align: top; }
+th { background: #dce8ef; color: #17324d; }
+tr:nth-child(even) td { background: #f5f8fa; }
+code { font-family: Consolas, monospace; background: #edf0f2; padding: 1px 4px; }
+.missing { color: #8a2e2e; font-weight: 600; }
+.partial { color: #8a5b14; font-weight: 600; }
+.covered { color: #17633a; font-weight: 600; }
+.small { color: #54636d; font-size: .92em; }
+li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<h1>Copilot Difference for Stage 0</h1>
+<p class="small"><strong>Reference document:</strong> Capitation Stage 0 Deep Dive final.html<br>
+<strong>Verified document:</strong> stage0_run_invocation_deepdive 1.html<br>
+<strong>Purpose:</strong> Identify concepts from the reference that are missing or materially underdeveloped in the AI-tool analysis.<br>
+<strong>Verification date:</strong> 2026-08-24</p>
+
+<div class="summary"><strong>Overall verdict:</strong> The AI-tool analysis covers the broad Stage 0 narrative, but it does not fully cover the reference analysis. Its largest gaps are implementation-level transitions, exact UI behavior, complete typed and legacy message paths, all routing branches, and the detailed scheduler/process-log behavior. Component-name presence was not treated as proof of coverage.</div>
+
+<h2>1. Verification summary</h2>
+<table>
+<tr><th>Measure</th><th>Reference</th><th>AI-tool analysis</th><th>Finding</th></tr>
+<tr><td>File size</td><td>Approximately 96.6 KB</td><td>Approximately 77.4 KB</td><td class="partial">The AI-tool analysis contains materially less content.</td></tr>
+<tr><td>Section headings</td><td>17 h2, 24 h3, 8 h4</td><td>18 h2, 23 h3, 0 h4</td><td class="missing">The reference's detailed h4-level control and data-loading analysis is flattened or missing.</td></tr>
+<tr><td>Tables</td><td>25</td><td>18</td><td class="missing">Seven fewer tables, including reduced inventories and mappings.</td></tr>
+<tr><td>Preformatted blocks</td><td>7</td><td>3</td><td class="missing">Several reference flow/schema representations are not reproduced in equivalent detail.</td></tr>
+</table>
+
+<h2>2. Missing or materially underdeveloped concepts</h2>
+
+<h3>2.0 Complete .sln Inventory</h3>
+<p>The reference provides a solution-by-solution implementation map that is absent from the AI-tool analysis. The missing inventory is:</p>
+<ul>
+<li><span class="missing">UI solutions:</span> <code>QNXTALL.sln</code> for the three-page wizard and <code>QTaskScheduler.sln</code> for Windows Task Scheduler COM interop.</li>
+<li><span class="missing">Legacy Stage 0 agent solutions:</span> <code>CAPSubmit.sln</code>, <code>CapData.sln</code>, <code>CAPGlobal.sln</code>, <code>CapPcp.sln</code>, and <code>SelectCapAffiliations.sln</code>.</li>
+<li><span class="missing">ASC solutions:</span> <code>QCSI ASC CapitationSetup.sln</code> for <code>CapProgramAgent</code>/<code>CapProviderActivity</code>, <code>QCSI ASC Capitation.sln</code> for the calculation library, and <code>QCSI ASC PostCapitationBatchAgent.sln</code> for configured but inactive post-capitation agents.</li>
+<li><span class="missing">Payment-layer solutions:</span> <code>QCSI_Capitation.sln</code> for <code>IAdvCap.vb</code>, <code>QCSI Payment DAL.sln</code>, and <code>QCSI Payment Service.sln</code>.</li>
+<li><span class="missing">Proxy and infrastructure solutions:</span> <code>QCSI Proxy Payment.sln</code>, <code>QCSI Internal Proxy.sln</code>, and <code>DistributionHub.sln</code>, including the proxy routing and Distribution Hub hand-off responsibilities.</li>
+</ul>
+
+<h3>2.1 Execution Approaches and Complete Invocation Flow</h3>
+<table>
+<tr><th>Reference concept</th><th>AI-tool coverage</th><th>Missing detail</th></tr>
+<tr><td>Payment Manager entry</td><td class="partial">Partial</td><td>The reference explicitly starts at Payment Manager Home/<code>paymgriframe</code>, the user action “Create Capitation Payments,” and the first wizard page. The AI-tool version starts at Step 1 and does not preserve this entry context as a complete transition.</td></tr>
+<tr><td>Wizard navigation</td><td class="partial">Partial</td><td>The three pages are named, but the reference explicitly records <code>btNext</code> navigation to <code>createcapp1</code> and <code>createcapp2</code>, Back/Next/Cancel behavior, and the handler-level transitions.</td></tr>
+<tr><td>End-to-end branch convergence</td><td class="partial">Partial</td><td>The reference shows Finish, Schedule, and Restart converging into the infrastructure and then diverging into typed/legacy processing. The AI-tool diagrams emphasize selected portions and do not preserve the full branch model with equivalent detail.</td></tr>
+<tr><td>Terminal Stage 1 hand-off</td><td class="covered">Covered</td><td>The AI-tool analysis identifies provider messages and Stage 1, but does not consistently show Stage 1 as the terminal output of both the modern typed path and the legacy XML path.</td></tr>
+</table>
+
+<h3>2.2 UI Screens Deep Dive and Wizard Flow (Step by Step)</h3>
+<ul>
+<li><span class="missing">Step 1 missing:</span> The reference gives the exact controls <code>pnlTrail</code>, <code>chkNonStdOrg</code>, <code>dgOrgList</code>, <code>chkSelectAllOrg</code>, and <code>btCancel</code>, including labels, organization-grid columns, and client-side behavior.</li>
+<li><span class="missing">Step 1 missing:</span> The exact call <code>CPayMgrUI.ProcessRequest("LoadNonStdEligOrg", null, null)</code>, session key <code>PayMgr_CreateCAPP_GridOrgs</code>, table <code>ELIGIBILITYORG_ENTITY</code>, and <code>fullname ASC</code> sort are not all carried into the AI-tool analysis.</li>
+<li><span class="missing">Step 2 missing:</span> The reference identifies the carrier/program view <code>PROGVIEW_CARRIERVIEW_PROGRAMTYPE_POLICY_ORGPOLICY</code>, program checkbox values, <code>ProgId</code> hash-separated encoding, and the exact <code>LoadCarrierMod</code> inputs: <code>eligorg</code>, <code>eligorgcount</code>, and <code>eligibleorgid</code>.</li>
+<li><span class="missing">Step 2 missing:</span> Provider search behavior, popup storage in <code>hdnProviderId</code>, date defaulting, session keys, and date validation are reduced or absent as a connected sequence.</li>
+<li><span class="missing">Step 3 missing:</span> The reference names <code>cbContCapitated</code>, <code>cbReconProv</code>, <code>cbSummaryOnly</code>, <code>ddlRecMonths</code>, <code>ddlRevMonths</code>, <code>dgResults</code>, <code>btFinish</code>, <code>btSched</code>, <code>btCancel</code>, and <code>txtDescription</code> with their behavior.</li>
+<li><span class="missing">Step 3 missing:</span> The reference records <code>LoadRestartRun</code>, its parameters, the per-program <code>LoadProgrambyProgramid</code> fund lookup, and <code>objRouter.HasOptions(optSchedule)</code>; these are not fully explained in the AI-tool version.</li>
+</ul>
+
+<h3>2.3 Operational modes</h3>
+<p>The AI-tool document recognizes modes, but does not fully reproduce the reference's five-row behavior mapping:</p>
+<table>
+<tr><th>Mode</th><th>Reference detail not fully covered</th></tr>
+<tr><td>Complete Run</td><td><code>GenerateMessages(false)</code> runs first and <code>GenerateMessages(true)</code> runs second, producing two separate proxy submissions for PCP and Global providers.</td></tr>
+<tr><td>PCPs Only</td><td><code>DoGlobal=N</code>; only <code>GenerateMessages(false)</code>; PCP path only.</td></tr>
+<tr><td>Global Contracts Only</td><td><code>DoGlobal=Y</code>; only <code>GenerateMessages(true)</code>; Global/blanket path only.</td></tr>
+<tr><td>Management Contracts Only</td><td><code>Capitationtype=MGT</code> rather than default <code>CAP</code>; uses the Global path with the management filter.</td></tr>
+<tr><td>Restart Previous Run</td><td>Builds <code>CapReStartRequestMessageType[]</code> from selected payment IDs, sets <code>ReStarting=Y</code>, and calls <code>CapReStartProxy</code> with <code>CapReStartProc</code>.</td></tr>
+</table>
+
+<h3>2.4 Post-Submit Execution Chain: Immediate Typed-Message Path</h3>
+<ul>
+<li><span class="partial">Underdeveloped:</span> The reference gives the ordered chain <code>btFinish_Click</code> -&gt; <code>GenerateMessages(bool isGlobal)</code> -&gt; <code>CapSubmitRequestMessageType[]</code> -&gt; <code>CapSubmitProxy.ProcessMessage</code> -&gt; <code>BulkProxy.Invoke</code>. The AI-tool analysis mentions these objects but does not preserve the complete transition sequence with equivalent evidence.</li>
+<li><span class="missing">Missing detail:</span> The reference enumerates message fields: program ID, fund ID, cap date, global flag, reconciliation flag/months, review months, capitated-only flag, summary flag, capitation type, affiliate ID, and registry-driven <code>LogInfo</code>.</li>
+<li><span class="missing">Missing detail:</span> The reference states that messages are created per program x eligible-organization combination and records the session acquisition through <code>CQServiceRouter</code>.</li>
+</ul>
+
+<h3>2.5 Post-Submit Execution Chain: BulkProxy and OneWayProxy Routing</h3>
+<table>
+<tr><th>Routing concept</th><th>AI-tool coverage</th><th>Reference detail missing or reduced</th></tr>
+<tr><td>Direct bypass</td><td class="covered">Mentioned</td><td>The reference explicitly says the <code>ByPassQEnterprise</code> registry setting calls <code>MessageProcessorEngine.ProcessRequest</code> directly.</td></tr>
+<tr><td>SQL Service Broker</td><td class="partial">Reduced</td><td>The reference specifies the <code>ServiceBrokerEnabled</code> decision and <code>data.EnqueueMessage(message, "BulkMessage")</code>.</td></tr>
+<tr><td>HTTP Distribution Hub</td><td class="partial">Reduced</td><td>The reference specifies the fallback HTTP POST through <code>Globals.HTTPPostXML</code> and its relation to the Distribution Hub.</td></tr>
+<tr><td>OneWayProxy parity</td><td class="missing">Missing</td><td>The reference explicitly confirms the same three routing modes in <code>OneWayProxy</code>, not only in <code>BulkProxy</code>.</td></tr>
+</table>
+
+<h3>2.6 Process chain configuration</h3>
+<ul>
+<li><span class="missing">Missing detail:</span> The reference explains that the message-processing engine resolves <code>process -&gt; processstep -&gt; agent -&gt; assembly mapping</code> from PlanIntegration.</li>
+<li><span class="missing">Missing detail:</span> The configured relationships among <code>CapSubmitProxy</code>, <code>QCSI ASC PostCapitationBatchAgent v5.1001.0.0</code>, and <code>CapReStartProxy</code> are not presented with the reference's explicit process-log types: <code>ADV_CAP_PROC</code>, <code>ADV_CAP_BATCH</code>, and <code>CapReStartProc</code>.</li>
+</ul>
+
+<h3>2.7 Modern typed agent path</h3>
+<ul>
+<li><span class="partial">Reduced:</span> The reference identifies <code>CapProgramAgent.ProcessMessage</code>, XML deserialization through <code>CUtility.GetObject()</code>, construction of <code>CapProviderActivity(session, headerId, detailId)</code>, and delegation to <code>BuildProgramCapitation</code> in that order.</li>
+<li><span class="missing">Missing detail:</span> The reference explains that <code>LoadProgramAndCaps(programid, capitationtype)</code> gates processing on available cap configuration and then branches on <code>DoGlobal</code>.</li>
+<li><span class="missing">Missing detail:</span> The reference explicitly calculates reconciliation/review dates from cap date minus the requested month counts and builds the affiliation filter before provider lookup.</li>
+<li><span class="partial">Reduced:</span> Global and PCP paths are named, but the reference separately explains <code>BlanketProviderList</code>, the PCP-specific query, and per-provider dispatch output for each branch.</li>
+</ul>
+
+<h3>2.8 XSLT Transformations: Legacy XML Pipeline</h3>
+<p class="warning">This is one of the most important gaps. The AI-tool analysis mentions the legacy agents and XSLT files, but does not fully reproduce the reference's four-stage data transformation:</p>
+<table>
+<tr><th>Stage</th><th>Reference behavior missing or reduced</th></tr>
+<tr><td><code>CapSubmitAgent</code></td><td>Reads <code>&lt;CapSubmitMessage&gt;</code>, loads <code>XSLTCapSubmit.xslt</code>, iterates <code>//ProgramList/Program</code>, and produces one <code>&lt;CapProgramMessage&gt;</code> per program in a multi-payload list.</td></tr>
+<tr><td><code>CapDataAgent</code></td><td>Reads the program message, creates <code>CapProviderActivity</code>, calls <code>XmlProgramAndCaps(programid)</code>, and appends <code>&lt;ProgramCaps&gt;</code>.</td></tr>
+<tr><td><code>CapGlobalAgent</code></td><td>Builds the global provider list, loads <code>XSLTCapGlobal.xslt</code>, iterates <code>//ProviderList/Provider</code>, and produces one provider message per global provider for Stage 1.</td></tr>
+<tr><td><code>CapPcpAgent</code></td><td>Builds the PCP provider list, loads <code>XSLTCapPcp.xslt</code>, iterates the provider list, and produces one provider message per PCP provider for Stage 1.</td></tr>
+</table>
+
+<h3>2.9 Parameters &amp; Message Schema</h3>
+<ul>
+<li><span class="missing">Missing as distinct concepts:</span> Dedicated treatment of <code>XSLTCapSubmit.xslt</code>, <code>XSLTCapGlobal.xslt</code>, and <code>XSLTCapPcp.xslt</code>, including each stylesheet's input, XPath iteration, output, and downstream hand-off.</li>
+<li><span class="missing">Missing:</span> The complete typed <code>CapSubmitRequestMessageType</code> property model, including nested Program and Capitation objects.</li>
+<li><span class="missing">Missing:</span> The legacy <code>CapSubmitMessage</code> XML structure with <code>session</code>, <code>Capitation</code>, <code>ProgramList</code>, and <code>AffilList</code>.</li>
+<li><span class="missing">Missing:</span> The restart schema's <code>PaymentId</code> and <code>ReStarting</code> fields as a dedicated contract.</li>
+<li><span class="missing">Missing:</span> Scheduler XML attribute mapping for <code>DoRecon</code>, reconciliation/review months, cap type, affiliations, cap date, programs, funds, eligible organization IDs, restart list, and flags.</li>
+</ul>
+
+<h3>2.10 Database Objects Inventory (Stage 0)</h3>
+<ul>
+<li><span class="missing">Missing as a separate concept:</span> The reference separates PlanIntegration objects, QNXT/Plandata objects, and service requests; the AI-tool version consolidates them.</li>
+<li><span class="missing">Missing detail:</span> The reference explicitly identifies the service requests <code>LoadNonStdEligOrg</code>, <code>LoadCarrierMod</code>, <code>LoadProgrambyProgramid</code>, and <code>LoadRestartRun</code>, with their purpose and returned tables.</li>
+<li><span class="missing">Missing detail:</span> The reference records the affiliation query using <code>SELECT affiliationid FROM affiliation WHERE affiliateid = ... AND payflag &lt;&gt; 0</code>.</li>
+<li><span class="missing">Missing detail:</span> The reference lists program-cap configuration columns: <code>effdate</code>, <code>termdate</code>, <code>splitmonthday</code>, <code>ageday</code>, <code>firsthalfpercent</code>, <code>sechalfpercent</code>, <code>capmethod</code>, <code>useageday</code>, and <code>usetruecap</code>.</li>
+</ul>
+
+<h3>2.11 QTaskScheduler Integration</h3>
+<ul>
+<li><span class="partial">Reduced:</span> The reference gives the complete sequence <code>btSched_Click</code> -&gt; <code>CreateXML()</code> -&gt; session/popup state -&gt; <code>SaveXML()</code> -&gt; Windows task creation -&gt; <code>Scheduler.exe</code> at run time.</li>
+<li><span class="missing">Missing detail:</span> XML is saved to the UNC path pattern <code>\\HPAALL\HPA\QPaymentManager\PayMgrXml\Capitation_YYYYMMDD_HHMM.xml</code>.</li>
+<li><span class="missing">Missing detail:</span> The task is named <code>AT{n}</code>, uses the registry scheduler path, has <code>TaskFlags.DeleteWhenDone</code>, and uses a <code>RunOnceTrigger</code> for the next day.</li>
+<li><span class="missing">Missing detail:</span> The reference documents the QTaskScheduler class roles: task collection, scheduled task, trigger, COM interop, and methods such as <code>CreateTask</code>, <code>OpenTask</code>, <code>Save</code>, and <code>Close</code>.</li>
+</ul>
+
+<h3>2.12 Error handling, observability, and operational risk</h3>
+<ul>
+<li><span class="missing">Missing:</span> UI success/failure message IDs <code>3715</code> and <code>3717</code> from <code>GenerateMessages()</code>.</li>
+<li><span class="missing">Missing:</span> The partial-submission risk caused by HTTP dispatch iterating messages one by one without rollback or <code>TransactionScope</code>.</li>
+<li><span class="missing">Missing:</span> The stronger atomicity observation that Service Broker wraps messages in one <code>QEnterpriseEnvelope</code>.</li>
+<li><span class="missing">Missing:</span> Process-log header creation in <code>STARTED</code> state and the <code>AUDIT</code>-level detail states written by <code>CapProviderActivity</code>.</li>
+<li><span class="missing">Missing:</span> Legacy-agent catch blocks that only call <code>Console.WriteLine(e.Message)</code>, creating a silent/partial failure risk.</li>
+<li><span class="missing">Missing:</span> The non-idempotency finding: a normal resubmission can create new process-log headers and duplicate provider messages, which explains the separate Restart mode.</li>
+</ul>
+
+<h3>2.13 Explicit unresolved questions</h3>
+<p>The reference explicitly records unresolved areas that the AI-tool document does not preserve as a complete list:</p>
+<ul>
+<li>Where the deployed <code>Scheduler.exe</code> is built from and whether it is custom or COTS.</li>
+<li>Where the SQL or stored-procedure implementation behind <code>CPayMgrUI.ProcessRequest</code> is configured.</li>
+<li>Where <code>GetProgramCapList</code> and <code>BlanketProviderList</code> are implemented in the base class/DAL hierarchy.</li>
+<li>Whether SQL Agent jobs provide any additional capitation entry point.</li>
+<li>The numeric/configuration source for <code>optSchedule</code>.</li>
+</ul>
+
+<h2>3. Concepts adequately covered</h2>
+<p>The AI-tool document does cover these high-level concepts, although some have less implementation detail than the reference:</p>
+<ul>
+<li>The three-page QNXT capitation wizard and its overall purpose.</li>
+<li>Immediate submission, scheduling, and restart as the primary invocation approaches.</li>
+<li><code>CapSubmitProxy</code>, <code>CapReStartProxy</code>, <code>CapProgramAgent</code>, and provider fan-out.</li>
+<li>Global versus PCP provider processing.</li>
+<li>Distribution Hub, message-processing infrastructure, and Stage 1 hand-off.</li>
+<li>QTaskScheduler as the Windows scheduling integration.</li>
+<li>Database objects, evidence statements, glossary, and a broad flow diagram.</li>
+</ul>
+
+<h2>4. Final assessment</h2>
+<table>
+<tr><th>Question</th><th>Answer</th></tr>
+<tr><td>Is the AI-tool analysis completely equivalent to the Copilot reference?</td><td class="missing">No.</td></tr>
+<tr><td>Does it cover the broad Stage 0 concept?</td><td class="covered">Yes.</td></tr>
+<tr><td>Does mentioning a component mean its behavior is covered?</td><td>No. Several components are named without the reference's inputs, branching conditions, outputs, or evidence.</td></tr>
+<tr><td>Most consequential omissions</td><td>The exact five-mode behavior, complete immediate/scheduled/restart chains, all three proxy routes, the full legacy XML transformation pipeline, scheduler task creation details, and error/idempotency risks.</td></tr>
+<tr><td>Recommended conclusion</td><td>Use the AI-tool analysis as a high-level decomposition, but use the Copilot reference for implementation-level Stage 0 flow verification.</td></tr>
+</table>
+
+<p class="small"><strong>Method:</strong> Compared headings, tables, preformatted flow/schema blocks, visible text, named methods/classes, data objects, configuration values, and behavior statements. A concept was marked missing when the reference supplied a distinct behavior or contract that the AI-tool document did not state; it was marked partial when the concept appeared but lacked the reference's controlling details.</p>
+</body>
+</html>
