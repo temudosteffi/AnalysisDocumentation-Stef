@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>cBuildCapEnrolls.vb Analysis</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.5;
+      margin: 24px;
+      color: #1a1a1a;
+      background: #f8f8f8;
+    }
+    h1, h2, h3 { color: #133a5e; }
+    h1 { border-bottom: 2px solid #d9dee6; padding-bottom: 8px; }
+    h2 { margin-top: 28px; border-bottom: 1px solid #d9dee6; padding-bottom: 6px; }
+    h3 { margin-top: 20px; }
+    .meta { background: #eef3fa; border: 1px solid #cfe0f5; padding: 12px; border-radius: 6px; }
+    .call { font-weight: bold; color: #004d99; }
+    .query {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+    ul, ol { padding-left: 22px; }
+    li { margin-bottom: 7px; }
+    .tag { background: #e8f5e9; border: 1px solid #b7dcbc; border-radius: 4px; padding: 2px 6px; font-weight: bold; color: #1f5f3a; }
+    .warning { background: #fff4e5; border-left: 4px solid #ffb020; padding: 10px 12px; }
+  </style>
+</head>
+<body>
+  <h1>cBuildCapEnrolls.vb – Detailed Class Flow and DB Evidence</h1>
+  <div class="meta">
+    <strong>Scope:</strong> This report analyzes only the class <strong>cBuildCapEnrolls</strong> from the selected VB file. It does not rely on other project files or external classes unless they are referenced by name within this file.
+  </div>
+
+  <h2>1) Input that comes into the class</h2>
+  <ul>
+    <li><span class="call">Constructor</span> receives:
+      <ul>
+        <li><strong>sess</strong> as <code>Q.Global.IQcsiSession</code></li>
+        <li><strong>procLog</strong> as <code>Q.ProcessLogWrapper.cProcessLog</code></li>
+        <li><strong>pHeaderId</strong> as String</li>
+        <li><strong>pDetailID</strong> as String</li>
+        <li><strong>mXML</strong> as String</li>
+      </ul>
+    </li>
+    <li>The constructor stores those values into class members such as <strong>Session</strong>, <strong>lProcessLog</strong>, <strong>lDetailId</strong>, <strong>lHeaderId</strong>, and <strong>createCAPXML</strong>.</li>
+    <li><span class="call">ProcessMessage(ByRef lxml As String)</span> then creates a new <strong>XMLAdvCap</strong> and calls <strong>InitXML(lxml)</strong>. This is the main XML message input used for the cap run.</li>
+    <li>Key message fields read from the XML include:
+      <ul>
+        <li><strong>m_XMLMessage.programid</strong></li>
+        <li><strong>m_XMLMessage.capdate</strong></li>
+        <li><strong>m_XMLMessage.recondate</strong></li>
+        <li><strong>m_XMLMessage.affiliateid</strong></li>
+        <li><strong>m_XMLMessage.eligibleorgid</strong></li>
+        <li><strong>m_XMLMessage.isGlobal</strong></li>
+        <li><strong>m_XMLMessage.isSummary</strong></li>
+        <li><strong>m_XMLMessage.capitationType</strong></li>
+        <li><strong>m_XMLMessage.advreconrun</strong></li>
+        <li><strong>m_XMLMessage.affils</strong></li>
+        <li><strong>m_XMLMessage.loginfo</strong></li>
+        <li><strong>m_XMLMessage.detailid</strong></li>
+        <li><strong>m_XMLMessage.messagequeueid</strong></li>
+      </ul>
+    </li>
+    <li>The class also holds runtime state for many data collections: <strong>m_enrollments</strong>, <strong>m_programCaps</strong>, <strong>m_openpayments</strong>, <strong>m_globalcapdata</strong>, <strong>m_affils</strong>, <strong>m_policycopays</strong>, and the payment queue variables.</li>
+  </ul>
+
+  <h2>2) End-to-end execution chain from the first method to the end</h2>
+  <ol>
+    <li><span class="call">ProcessMessage(lxml)</span>
+      <ul>
+        <li>Initializes the XML message.</li>
+        <li>Checks whether the message is a restart run with <strong>m_XMLMessage.restarting = "Y"</strong>.</li>
+        <li>If restart: calls <strong>RestartFailedCapRun()</strong>.</li>
+        <li>If not restart: calls <strong>BuildCapEnrolls()</strong>.</li>
+      </ul>
+    </li>
+    <li><span class="call">BuildCapEnrolls()</span>
+      <ul>
+        <li>Reads CAP batch size option from session.</li>
+        <li>If summary global messages exist, it forces <strong>recondate = capdate</strong> and <strong>reviewdate = capdate</strong>.</li>
+        <li>Calls <strong>LoadProgramcaps()</strong>.</li>
+        <li>Walks the loaded program caps and, if <strong>usetruecap = "Y"</strong>, changes the cap date to the last day of the month.</li>
+        <li>Calls <strong>LoadOpenPayments()</strong>.</li>
+        <li>Chooses either <strong>Build_Global_Enrollments()</strong> or <strong>Build_PCP_Enrollments()</strong>.</li>
+        <li>Calls <strong>ValidateCapFactorProgramFundsForAffiliations()</strong>.</li>
+        <li>Calls <strong>ProcessEnrollments()</strong>.</li>
+        <li>Logs completion and returns true.</li>
+      </ul>
+    </li>
+    <li><span class="call">Build_PCP_Enrollments()</span>
+      <ul>
+        <li>Prepares the first day of the month.</li>
+        <li>Runs <strong>CheckPayHolds()</strong>.</li>
+        <li>Creates a message queue ID.</li>
+        <li>Determines management cap flag from <strong>capitationType</strong>.</li>
+        <li>Calls the stored-procedure-based query class to load enrollment batches:</li>
+        <li>Either <strong>cExecuteSpq_buildpcpcapmessagewithtypeadvreconrun</strong> or <strong>cExecuteSpq_buildpcpcapmessagewithtype</strong>.</li>
+      </ul>
+    </li>
+    <li><span class="call">Build_Global_Enrollments()</span>
+      <ul>
+        <li>Computes <strong>l_firstdayofcapmonth</strong>.</li>
+        <li>Loads global affiliations via <strong>cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc</strong>.</li>
+        <li>Validates that exactly one unique global pay-to affiliation exists.</li>
+        <li>Loads global contract data via <strong>LoadGlobalContractData()</strong>.</li>
+        <li>Generates a queue ID.</li>
+        <li>Calls global cap message execution query class <strong>cExecuteSpq_buildglobalcapmessage</strong> or the advance recon version.</li>
+      </ul>
+    </li>
+    <li><span class="call">ValidateCapFactorProgramFundsForAffiliations()</span>
+      <ul>
+        <li>Extracts the affiliation list from the XML filter string via <strong>getAffiliationList()</strong>.</li>
+        <li>Calls <strong>cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc.LoadData(programid, capdate, affils)</strong>.</li>
+        <li>Writes a warning process-log state when an invalid fund is found for a cap factor.</li>
+      </ul>
+    </li>
+    <li><span class="call">ProcessEnrollments()</span>
+      <ul>
+        <li>Uses the loaded <strong>m_enrollments.QTable</strong>.</li>
+        <li>Groups rows by <strong>capmessagequeueid</strong>.</li>
+        <li>For each queue, loads default XML data from programcaps/open payments/global contract/global affiliation.</li>
+        <li>Creates a payment record by calling <strong>CreatePayment()</strong>.</li>
+        <li>If caps require adjustment, calls <strong>CalcCapAdjustments()</strong>.</li>
+        <li>Dispatches work synchronously or through the cap batch proxy depending on how many rows are in the batch.</li>
+      </ul>
+    </li>
+    <li><span class="call">RestartFailedCapRun()</span>
+      <ul>
+        <li>Loads remaining cap messages by queue ID via <strong>cSelectRemainingCapmessagesByMessagequeueid</strong>.</li>
+        <li>If no remaining enrollments exist, finalizes payment via <strong>cCapPayment.ProcessMessage(m_OriginalXML)</strong>.</li>
+        <li>If remaining enrollments exist, re-submits the batch messages.</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2>3) Detailed function-by-function business logic</h2>
+
+  <h3>ProcessMessage(ByRef lxml As String)</h3>
+  <p>This is the public entry method. It does the following:</p>
+  <ul>
+    <li>Creates and initializes the XML message object.</li>
+    <li>Sets <strong>m_OriginalXML</strong>.</li>
+    <li>Sets <strong>m_loginfo = (Trim(m_XMLMessage.loginfo) = "Y")</strong>.</li>
+    <li>If the message indicates restart, calls <strong>RestartFailedCapRun()</strong>.</li>
+    <li>Otherwise, logs start-state entries and calls <strong>BuildCapEnrolls()</strong>.</li>
+    <li>In the final block, it updates the process detail status to completed or error based on the count returned from <strong>cSelectProcessstateFailureCountByDetailId</strong>.</li>
+  </ul>
+
+  <h3>BuildCapEnrolls()</h3>
+  <p>This is the main orchestration method for the cap run.</p>
+  <ul>
+    <li>Sets <strong>Opt_CAPBatchSize</strong> and <strong>reqCAPSize</strong> from session options.</li>
+    <li>If the message is summary global, it overrides the recon and review dates to the cap date.</li>
+    <li>Loads program caps and, for any matching cap record where <strong>usetruecap = "Y"</strong>, it moves the cap date to the last day of the month.</li>
+    <li>Loads open payments for the program, affiliate, and type.</li>
+    <li>Chooses global vs PCP flow and then validates cap factors/funds.</li>
+    <li>Processes all enrollment batches and logs final 완료/accepted state.</li>
+  </ul>
+
+  <h3>ValidateCapFactorProgramFundsForAffiliations()</h3>
+  <p>This is a validation check introduced for fund configuration issues.</p>
+  <ul>
+    <li>Builds an affiliation list by stripping the parenthesized IN clause from the XML filter string.</li>
+    <li>Calls a query class that checks for invalid fund definitions related to cap factors in the current program and cap date.</li>
+    <li>If any rows are returned and <strong>fundid</strong> is not empty, it logs a warning with the program, affiliation, factor value, and cap date.</li>
+  </ul>
+
+  <h3>getAffiliationList(ByVal pList As String)</h3>
+  <p>This helper converts a string such as:</p>
+  <div class="query">"affiliationid IN ('QMQC00000003353','QMQC00000003352')"</div>
+  <p>into:</p>
+  <div class="query">'QMQC00000003353','QMQC00000003352'</div>
+  <p>It does this by finding the first <code>(</code> and first <code>)</code> and extracting what sits between them.</p>
+
+  <h3>Build_PCP_Enrollments()</h3>
+  <p>Builds the enrollment result set for PCP-based capitation runs.</p>
+  <ul>
+    <li>Determines the first day of the month.</li>
+    <li>Calls <strong>CheckPayHolds()</strong> before preparing the message queue.</li>
+    <li>Creates a queue ID and stores it in <strong>m_XMLMessage.messagequeueid</strong>.</li>
+    <li>If <strong>m_XMLMessage.capitationType = "MGT"</strong>, it translates this to <strong>ismanagementcap = "Y"</strong>; otherwise <strong>"N"</strong>.</li>
+    <li>Checks whether it is an advance recon run by reading <strong>cSelectcapadjustmentReconDateforAdvanceReconRun</strong>.</li>
+    <li>Loads the actual enrollment dataset using one of the SQL-procedure query wrappers with a large parameter list including program, cap date, recon date, first day, affiliate, queue id, detail id, eligibleorgid, capitation type, management flag, reqCAPSize, and optional advance recon date.</li>
+  </ul>
+
+  <h3>Build_Global_Enrollments()</h3>
+  <p>Builds the enrollment result set for global capitation runs.</p>
+  <ul>
+    <li>Loads a global-affiliation dataset.</li>
+    <li>Requires a single unique pay-to affiliation to proceed. If not, exception is thrown.</li>
+    <li>Loads global contract data for that pay-to affiliation.</li>
+    <li>Requires at least one contract row; otherwise it throws.</li>
+    <li>Creates a new queue ID and calls the global-cap message stored-procedure query wrapper.</li>
+  </ul>
+
+  <h3>ProcessEnrollments()</h3>
+  <p>This method takes the prebuilt enrollment data and turns it into actual processing work.</p>
+  <ul>
+    <li>Uses <strong>m_enrollments.QTable</strong> and sums <strong>EnrollCount</strong>.</li>
+    <li>Groups batches by <strong>capmessagequeueid</strong>.</li>
+    <li>For each queue:</li>
+    <ul>
+      <li>Loads program caps, open payments, global contract data, and global affiliation into the XML message.</li>
+      <li>Finds the matching enrollment rows for that queue.</li>
+      <li>Creates a payment using <strong>CreatePayment()</strong>.</li>
+      <li>Calls <strong>CalcCapAdjustments()</strong> if the cap needs adjustment.</li>
+      <li>Processes as either a single batch or multiple batch messages via <strong>CapitationBatchProcessProxy</strong>.</li>
+    </ul>
+  </ul>
+  <div class="warning">
+    The method intentionally logs a state if no enrollments are found, and also logs an error if the dataset itself was not available.
+  </div>
+
+  <h3>LoadOpenPayments()</h3>
+  <p>Loads open or paid payment records that affect the current cap run.</p>
+  <ul>
+    <li>The actual runtime call is:</li>
+    <li><strong>m_openpayments = New Queries.cRetrievePaymentsByProgProvDateType(Session)</strong></li>
+    <li><strong>m_openpayments.LoadData(programid, affiliateid, capitationType, LastDayofMonth(capdate), FirstDayofMonth(recondate), eligibleorgid)</strong></li>
+  </ul>
+  <p>Legacy comment in the file shows the older direct SQL logic:</p>
+  <div class="query">SELECT payment.paymentid, payment.paydate, capvoucher.capdate
+From payment(NOLOCK)
+JOIN capvoucher (NOLOCK) on payment.paymentid = capvoucher.paymentid
+WHERE payment.programid = '...'
+  AND payment.provid = '...'
+  AND (payment.status = 'OPEN' OR payment.status = 'PAID')
+  AND payment.paytype = 'CAP'
+  AND paydate &lt;= 'LastDayofMonth(capdate)'
+  AND paydate &gt;= 'FirstDayofMonth(recondate)'
+  AND payment.eligibleorgid = '...'
+GROUP BY payment.paymentid, payment.paydate, capvoucher.capdate</div>
+
+  <h3>LoadOpenPaymentsIntoXML()</h3>
+  <p>Copies every loaded payment row into <strong>m_XMLMessage.OpenPayments</strong>.</p>
+  <ul>
+    <li>Examples of mapped fields: <strong>paydate</strong>, <strong>paymentid</strong>, <strong>capdate</strong>.</li>
+  </ul>
+
+  <h3>LoadProgramcaps()</h3>
+  <p>Loads the relevant program caps for the selected program and cap type.</p>
+  <ul>
+    <li>It converts the XML capitation type to the stored query code:</li>
+    <li><strong>MGT =&gt; "M"</strong>; otherwise <strong>"S"</strong>.</li>
+    <li>Then calls:</li>
+    <li><strong>m_programCaps = New Queries.cRetrieveProgramCapsByProgidCapTypeEffdateTermdate(Session)</strong></li>
+    <li><strong>m_programCaps.LoadData(m_XMLMessage.programid, sProgramCapType, m_XMLMessage.capdate, m_XMLMessage.recondate)</strong></li>
+  </ul>
+  <p>The old legacy direct SQL is commented in this file as:</p>
+  <div class="query">SELECT *
+FROM programcap
+WHERE programid = '...'
+  AND effdate &lt;= 'capdate'
+  AND termdate &gt;= 'recondate'
+ORDER BY effdate</div>
+
+  <h3>LoadProgramcapsIntoXML()</h3>
+  <p>Copies each row from <strong>m_programCaps</strong> into <strong>m_XMLMessage.Programcaps</strong>, including fields such as:</p>
+  <ul>
+    <li>programid</li>
+    <li>effdate</li>
+    <li>termdate</li>
+    <li>splitmonthday</li>
+    <li>ageday</li>
+    <li>firsthalfpercent</li>
+    <li>sechalfpercent</li>
+    <li>capmethod</li>
+    <li>useageday</li>
+    <li>usetruecap</li>
+  </ul>
+
+  <h3>LoadPolicycopaysIntoXML()</h3>
+  <p>Loads policy copays into the XML and clears prior data before repopulating.</p>
+  <ul>
+    <li>Calls <strong>LoadPolicycopays()</strong> first.</li>
+    <li>Copies into <strong>m_XMLMessage.Policycopays</strong>:</li>
+    <li>copaygroupid, copayid, copay, effdate, termdate, rateid, eligibleorgid</li>
+  </ul>
+
+  <h3>LoadPolicycopays()</h3>
+  <p>This method loads policy copay data for the active rateid/eligibleorgid context.</p>
+  <ul>
+    <li>Runtime call:</li>
+    <li><strong>m_policycopays = New Queries.cSelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail(Session)</strong></li>
+    <li><strong>m_policycopays.LoadData(m_XMLMessage.capdate, m_XMLMessage.recondate, DistinctRateIDSQL(), DistinctEligibleorgIDSQL())</strong></li>
+  </ul>
+  <p>The legacy direct SQL commented in the file shows the intended table union logic:</p>
+  <div class="query">SELECT copayid, copay,
+  effdate = 'capdate',
+  termdate = 'recondate', rateid, eligibleorgid = ''
+FROM policycopay
+WHERE rateid in ( ... )
+UNION
+SELECT cgd.copayid, copay=cgd.amount, pcg.effdate, pcg.termdate, pcg.rateid, pcg.eligibleorgid
+FROM copaygroupdetail cgd
+JOIN policycopaygroup pcg ON cgd.copaygroupid = pcg.copaygroupid
+WHERE pcg.rateid in ( ... )
+  AND pcg.effdate &lt;= 'capdate'
+  AND pcg.termdate &gt;= 'recondate'</div>
+  <p>The file also contains the older policycopaygroup SQL as a commented block:</p>
+  <div class="query">SELECT *
+FROM policycopaygroup
+WHERE rateid in ( ... )
+  AND eligibleorgid in ( ... )
+  AND effdate &lt;= 'capdate'
+  AND termdate &gt;= 'recondate'
+ORDER BY effdate</div>
+
+  <h3>CreatePayment(ByRef pProgramid As String, ByRef provID As String, ByRef pPayee As String, ByRef pDate As String, ByRef pusername As String, ByRef pmessagequeueid As String, ByRef pcapmessage As String)</h3>
+  <p>Creates the payment row for the cap run.</p>
+  <ul>
+    <li>It generates a new payable ID using <strong>CNextId</strong>.</li>
+    <li>Then executes a payment insert via:</li>
+    <li><strong>l_CreatePaymentRecord = New Queries.cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc(Session)</strong></li>
+    <li><strong>l_CreatePaymentRecord.ExecuteQuery(Trim(spayid), Trim(pProgramid), Trim(provID), DBFixup(Mid(pPayee, 1, 60)), Trim(pDate), Trim(m_XMLMessage.capitationType), Trim(pmessagequeueid), Trim(pcapmessage), Trim(m_XMLMessage.eligibleorgid), Trim(lHeaderId))</strong></li>
+  </ul>
+  <p>The original SQL as commented in the file is:</p>
+  <div class="query">Insert payment(paymentid, programid, provid, payee, paydate, paytype, status, capmessagequeueid, capmessage, eligibleorgid)
+VALUES(
+  'spayid',
+  'pProgramid',
+  'provID',
+  'Mid(pPayee,1,60)',
+  'pDate',
+  'CAP',
+  'INCOMPLETE',
+  'pmessagequeueid',
+  'pcapmessage',
+  'eligibleorgid'
+)</div>
+
+  <h3>CheckPayHolds()</h3>
+  <p>Checks if providers are flagged on pay hold and logs them if they are.</p>
+  <ul>
+    <li>Only runs when <strong>m_loginfo = True</strong>.</li>
+    <li>Maps management flag the same way as elsewhere:</li>
+    <li><strong>MGT =&gt; "Y"</strong>; otherwise <strong>"N"</strong>.</li>
+    <li>Loads provider-hold data via:</li>
+    <li><strong>m_capProviders = New Queries.cRetrieveCapitationPayHoldsPlusCapType(Session)</strong></li>
+    <li><strong>m_capProviders.LoadData(programid, isCapitatedOnly, ismanagementcap, capdate, recondate, affiliateid)</strong></li>
+  </ul>
+  <p>The legacy SQL in comments shows the direct query against affiliation, contractinfo, contract, capitation, memberpcp, enrollkeys, benefitplan, affiliation, provider, provmemo, and memo tables:</p>
+  <div class="query">SELECT DISTINCT prov.fullname, prov.provid, codeid
+FROM affiliation afpayto (NOLOCK)
+JOIN contractinfo (NOLOCK) ON ...
+JOIN contract (NOLOCK) ON ...
+JOIN capitation (NOLOCK) ON ...
+JOIN memberpcp pcp (NOLOCK) ON ...
+JOIN enrollkeys enr (NOLOCK) ON ...
+JOIN benefitplan bplan (NOLOCK) ON ...
+JOIN affiliation afprov (NOLOCK) ON ...
+JOIN provider prov (NOLOCK) ON ...
+LEFT OUTER JOIN provmemo (NOLOCK) ON ...
+LEFT OUTER JOIN memo (NOLOCK) ON ...
+WHERE afpayto.payflag &lt;&gt; 0
+  AND afpayto.effdate &lt;= 'capdate'
+  AND afpayto.termdate &gt;= 'recondate'
+  AND afpayto.affiliationid IN (...)
+  AND (memo.codeid = 'HOLD')</div>
+
+  <h3>LoadGlobalContractData()</h3>
+  <p>Loads the contract data needed for the global pay-to affiliation.</p>
+  <ul>
+    <li>Calls:</li>
+    <li><strong>m_globalcapdata = New Queries.cSelectGlobalContractData(Session)</strong></li>
+    <li><strong>m_globalcapdata.LoadData(m_XMLMessage.fundid, m_globalPaytoAffil, m_XMLMessage.isCapitatedOnly, LastDayofMonth(m_XMLMessage.capdate), FirstDayofMonth(m_XMLMessage.recondate), m_XMLMessage.programid)</strong></li>
+  </ul>
+  <p>Legacy direct SQL in comments:</p>
+  <div class="query">SELECT DISTINCT ci.contractid, ci.effdate, ci.termdate,
+  capfundid = (CASE WHEN ct.capfundid = '' OR ct.capfundid IS NULL THEN 'fundid' ELSE ct.capfundid END),
+  cap.capid, cap.captype, ct.haspool, ci.isflatfee, ci.flatfeeamount
+FROM contractinfo ci
+JOIN contract ct ON ct.contractid = ci.contractid
+JOIN capitation cap ON cap.capid = ct.capid
+WHERE ci.affiliationid = 'globalPaytoAffil'
+  AND RTrim(ci.servicelocationid) = ''
+  AND ci.effdate &lt;= 'LastDayofMonth(capdate)'
+  AND ci.termdate &gt;= 'FirstDayofMonth(recondate)'
+  AND programid = 'programid'
+  AND ((cap.captype = 'capterms' AND (... fundid in programfund ...)) OR (cap.captype = 'capfactors'))</div>
+
+  <h3>LoadGlobalContractDataIntoXML()</h3>
+  <p>Maps the loaded contract rows into <strong>m_XMLMessage.GlobalContractDatas</strong>, including:</p>
+  <ul>
+    <li>contractid</li>
+    <li>effdate</li>
+    <li>termdate</li>
+    <li>capfundid</li>
+    <li>capid</li>
+    <li>captype</li>
+    <li>haspool</li>
+    <li>isflatfee</li>
+    <li>flatfeeamount</li>
+  </ul>
+
+  <h3>LoadGlobalAffiliation()</h3>
+  <p>Confirms that the global pay-to affiliation record is valid and exists.</p>
+  <ul>
+    <li>Runtime call:</li>
+    <li><strong>m_affils = New Q.DataServices.Provider.DataAccess.Queries.cSelectAffiliationByAffiliationid(Session)</strong></li>
+    <li><strong>m_affils.LoadData(m_globalPaytoAffil)</strong></li>
+  </ul>
+  <p>The commented legacy SQL is:</p>
+  <div class="query">SELECT *
+FROM affiliation
+WHERE affiliationid = 'm_globalPaytoAffil'</div>
+  <p>It returns true only when exactly one row is found.</p>
+
+  <h3>LoadGlobalAffiliationIntoXML()</h3>
+  <p>Copies the global affiliation row into the XML output model:</p>
+  <ul>
+    <li>affiliationID</li>
+    <li>effdate</li>
+    <li>termdate</li>
+    <li>payflag</li>
+    <li>provid</li>
+    <li>status</li>
+    <li>affiliateid</li>
+    <li>affiltype</li>
+    <li>hospaffiltype</li>
+    <li>pcp</li>
+  </ul>
+
+  <h3>RestartFailedCapRun()</h3>
+  <p>This path is used when the incoming XML says the message is restarting.</p>
+  <ul>
+    <li>Loads remaining cap messages using:</li>
+    <li><strong>m_enrollments = New Queries.cSelectRemainingCapmessagesByMessagequeueid(Session)</strong></li>
+    <li><strong>m_enrollments.LoadData(m_XMLMessage.messagequeueid)</strong></li>
+    <li>If count indicates all enrollments are complete, finalizes payment through <strong>cCapPayment.ProcessMessage(m_OriginalXML)</strong>.</li>
+    <li>If work remains, it replays the batch process with the remaining data.</li>
+  </ul>
+
+  <h3>DistinctRateIDSQL()</h3>
+  <p>This helper creates the <strong>rateid</strong> list used in policy copay queries.</p>
+  <ul>
+    <li>It builds a SELECT DISTINCT string from either glob al or PCP logic.</li>
+    <li>It includes a union of active enrollments and prior cap vouchers.</li>
+    <li>It filters by <strong>programid</strong>, <strong>affiliateid</strong>, <strong>capdate</strong>, <strong>recondate</strong>, and capitation type.</li>
+  </ul>
+  <p>The literal SQL in this method is directly assembled in the file. A shortened evidence block is below:</p>
+  <div class="query">SELECT distinct enr.rateid
+FROM (
+  SELECT enr.enrollid
+  FROM enrollkeys enr (NOLOCK)
+  JOIN benefitplan bplan (NOLOCK) ON bplan.planid = enr.planid and bplan.programid = 'programid'
+  JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid
+  JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.status &lt;&gt; 'SUSPENDED'
+  WHERE enr.segtype = 'INT' AND bplan.planid = enr.planid
+    AND op.eligibleorgid=enr.eligibleorgid
+    AND enr.effdate &lt;= 'capdate' AND enr.termdate &gt;= 'recondate'
+  UNION
+  SELECT DISTINCT capvoucher.enrollid
+  From capvoucher(NOLOCK)
+  JOIN payment (NOLOCK) ON ...
+  AND payment.paytype = 'capitationType'
+) a
+JOIN enrollkeys enr ON enr.enrollid=a.enrollid</div>
+
+  <h3>DistinctEligibleorgIDSQL()</h3>
+  <p>This helper creates the <strong>eligibleorgid</strong> list used with the copay query parameters.</p>
+  <ul>
+    <li>It uses the same pattern as <strong>DistinctRateIDSQL()</strong> but selects <strong>enr.eligibleorgid</strong> instead.</li>
+    <li>The exact SQL is assembled directly inside the method using the same join and union logic.</li>
+  </ul>
+
+  <h3>WriteDebugMessage(ByVal msg As String)</h3>
+  <p>Only writes app-event information if <strong>m_XMLMessage.loginfo = "Y"</strong>.</p>
+  <ul>
+    <li>This is the only logging gate used in the debugging helper.</li>
+  </ul>
+
+  <h3>CalcCapAdjustments()</h3>
+  <p>Calculates monetary cap adjustments and stores them as cap vouchers.</p>
+  <ul>
+    <li>Loads a cap adjustment record set using:</li>
+    <li><strong>m_adjustments = New Queries.cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly(Session)</strong></li>
+    <li><strong>m_adjustments.LoadData(programid, affiliateid, capdate)</strong></li>
+  </ul>
+  <p>The file shows the original direct SQL as:</p>
+  <div class="query">SELECT ca.*,
+  use_fundid = case when ca.fundid = '' then p.fundid else ca.fundid end
+FROM capadjustment ca
+JOIN program p ON ca.programid = p.programid
+WHERE ca.programid = 'programid'
+  AND ca.payeeid = 'affiliateid'
+  AND ca.processingperiod &lt;= 'capdate'
+  AND ca.capadjstatus = 'PENDING'
+  AND ca.capadjtype = 'MONETARY'</div>
+  <p>For each row it then creates a cap voucher via:</p>
+  <ul>
+    <li><strong>l_createcapvoucher = New Queries.cCreatecapvoucherRecord(Session)</strong></li>
+    <li><strong>l_createcapvoucher.ExecuteQuery(...)</strong></li>
+  </ul>
+  <p>Then it updates the adjustment record via:</p>
+  <ul>
+    <li><strong>l_updatecapadjustment = New Queries.cUpdateCapadjustmentByProcessdatePaymentidStatusEtc(Session)</strong></li>
+    <li><strong>l_updatecapadjustment.ExecuteQuery(Now, paymentid, "PROCESSED", capadjustmentid)</strong></li>
+  </ul>
+
+  <h2>4) Exact database queries in the file and what they are doing</h2>
+  <p>Below is the evidence from this single file. In several places, the runtime uses generated query classes and no literal SQL text is visible in this class. The direct SQL is preserved in comments and is therefore the clearest evidence available inside this file.</p>
+
+  <h3>Query classes used with actual LoadData/ExecuteQuery calls</h3>
+  <ul>
+    <li><strong>cSelectProcessstateFailureCountByDetailId.LoadData(lDetailId)</strong></li>
+    <li><strong>cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc.LoadData(programid, capdate, affils)</strong></li>
+    <li><strong>cRetrieveProgramCapsByProgidCapTypeEffdateTermdate.LoadData(programid, capType, capdate, recondate)</strong></li>
+    <li><strong>cRetrievePaymentsByProgProvDateType.LoadData(programid, affiliateid, capitationType, LastDayofMonth(capdate), FirstDayofMonth(recondate), eligibleorgid)</strong></li>
+    <li><strong>cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc.LoadData(programid, capdate, recondate, isCapitatedOnly, affiliateid)</strong></li>
+    <li><strong>cExecuteSpq_buildpcpcapmessagewithtype.LoadData(...)</strong></li>
+    <li><strong>cExecuteSpq_buildpcpcapmessagewithtypeadvreconrun.LoadData(..., advrecondate)</strong></li>
+    <li><strong>cExecuteSpq_buildglobalcapmessage.LoadData(...)</strong></li>
+    <li><strong>cExecuteSpq_buildglobalcapmessageforadvreconrun.LoadData(...)</strong></li>
+    <li><strong>cSelectAffiliationByAffiliationid.LoadData(m_globalPaytoAffil)</strong></li>
+    <li><strong>cSelectRemainingCapmessagesByMessagequeueid.LoadData(messagequeueid)</strong></li>
+    <li><strong>cRetrieveCapitationPayHoldsPlusCapType.LoadData(programid, isCapitatedOnly, ismanagementcap, capdate, recondate, affiliateid)</strong></li>
+    <li><strong>cSelectGlobalContractData.LoadData(fundid, globalPaytoAffil, isCapitatedOnly, LastDayofMonth(capdate), FirstDayofMonth(recondate), programid)</strong></li>
+    <li><strong>cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc.ExecuteQuery(...)</strong></li>
+    <li><strong>cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly.LoadData(programid, affiliateid, capdate)</strong></li>
+    <li><strong>cCreatecapvoucherRecord.ExecuteQuery(...)</strong></li>
+    <li><strong>cUpdateCapadjustmentByProcessdatePaymentidStatusEtc.ExecuteQuery(...)</strong></li>
+  </ul>
+
+  <h3>Direct SQL text preserved in comments in this file</h3>
+  <div class="query">SELECT payment.paymentid, payment.paydate, capvoucher.capdate
+From payment(NOLOCK)
+JOIN capvoucher (NOLOCK) on payment.paymentid = capvoucher.paymentid
+WHERE payment.programid = '...'
+  AND payment.provid = '...'
+  AND (payment.status = 'OPEN' OR payment.status = 'PAID')
+  AND payment.paytype = 'CAP'
+  AND paydate &lt;= 'LastDayofMonth(capdate)'
+  AND paydate &gt;= 'FirstDayofMonth(recondate)'
+  AND payment.eligibleorgid = '...'
+GROUP BY payment.paymentid, payment.paydate, capvoucher.capdate</div>
+
+  <div class="query">SELECT *
+FROM programcap
+WHERE programid = '...'
+  AND effdate &lt;= 'capdate'
+  AND termdate &gt;= 'recondate'
+ORDER BY effdate</div>
+
+  <div class="query">SELECT copayid, copay,
+  effdate = 'capdate',
+  termdate = 'recondate', rateid, eligibleorgid = ''
+FROM policycopay
+WHERE rateid in (...)
+UNION
+SELECT cgd.copayid, copay=cgd.amount, pcg.effdate, pcg.termdate, pcg.rateid, pcg.eligibleorgid
+FROM copaygroupdetail cgd
+JOIN policycopaygroup pcg ON cgd.copaygroupid = pcg.copaygroupid
+WHERE pcg.rateid in (...)
+  AND pcg.effdate &lt;= 'capdate'
+  AND pcg.termdate &gt;= 'recondate'</div>
+
+  <div class="query">Insert payment(paymentid, programid, provid, payee, paydate, paytype, status, capmessagequeueid, capmessage, eligibleorgid)
+VALUES(
+  'spayid',
+  'pProgramid',
+  'provID',
+  'Mid(pPayee,1,60)',
+  'pDate',
+  'CAP',
+  'INCOMPLETE',
+  'pmessagequeueid',
+  'pcapmessage',
+  'eligibleorgid'
+)</div>
+
+  <div class="query">SELECT DISTINCT prov.fullname, prov.provid, codeid
+FROM affiliation afpayto (NOLOCK)
+JOIN contractinfo (NOLOCK) ON ...
+JOIN contract (NOLOCK) ON ...
+JOIN capitation (NOLOCK) ON ...
+JOIN memberpcp pcp (NOLOCK) ON ...
+JOIN enrollkeys enr (NOLOCK) ON ...
+JOIN benefitplan bplan (NOLOCK) ON ...
+JOIN affiliation afprov (NOLOCK) ON ...
+JOIN provider prov (NOLOCK) ON ...
+LEFT OUTER JOIN provmemo (NOLOCK) ON ...
+LEFT OUTER JOIN memo (NOLOCK) ON ...
+WHERE afpayto.payflag &lt;&gt; 0
+  AND afpayto.effdate &lt;= 'capdate'
+  AND afpayto.termdate &gt;= 'recondate'
+  AND afpayto.affiliationid IN (...)
+  AND (memo.codeid = 'HOLD')</div>
+
+  <div class="query">SELECT DISTINCT ci.contractid, ci.effdate, ci.termdate,
+  capfundid = (CASE WHEN ct.capfundid = '' OR ct.capfundid IS NULL THEN 'fundid' ELSE ct.capfundid END),
+  cap.capid, cap.captype, ct.haspool, ci.isflatfee, ci.flatfeeamount
+FROM contractinfo ci
+JOIN contract ct ON ct.contractid = ci.contractid
+JOIN capitation cap ON cap.capid = ct.capid
+WHERE ci.affiliationid = 'globalPaytoAffil'
+  AND RTrim(ci.servicelocationid) = ''
+  AND ci.effdate &lt;= 'LastDayofMonth(capdate)'
+  AND ci.termdate &gt;= 'FirstDayofMonth(recondate)'
+  AND programid = 'programid'
+  AND ((cap.captype = 'capterms' AND (... fundid in programfund ...)) OR (cap.captype = 'capfactors'))</div>
+
+  <div class="query">SELECT ca.*,
+  use_fundid = case when ca.fundid = '' then p.fundid else ca.fundid end
+FROM capadjustment ca
+JOIN program p ON ca.programid = p.programid
+WHERE ca.programid = 'programid'
+  AND ca.payeeid = 'affiliateid'
+  AND ca.processingperiod &lt;= 'capdate'
+  AND ca.capadjstatus = 'PENDING'
+  AND ca.capadjtype = 'MONETARY'</div>
+
+  <h2>5) Summary: the real operating flow</h2>
+  <ol>
+    <li>Receive cap XML message.</li>
+    <li>Determine if it is a restart.</li>
+    <li>For new runs, load program caps and adjust date if needed.</li>
+    <li>Load open payments.</li>
+    <li>Choose either global or PCP enrollment generation.</li>
+    <li>Validate cap-factor/fund setup.</li>
+    <li>Process raw enrollment batches.</li>
+    <li>Create payment records.</li>
+    <li>Apply cap adjustments to vouchers.</li>
+    <li>Dispatch each batch to the batch processor.</li>
+    <li>Finalize or continue processing for retry/restart scenarios.</li>
+  </ol>
+  <p><strong>Important:</strong> This file does not contain the final implementation SQL for the generated query classes such as <strong>cExecuteSpq_buildglobalcapmessage</strong> or <strong>cRetrieveProgramCapsByProgidCapTypeEffdateTermdate</strong>. The class invokes those classes via <strong>LoadData(...)</strong>, but the literal SQL is hidden in their generated query definitions outside this file. The SQL shown above is the exact query evidence that is present in this file itself, and it matches the intended logic being executed.</p>
+</body>
+</html>
