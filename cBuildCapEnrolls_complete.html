@@ -1,0 +1,2763 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Q.ServiceComponents.Capitation.cBuildCapEnrolls — Deep Dive</title>
+  <style>
+    body{font-family:"Segoe UI",SegoeUI,Arial,sans-serif;font-size:11pt;max-width:1080px;margin:24px auto;line-height:1.35;color:#111}
+    h1{color:#1a237e;border-bottom:3px solid #1a237e;padding-bottom:6px}
+    h2{color:#283593;margin-top:26px}
+    h3{color:#3949ab;margin-top:18px}
+    h4{color:#5c6bc0;margin-top:14px}
+    table{border-collapse:collapse;width:100%;margin:10px 0}
+    th,td{border:1px solid #c5cae9;padding:6px 8px;vertical-align:top}
+    th{background:#e8eaf6;text-align:left}
+    tbody tr:nth-child(even){background:#f5f5f5}
+    code,pre{font-family:Consolas,Menlo,monospace;background:#f5f5f5}
+    pre{padding:10px;overflow:auto;border:1px solid #e0e0e0}
+    .plain{background:#eef1fb;border-left:4px solid #3949ab;padding:10px 12px;margin:10px 0}
+    .tag{display:inline-block;font-size:10pt;padding:1px 8px;border-radius:999px;color:#fff;margin-left:6px}
+    .tag.c{background:#2e7d32}
+    .tag.i{background:#1565c0}
+    .tag.u{background:#e65100}
+    a{color:#1a237e;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .small{font-size:10pt;color:#333}
+    @media print{
+      h2,h3{break-after:avoid}
+      table,pre{break-inside:avoid}
+    }
+  </style>
+</head>
+<body>
+<h1>Q.ServiceComponents.Capitation.cBuildCapEnrolls — Function-by-function Deep Dive</h1>
+
+<div class="plain">
+  Scope: This document analyzes <b>only</b> <code>Q.ServiceComponents.Capitation.cBuildCapEnrolls</code> in
+  <code>cBuildCapEnrolls.vb</code>. Called query classes and stored procedures are referenced only to the extent
+  their invocation is visible from this class and the knowledge graph. No other classes’ flows are narrated.
+</div>
+
+<h2 id="overview">Class Overview</h2>
+<p>
+  <code>Q.ServiceComponents.Capitation.cBuildCapEnrolls</code> is the “build” stage for an Advanced Capitation run:
+  it parses an incoming capitation XML message, generates capitation message-queue work (global or PCP) by executing
+  stored-procedure-backed query classes, creates a capitation payment record, and then dispatches batch processing
+  requests (synchronously for single batches or via a proxy for multiple batches). It also loads supporting data
+  (program caps, open payments, global contract data, global affiliation) into the XML message that is passed to
+  downstream batch processors. <span class="tag c">C</span>
+</p>
+
+<h3>File</h3>
+<ul>
+  <li><code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\ASCs\Capitation\Src\QCSI ASC Capitation\cBuildCapEnrolls.vb</code> <span class="tag c">C</span></li>
+</ul>
+
+<h3>Constructor-initialized state (retrieved)</h3>
+<ul>
+  <li><code>Session</code> and <code>QSession</code> are set from the provided <code>IQcsiSession</code>. <span class="tag c">C</span></li>
+  <li><code>lProcessLog</code> is set from the provided <code>Q.ProcessLogWrapper.cProcessLog</code>. <span class="tag c">C</span></li>
+  <li><code>lHeaderId</code>, <code>lDetailId</code>, and <code>createCAPXML</code> are stored. <span class="tag c">C</span></li>
+  <li>Session aliases are selected: <code>PlanData</code> and <code>qenterprise</code>. <span class="tag c">C</span></li>
+  <li><code>sessionPlanintegration</code> is created as a new session clone and selects alias <code>planintegration</code>. <span class="tag c">C</span></li>
+</ul>
+<p class="small">
+  Evidence: <code>cBuildCapEnrolls.New(...)</code> lines 89–107. <span class="tag c">C</span>
+</p>
+
+<h3>Primary runtime fields/state used by methods (as observed)</h3>
+<ul>
+  <li><code>m_XMLMessage As XMLAdvCap</code> — parsed XML message wrapper; many fields are read/written. <span class="tag c">C</span></li>
+  <li><code>m_OriginalXML</code> — original XML string captured after <code>InitXML</code>. <span class="tag c">C</span></li>
+  <li><code>m_loginfo As Boolean</code> — derived from <code>m_XMLMessage.loginfo = "Y"</code>. <span class="tag c">C</span></li>
+  <li><code>m_globalPaytoAffil</code> — global pay-to affiliation id resolved during global build. <span class="tag c">C</span></li>
+  <li><code>m_queueid</code> — generated queue id for capmessagequeue grouping. <span class="tag c">C</span></li>
+  <li>Recordset-like query objects used as “ADOR-style” iterators:
+    <code>m_enrollments</code>, <code>m_programCaps</code>, <code>m_openpayments</code>, <code>m_globalcapdata</code>, <code>m_affils</code>, <code>m_capProviders</code>, etc. <span class="tag c">C</span>
+  </li>
+  <li><code>m_adjustCap As Boolean</code> — toggles whether monetary cap adjustments are calculated. <span class="tag c">C</span></li>
+  <li><code>reqCAPSize</code> — passed into stored-proc execution queries to control request splitting; value origin not retrieved in provided snippets. <span class="tag u">!</span></li>
+</ul>
+
+<h3>Incoming XML fields actually read by this class</h3>
+<p>From <code>ProcessMessage</code> and downstream methods, the class reads (at minimum):</p>
+<ul>
+  <li><code>detailid</code>, <code>affiliateid</code>, <code>loginfo</code>, <code>restarting</code> <span class="tag c">C</span></li>
+  <li><code>programid</code>, <code>capdate</code>, <code>recondate</code>, <code>eligibleorgid</code>, <code>isCapitatedOnly</code> <span class="tag c">C</span></li>
+  <li><code>capitationType</code> (used to derive management cap flag and to retrieve open payments) <span class="tag c">C</span></li>
+  <li><code>advreconrun</code> (branches to “advance recon run” stored-proc variants) <span class="tag c">C</span></li>
+  <li><code>fundid</code> (used when loading global contract data) <span class="tag c">C</span></li>
+  <li><code>affils</code> (string filter like <code>affiliationid IN (...)</code>, used by validation helper) <span class="tag c">C</span></li>
+  <li><code>messagequeueid</code> (used on restart path) <span class="tag c">C</span></li>
+  <li><code>payee</code>, <code>username</code> (used when creating payment) <span class="tag c">C</span></li>
+</ul>
+
+<div class="plain">
+  Ownership clarification: <code>LoadProgramcaps</code> and <code>LoadCapAdjustments</code> are methods of
+  <code>Q.ServiceComponents.Capitation.cBuildCapEnrolls</code> and <code>Q.ServiceComponents.Capitation.cBatchProcessEnrolls</code>
+  respectively. In this class, <code>LoadProgramcaps</code> exists at lines 986–1048. <span class="tag c">C</span>
+  The <code>LoadCapAdjustments</code> method shown in evidence is from <code>cBatchProcessEnrolls.vb</code> lines 534–584,
+  not from this class. <span class="tag c">C</span>
+</div>
+
+<h2 id="inventory">Method Inventory</h2>
+<p class="small">
+  Checklist source: knowledge-graph <code>get_subgraph</code> for <code>Q.ServiceComponents.Capitation.cBuildCapEnrolls</code> (depth 2). Some method bodies were not retrieved in the provided evidence set; those are marked <span class="tag u">!</span>.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Method (FQN)</th>
+      <th>Line range</th>
+      <th>One-line purpose</th>
+      <th>Covered</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="#m-new">New(IQcsiSession, cProcessLog, String, String, String)</a></td>
+      <td>89–107</td>
+      <td>Initialize sessions, aliases, and process-log context.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-processmessage">ProcessMessage(ByRef String) As Boolean</a></td>
+      <td>111–202</td>
+      <td>Entry point: parse XML, branch restart vs new build, finalize process-log status.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-buildcapenrolls">BuildCapEnrolls() As Boolean</a></td>
+      <td>203–300</td>
+      <td>Orchestrator: load program caps/open payments, validate, build global/PCP queue, then process enrollments.</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-validatefunds">ValidateCapFactorProgramFundsForAffiliations()</a></td>
+      <td>302–351</td>
+      <td>Warn if invalid fund configuration exists for capfactors for the run’s affiliations.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-getaffillist">getAffiliationList(String) As String</a></td>
+      <td>353–384</td>
+      <td>Extracts the <code>('A','B')</code> portion from an <code>affiliationid IN (...)</code> filter string.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-buildpcp">Build_PCP_Enrollments()</a></td>
+      <td>386–515</td>
+      <td>Generate PCP cap messages into capmessagequeue via stored-proc query execution.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-buildglobal">Build_Global_Enrollments()</a></td>
+      <td>518–712</td>
+      <td>Resolve global pay-to affiliation, load global contract data, then generate global cap messages.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-processenrollments">ProcessEnrollments() As Integer</a></td>
+      <td>719–902</td>
+      <td>Split work by messagequeueid, create payments, optionally calc adjustments, dispatch batch processing.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadopenpayments">LoadOpenPayments()</a></td>
+      <td>907–961</td>
+      <td>Retrieve open/paid CAP payments in recon window for provider/program/type.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadopenpaymentsxml">LoadOpenPaymentsIntoXML()</a></td>
+      <td>963–984</td>
+      <td>Copy open payments recordset into XML message nodes.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadprogramcaps">LoadProgramcaps()</a></td>
+      <td>986–1048</td>
+      <td>Retrieve programcap rows for program/cap type/date window.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadprogramcapsxml">LoadProgramcapsIntoXML()</a></td>
+      <td>1053–1086</td>
+      <td>Copy programcap rows into XML message nodes.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadpolicycopaysxml">LoadPolicycopaysIntoXML()</a></td>
+      <td>1089–1140</td>
+      <td>Load policy copays and copy into XML message nodes.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadpolicycopays">LoadPolicycopays()</a></td>
+      <td>1143–1252</td>
+      <td>Retrieve policy copays/copy groups for eligible orgs and rates (SQL builders used).</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-createpayment">CreatePayment(ByRef String, ByRef String, ByRef String, ByRef String, ByRef String, ByRef String, ByRef String)</a></td>
+      <td>1254–1311</td>
+      <td>Create a payment record for this cap run (CAP payment).</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-checkpayholds">CheckPayHolds()</a></td>
+      <td>1317–1410</td>
+      <td>Warn if providers are on pay-hold for this run’s parameters.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadglobalcontract">LoadGlobalContractData() As Boolean</a></td>
+      <td>1412–1475</td>
+      <td>Load global contract/cap data for global pay-to affiliation.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadglobalcontractxml">LoadGlobalContractDataIntoXML()</a></td>
+      <td>1479–1510</td>
+      <td>Copy global contract data rows into XML message nodes.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadglobalaffil">LoadGlobalAffiliation() As Boolean</a></td>
+      <td>1512–1561</td>
+      <td>Load the global pay-to affiliation record.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-loadglobalaffilxml">LoadGlobalAffiliationIntoXML()</a></td>
+      <td>1563–1588</td>
+      <td>Copy global affiliation record into XML message nodes.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-restart">RestartFailedCapRun() As Boolean</a></td>
+      <td>1594–1751</td>
+      <td>Restart path: determine remaining cap messages and re-dispatch batch processing or finalize payment.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-distrate">DistinctRateIDSQL() As String</a></td>
+      <td>1753–1847</td>
+      <td>Builds SQL fragment for distinct rate IDs (used by policy copay loading).</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-distorg">DistinctEligibleorgIDSQL() As String</a></td>
+      <td>1849–1939</td>
+      <td>Builds SQL fragment for distinct eligible org IDs (used by policy copay loading).</td>
+      <td><span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-writedebug">WriteDebugMessage(String)</a></td>
+      <td>1941–1945</td>
+      <td>Write an application event when loginfo is enabled.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><a href="#m-calccapadj">CalcCapAdjustments()</a></td>
+      <td>1957–2068</td>
+      <td>Create capvoucher rows for monetary cap adjustments and mark adjustments processed.</td>
+      <td><span class="tag c">C</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="flow">Execution Flow</h2>
+
+<pre class="mermaid">
+flowchart TD
+  A[ProcessMessage] -->|"restarting=Y"| B[RestartFailedCapRun]
+  A -->|"restarting!=Y"| C[BuildCapEnrolls]
+  C -->|"isGlobal=Y?"| D[Build_Global_Enrollments]
+  C -->|"else"| E[Build_PCP_Enrollments]
+  C --> F[ProcessEnrollments]
+  F --> G[CreatePayment]
+  F --> H[CalcCapAdjustments]
+  D --> I[LoadGlobalAffiliation]
+  D --> J[LoadGlobalContractData]
+  F --> K[Proxy.CapitationBatchProcessProxy.ProcessMessage or cBatchProcessEnrolls.ProcessMessage]
+</pre>
+
+<h3 id="m-new">New(ByVal sess As IQcsiSession, ByVal procLog As cProcessLog, ByVal pHeaderId As String, ByVal pDetailID As String, ByVal mXML As String)</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Public Sub New(...)</code>, lines 89–107. <span class="tag c">C</span>
+</div>
+<ul>
+  <li><b>Receives:</b> session, process log wrapper, header/detail ids, and an XML string (<code>mXML</code>). <span class="tag c">C</span></li>
+  <li><b>Mutates class state:</b> sets <code>Session</code>, <code>QSession</code>, <code>lProcessLog</code>, <code>lDetailId</code>, <code>lHeaderId</code>, <code>createCAPXML</code>. <span class="tag c">C</span></li>
+  <li><b>Session aliasing:</b> selects <code>PlanData</code> and <code>qenterprise</code>; creates <code>sessionPlanintegration</code> and selects <code>planintegration</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-processmessage">ProcessMessage(ByRef lxml As String) As Boolean</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Public Function ProcessMessage(ByRef lxml As String) As Boolean</code>, lines 111–202. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li>Parameter <code>lxml</code> (incoming XML). <span class="tag c">C</span></li>
+  <li>From parsed XML: <code>detailid</code>, <code>loginfo</code>, <code>restarting</code>, <code>affiliateid</code>. <span class="tag c">C</span></li>
+  <li>Class state: <code>lDetailId</code>, <code>lHeaderId</code>, <code>sessionPlanintegration</code>, <code>lProcessLog</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Create <code>m_XMLMessage = New XMLAdvCap(Session)</code> and parse XML via <code>m_XMLMessage.InitXML(lxml)</code>. <span class="tag c">C</span></li>
+  <li>Capture <code>m_OriginalXML = m_XMLMessage.XML</code>. <span class="tag c">C</span></li>
+  <li>Set <code>m_loginfo = (Trim(m_XMLMessage.loginfo) = "Y")</code>. <span class="tag c">C</span></li>
+  <li>If <code>m_XMLMessage</code> is not <code>Nothing</code>:
+    <ul>
+      <li>Write debug message: <code>"ProcessMessage Entered -- DetailID = " + m_XMLMessage.detailid</code>. <span class="tag c">C</span></li>
+      <li>If <code>m_XMLMessage.restarting = "Y"</code>:
+        <ul>
+          <li>If <code>lDetailId &lt;&gt; ""</code> and <code>m_loginfo</code>, write process-log state: “BuildCapEnrolls Service Re-Started for provider: …”. <span class="tag c">C</span></li>
+          <li>Call <code>RestartFailedCapRun()</code> and return its boolean. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+      <li>Else (not restarting):
+        <ul>
+          <li>Trace “Beginning Adv Cap Run …”. <span class="tag c">C</span></li>
+          <li>If <code>lDetailId &lt;&gt; ""</code> and <code>m_loginfo</code>, write two INFORMATION states:
+            “Beginning Adv Cap Run …” and “BuildCapEnrolls Service Started”. <span class="tag c">C</span></li>
+          <li>Call <code>BuildCapEnrolls()</code> and return its boolean. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li>Else (no valid XML message):
+    <ul>
+      <li>Trace warning “No Valid XML Message Provided”. <span class="tag c">C</span></li>
+      <li>If <code>lDetailId &lt;&gt; ""</code>, write ERROR state “No Valid XML Message Provided”. <span class="tag c">C</span></li>
+      <li>Return <code>False</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li><b>Catch</b> any exception:
+    <ul>
+      <li>Trace error and write an application event “Encountered an error :: …”. <span class="tag c">C</span></li>
+      <li>Set return <code>False</code>. <span class="tag c">C</span></li>
+      <li>If <code>lDetailId &lt;&gt; ""</code>, write ERROR state: <code>m_XMLMessage.affiliateid + " encountered cBuildCapEnrolls error :: " &amp; ex.ToString()</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li><b>Finally</b> (process-log completion/error rollup):
+    <ul>
+      <li>If <code>lDetailId</code> and <code>lHeaderId</code> are non-empty:
+        <ul>
+          <li>Load failure count via <code>cSelectProcessstateFailureCountByDetailId(sessionPlanintegration)</code> with <code>LoadData(lDetailId)</code>. <span class="tag c">C</span></li>
+          <li>If returned count &gt; 0: update process-log detail to <code>DetailStageEnum.ERROR</code> with message “Finished Processing Message With Errors…”, passing <code>errCount</code>. <span class="tag c">C</span></li>
+          <li>Else: update to <code>DetailStageEnum.COMPLETED</code> with message “Finished Processing Message With No Errors”. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>cSelectProcessstateFailureCountByDetailId</code> (query class) is used to retrieve a single failure-count value for the detail id. The exact SQL is not present in retrieved evidence. <span class="tag u">!</span>
+    <ul>
+      <li><b>Parameters passed:</b> <code>lDetailId</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> first column of first row (<code>Rows(0)(0)</code>) cast to <code>Integer</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched</h4>
+<p>Not directly shown for this method in retrieved edges/snippets. <span class="tag u">!</span></p>
+
+<h3>BuildCapEnrolls</h3>
+<div class="plain"><b>Second-pass retrieval:</b> this method body was retrieved in a follow-up pass and the section below supersedes the earlier stub. <span class="tag c">C</span></div>
+
+  <h4>Signature &amp; line range <span class="tag c">C</span></h4>
+  <pre>Private Function BuildCapEnrolls() As Boolean
+' File: ...\cBuildCapEnrolls.vb  Lines: 203-300</pre>
+
+  <h4>Step-by-step logic (orchestrator) <span class="tag c">C</span></h4>
+  <ol>
+    <li>
+      Reads a session option <code>qmxGlobals.QCSOptions.optCAPBatchSize</code> into <code>Opt_CAPBatchSize</code>, and if &gt; 0 maps it through <code>qmxGlobals.dictCAPBatch</code> into <code>reqCAPSize</code>. <span class="tag c">C</span>
+    </li>
+    <li>
+      If <code>m_XMLMessage.isSummary = True</code> <b>and</b> <code>m_XMLMessage.isGlobal = True</code>, then forces:
+      <ul>
+        <li><code>m_XMLMessage.recondate = m_XMLMessage.capdate</code></li>
+        <li><code>m_XMLMessage.reviewdate = m_XMLMessage.capdate</code></li>
+      </ul>
+      This ensures summary runs only process the cap month and do not reconcile earlier months. <span class="tag c">C</span>
+    </li>
+    <li>
+      Calls <code>LoadProgramcaps()</code> to load program cap configuration for the run. <span class="tag c">C</span>
+    </li>
+    <li>
+      If <code>m_programCaps</code> is not <code>Nothing</code> and <code>m_programCaps.Count &gt; 0</code>, iterates rows (via <code>MoveFirst()</code> and <code>While m_programCaps.CurrentRow &lt; m_programCaps.RecordCount</code>) looking for the first programcap row where:
+      <ul>
+        <li><code>effdate &lt;= m_XMLMessage.capdate</code> and</li>
+        <li><code>termdate &gt;= m_XMLMessage.capdate</code></li>
+      </ul>
+      If that row has <code>usetruecap = "Y"</code>, then sets <code>m_XMLMessage.capdate = LastDayofMonth(m_XMLMessage.capdate)</code> (i.e., adjusts capdate to month-end). Exits the loop after the first effective row match. <span class="tag c">C</span>
+    </li>
+    <li>
+      Calls <code>LoadOpenPayments()</code> to load existing open/paid payments for the provider/program/date window (used later to avoid rebuilding months already paid/open). <span class="tag c">C</span>
+    </li>
+    <li>
+      Branches on global vs PCP:
+      <ul>
+        <li>If <code>m_XMLMessage.isGlobal = True</code> then calls <code>Build_Global_Enrollments()</code>. <span class="tag c">C</span></li>
+        <li>Else calls <code>Build_PCP_Enrollments()</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>
+      Calls <code>ValidateCapFactorProgramFundsForAffiliations()</code> (comment indicates validation for invalid fund configuration for capfactors). <span class="tag c">C</span>
+    </li>
+    <li>
+      Calls <code>ProcessEnrollments()</code> to perform downstream enrollment processing and message generation. <span class="tag c">C</span>
+    </li>
+    <li>
+      If <code>lDetailId &lt;&gt; ""</code> and <code>m_loginfo</code> is true, writes a process-log detail state:
+      <code>StateStageEnum.ACCEPTED</code> with message <code>"BUILDCAPENROLLS Service Finished provider: " + m_XMLMessage.affiliateid</code>. <span class="tag c">C</span>
+    </li>
+    <li>
+      Sets <code>BuildCapEnrolls = True</code> and returns success. <span class="tag c">C</span>
+    </li>
+    <li>
+      On exception: traces error, sets <code>BuildCapEnrolls = False</code>, and if <code>lDetailId &lt;&gt; ""</code> writes a process-log detail state with <code>StateStageEnum.ERROR</code> and message:
+      <code>"Provider " + m_XMLMessage.affiliateid + " error - qmxAdvCap.cBuildCapEnrolls.BuildCapEnrolls:: " &amp; ex.Message</code>, then rethrows. <span class="tag c">C</span>
+    </li>
+  </ol>
+
+  <h4>Calls (exact order) <span class="tag c">C</span></h4>
+  <pre>1) LoadProgramcaps()
+2) LoadOpenPayments()
+3) If m_XMLMessage.isGlobal Then Build_Global_Enrollments() Else Build_PCP_Enrollments()
+4) ValidateCapFactorProgramFundsForAffiliations()
+5) ProcessEnrollments()</pre>
+
+  <h4>Data access touched by this method (directly) <span class="tag c">C</span></h4>
+  <ul>
+    <li>None inline; all DB access occurs inside called methods (<code>LoadProgramcaps</code>, <code>LoadOpenPayments</code>, <code>Build_Global_Enrollments</code>, <code>Build_PCP_Enrollments</code>, etc.). <span class="tag c">C</span></li>
+  </ul>
+
+  
+<h3 id="m-validatefunds">ValidateCapFactorProgramFundsForAffiliations()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub ValidateCapFactorProgramFundsForAffiliations()</code>, lines 302–351. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.programid</code>, <code>m_XMLMessage.capdate</code>, <code>m_XMLMessage.affils</code>. <span class="tag c">C</span></li>
+  <li><code>lDetailId</code>, <code>lProcessLog</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Instantiate query <code>Queries.cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc(Session)</code>. <span class="tag c">C</span></li>
+  <li>Guard: only proceed if <code>m_XMLMessage IsNot Nothing AndAlso m_XMLMessage.affils IsNot Nothing</code>. <span class="tag c">C</span></li>
+  <li>Compute <code>sAffilsList = getAffiliationList(m_XMLMessage.affils)</code>. <span class="tag c">C</span></li>
+  <li>Load query data:
+    <code>LoadData(m_XMLMessage.programid, m_XMLMessage.capdate, sAffilsList)</code>. <span class="tag c">C</span>
+  </li>
+  <li>If <code>RecordCount &gt; 0</code>, iterate rows:
+    <ul>
+      <li><code>MoveFirst()</code>, then <code>While Not EOF</code>. <span class="tag c">C</span></li>
+      <li>Only warn if <code>Fields("fundid").Value.Trim &lt;&gt; ""</code>. <span class="tag c">C</span></li>
+      <li>If <code>lDetailId &lt;&gt; ""</code>, write WARNING state with a message including:
+        affiliationid, programid, factorvalueid, capdate. <span class="tag c">C</span>
+      </li>
+      <li><code>MoveNext()</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Exceptions are swallowed (empty <code>Catch</code>). <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not present in retrieved snippet for the query class; only the wrapper and field properties are shown. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(programid, capdate, affilsList)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> <code>fundid</code>, <code>affiliationid</code>, <code>factorvalueid</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched</h4>
+<p>Not available from retrieved edges for this method. <span class="tag u">!</span></p>
+
+<h3 id="m-getaffillist">getAffiliationList(ByVal pList As String) As String</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Function getAffiliationList(ByVal pList As String) As String</code>, lines 353–384. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Find indices of <code>"("</code> and <code>")"</code> in <code>pList</code>. <span class="tag c">C</span></li>
+  <li>If either index is 0, return empty string. <span class="tag c">C</span></li>
+  <li>Else return substring between parentheses (exclusive). <span class="tag c">C</span></li>
+  <li>On exception, return empty string. <span class="tag c">C</span></li>
+</ol>
+
+<h3 id="m-buildpcp">Build_PCP_Enrollments()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub Build_PCP_Enrollments()</code>, lines 386–515. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.capdate</code>, <code>recondate</code>, <code>programid</code>, <code>affiliateid</code>, <code>detailid</code>, <code>eligibleorgid</code>, <code>isCapitatedOnly</code>, <code>capitationType</code>, <code>advreconrun</code>. <span class="tag c">C</span></li>
+  <li><code>lHeaderId</code>, <code>reqCAPSize</code>, <code>QSession.SessionData.ServerName</code>, <code>QSession.SessionData.DBName</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Compute <code>l_firstdayofcapmonth</code>:
+    if day(capdate) != 1, set to <code>MM/01/YYYY</code>, else use capdate. <span class="tag c">C</span>
+  </li>
+  <li>Write debug “CheckPayHolds”, then call <code>CheckPayHolds()</code>. <span class="tag c">C</span></li>
+  <li>Reset <code>m_globalPaytoAffil = ""</code>. <span class="tag c">C</span></li>
+  <li>Generate a new queue id:
+    <ul>
+      <li>Write debug “Getting NextID”. <span class="tag c">C</span></li>
+      <li><code>m_queueid = New CNextId(Session).GetStringID(QCS_ID_MISC)</code>. <span class="tag c">C</span></li>
+      <li>Set <code>m_XMLMessage.messagequeueid = m_queueid</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Derive <code>ismanagementcap</code>:
+    if <code>capitationType.Trim().ToUpper() = "MGT"</code> then “Y” else “N”. <span class="tag c">C</span>
+  </li>
+  <li>Execute stored-proc wrapper query to build PCP cap messages:
+    <ul>
+      <li>Compute <code>servDBName = "[" + ServerName + "].[" + DBName + "]"</code>. <span class="tag c">C</span></li>
+      <li>If <code>m_XMLMessage.advreconrun = "Y"</code>:
+        <ul>
+          <li>Load <code>cSelectcapadjustmentReconDateforAdvanceReconRun</code> by <code>(programid, affiliateid)</code>. <span class="tag c">C</span></li>
+          <li>If it returns a non-empty <code>recondate</code>, call
+            <code>Queries.cExecuteSpq_buildpcpcapmessagewithtypeadvreconrun</code> with the standard parameters plus the adv recon date. <span class="tag c">C</span></li>
+          <li>Else call <code>Queries.cExecuteSpq_buildpcpcapmessagewithtype</code>. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+      <li>Else (not adv recon run): call <code>Queries.cExecuteSpq_buildpcpcapmessagewithtype</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>On exception:
+    <ul>
+      <li>Trace error and write debug message with stack trace. <span class="tag c">C</span></li>
+      <li>If <code>lDetailId &lt;&gt; ""</code>, write ERROR state “Provider … error - …Build_PCP_Enrolls:: …”. <span class="tag c">C</span></li>
+      <li>Rethrow. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><b>Stored procedure called (per graph edges):</b> <code>Plandata_Parallel.dbo.spQ_BuildPCPCapMessage</code>. <span class="tag c">C</span></li>
+  <li><b>Exact procedure SQL/DDL:</b> Not retrieved; the KG only shows the procedure node and that it reads <code>capmessagequeue</code>. <span class="tag u">!</span></li>
+  <li><b>Query class used:</b> <code>Queries.cExecuteSpq_buildpcpcapmessagewithtype</code> (and adv-recon variant). <span class="tag c">C</span>
+    <ul>
+      <li><b>Parameters passed (non-adv):</b>
+        <code>(programid, capdate, recondate, firstdayofmonth, affiliateid, queueid, headerId, detailid, isCapitatedOnly, eligibleorgid, capitationType, ismanagementcap, reqCAPSize, servDBName)</code>. <span class="tag c">C</span>
+      </li>
+      <li><b>Parameters passed (adv):</b> same plus <code>advrecondate.ToShortDateString()</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> none directly in this method; the returned table is later used by <code>ProcessEnrollments</code> (expects columns like <code>capmessagequeueid</code>, <code>EnrollCount</code>, <code>firstid</code>, <code>lastid</code>, <code>processlogdetailid</code>). <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.capmessagequeue</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-buildglobal">Build_Global_Enrollments()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub Build_Global_Enrollments()</code>, lines 518–712. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.programid</code>, <code>capdate</code>, <code>recondate</code>, <code>affiliateid</code>, <code>detailid</code>, <code>eligibleorgid</code>, <code>isCapitatedOnly</code>, <code>advreconrun</code>. <span class="tag c">C</span></li>
+  <li><code>lHeaderId</code>, <code>reqCAPSize</code>, <code>QSession.SessionData.ServerName</code>, <code>QSession.SessionData.DBName</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Compute <code>l_firstdayofcapmonth</code> similarly to PCP build. <span class="tag c">C</span></li>
+  <li>Reset <code>m_globalPaytoAffil = ""</code>. <span class="tag c">C</span></li>
+  <li>Load global affiliations to determine a single global pay-to affiliation:
+    <ul>
+      <li><code>m_enrollments = New Queries.cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc(Session)</code>. <span class="tag c">C</span></li>
+      <li><code>m_enrollments.LoadData(programid, capdate, recondate, isCapitatedOnly, affiliateid)</code>. <span class="tag c">C</span></li>
+      <li>If <code>RecordCount = 1</code>:
+        <ul>
+          <li><code>m_globalPaytoAffil = Fields("globalpaytoaffil").Value</code>. <span class="tag c">C</span></li>
+          <li>If <code>LoadGlobalAffiliation() = False</code>, throw exception “Multiple global affiliations found and can't proceed”. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+      <li>Else throw exception “Unable to determine a single, unique global payto affiliation”. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Load global contract data:
+    <ul>
+      <li>If <code>LoadGlobalContractData() = False</code>, throw exception “No capitated contracts found…”. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Generate new queue id via <code>CNextId</code> and set <code>m_XMLMessage.messagequeueid</code>. <span class="tag c">C</span></li>
+  <li>Write debug message including detail id and queue id. <span class="tag c">C</span></li>
+  <li>Execute stored-proc wrapper query to build global cap messages:
+    <ul>
+      <li>Compute <code>servDBName</code> as <code>[server].[db]</code>. <span class="tag c">C</span></li>
+      <li>If <code>advreconrun = "Y"</code>, load adv recon date and call either:
+        <ul>
+          <li><code>Queries.cExecuteSpq_buildglobalcapmessageforadvreconrun</code> (if adv recon date present), or <span class="tag c">C</span></li>
+          <li><code>Queries.cExecuteSpq_buildglobalcapmessage</code> (otherwise). <span class="tag c">C</span></li>
+        </ul>
+      </li>
+      <li>Else call <code>Queries.cExecuteSpq_buildglobalcapmessage</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>On exception: write ERROR state to process log (if detail id present) and rethrow. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not present (LDL call only). <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(programid, capdate, recondate, isCapitatedOnly, affiliateid)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> <code>globalpaytoaffil</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li><b>Stored procedure called (per graph edges):</b> <code>Plandata_Parallel.dbo.spQ_BuildGlobalCapMessage</code>. <span class="tag c">C</span></li>
+  <li><b>Exact procedure SQL/DDL:</b> Not retrieved; KG only shows the procedure node and that it reads <code>capmessagequeue</code>. <span class="tag u">!</span></li>
+  <li><code>Queries.cExecuteSpq_buildglobalcapmessage</code> (and adv-recon variant)
+    <ul>
+      <li><b>Parameters passed (non-adv):</b>
+        <code>(programid, capdate, recondate, firstdayofmonth, affiliateid, queueid, detailid, globalPaytoAffil, eligibleorgid, headerId, reqCAPSize, servDBName)</code>. <span class="tag c">C</span>
+      </li>
+      <li><b>Columns consumed:</b> none directly here; consumed later by <code>ProcessEnrollments</code> via <code>m_enrollments.QTable</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.affiliation</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contract</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contractinfo</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.capitation</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.capmessagequeue</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-processenrollments">ProcessEnrollments() As Integer</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Function ProcessEnrollments() As Integer</code>, lines 719–902. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_enrollments</code> (expects a query result table with enrollment batch metadata). <span class="tag c">C</span></li>
+  <li><code>m_XMLMessage</code> fields: <code>capdate</code>, <code>recondate</code>, <code>affiliateid</code>, <code>programid</code>, <code>payee</code>, <code>username</code>, <code>messagequeueid</code>, <code>detailid</code>. <span class="tag c">C</span></li>
+  <li><code>lDetailId</code>, <code>lHeaderId</code>, <code>createCAPXML</code>, <code>reqCAPSize</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Initialize temp dates:
+    <code>l_tmpCapDate = m_XMLMessage.capdate</code>,
+    <code>l_tmpReconDate = m_XMLMessage.recondate</code>. <span class="tag c">C</span>
+  </li>
+  <li>If day(capdate) != 1, set <code>l_tmpCapDate</code> to first of month. <span class="tag c">C</span></li>
+  <li>If <code>m_enrollments IsNot Nothing</code>:
+    <ul>
+      <li>Set <code>l_updateAdj = False</code>. <span class="tag c">C</span></li>
+      <li>If <code>m_enrollments.RecordCount &gt; 0</code>:
+        <ul>
+          <li><code>dtEnrolls = m_enrollments.QTable</code>. <span class="tag c">C</span></li>
+          <li><code>totEnrolls</code> = sum of <code>EnrollCount</code> across rows. <span class="tag c">C</span></li>
+          <li><code>dtMsgQueue</code> = distinct <code>capmessagequeueid</code> values. <span class="tag c">C</span></li>
+          <li><code>totalReq</code> = number of distinct queue ids. <span class="tag c">C</span></li>
+          <li>Set <code>m_adjustCap = True</code>. <span class="tag c">C</span></li>
+          <li>If <code>lDetailId &lt;&gt; ""</code>, write INFORMATION state describing total enrollments and number of requests, including configured CAP batch size (<code>reqCAPSize</code>). <span class="tag c">C</span></li>
+          <li>For each distinct <code>capmessagequeueid</code>:
+            <ol type="a">
+              <li>Load default/supporting XML nodes for this batch:
+                <code>LoadProgramcapsIntoXML()</code>,
+                <code>LoadOpenPaymentsIntoXML()</code>,
+                <code>LoadGlobalContractDataIntoXML()</code>,
+                <code>LoadGlobalAffiliationIntoXML()</code>. <span class="tag c">C</span>
+              </li>
+              <li><code>drEnroll</code> = rows in <code>dtEnrolls</code> matching this queue id. <span class="tag c">C</span></li>
+              <li><code>Count</code> = sum of <code>EnrollCount</code> for those rows. <span class="tag c">C</span></li>
+              <li>Set <code>m_XMLMessage.messagequeueid</code> to the queue id. <span class="tag c">C</span></li>
+              <li>Write debug “ProcessEnrollments -- Detailid = … -- Batch Count = …”. <span class="tag c">C</span></li>
+              <li>Set <code>m_XMLMessage.batchcount</code> to max(<code>lastid</code>) across <code>drEnroll</code>. <span class="tag c">C</span></li>
+              <li>Create payment for this queue:
+                <ul>
+                  <li><code>m_paymentid = CreatePayment(programid, affiliateid, payee, l_tmpCapDate, username, messagequeueid, DBFixup(m_XMLMessage.XML))</code>. <span class="tag c">C</span></li>
+                  <li>Set <code>m_XMLMessage.paymentid = m_paymentid</code>. <span class="tag c">C</span></li>
+                </ul>
+              </li>
+              <li>If <code>lDetailId &lt;&gt; ""</code>, write INFORMATION state: provider will process N enrollments, includes PaymentID and MessageQueueID. <span class="tag c">C</span></li>
+              <li>If <code>m_adjustCap</code> then call <code>CalcCapAdjustments()</code>. <span class="tag c">C</span></li>
+              <li>If <code>drEnroll.Count = 1</code>:
+                <ul>
+                  <li>Process synchronously via <code>cBatchProcessEnrolls</code>:
+                    set <code>firstmessageid</code>/<code>lastmessageid</code> from the single row and call <code>ocBatchProcessEnrolls.ProcessMessage(m_XMLMessage.XML)</code>. <span class="tag c">C</span></li>
+                </ul>
+              </li>
+              <li>Else (multiple rows/batches):
+                <ul>
+                  <li>Build a QFrame message template: <code>sOutputMsg = m_XMLMessage.GetQFrameMessage()</code>. <span class="tag c">C</span></li>
+                  <li>For each row <code>dr</code> in <code>drEnroll</code>:
+                    <ul>
+                      <li><code>bDetailId = dr("processlogdetailid")</code>. <span class="tag c">C</span></li>
+                      <li>If <code>bDetailId &lt;&gt; ""</code>, create a process-log detail row:
+                        <code>CreatePLDetail(Session, lHeaderId, bDetailId, STARTED, "ADV_CAP_BATCH", createCAPXML, capmessagequeueid, "")</code>. <span class="tag c">C</span></li>
+                      <li>Deserialize template into <code>CapitationBatchProcessRequestMessageType</code>, set First/Last message ids, and set <code>ObjMessage.detailId = bDetailId</code>. <span class="tag c">C</span></li>
+                      <li>Dispatch via <code>Proxy.CapitationBatchProcessProxy(Session).ProcessMessage(ObjMessage)</code>. <span class="tag c">C</span></li>
+                    </ul>
+                  </li>
+                </ul>
+              </li>
+            </ol>
+          </li>
+        </ul>
+      </li>
+      <li>Else (RecordCount == 0): write INFORMATION “No Enrollments Found” (if detail id present). <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Else (m_enrollments is Nothing): write ERROR “Could not query for enrollments” (if detail id present). <span class="tag c">C</span></li>
+  <li>Catch: write ERROR state “BUILDCAPENROLLS Provider … error - …ProcessEnrollments:: …” and rethrow. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>CreatePayment(...)</code> is called once per distinct <code>capmessagequeueid</code>. The method body was not retrieved, so the exact SQL executed from within <code>CreatePayment</code> is not visible here. <span class="tag u">!</span></li>
+  <li>Batch dispatch uses:
+    <ul>
+      <li><code>cBatchProcessEnrolls.ProcessMessage</code> (synchronous path) — outside this class. <span class="tag c">C</span></li>
+      <li><code>Proxy.CapitationBatchProcessProxy.ProcessMessage</code> (async path) — outside this class. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched</h4>
+<p>Not directly enumerated by retrieved edges for this method; it primarily consumes in-memory <code>m_enrollments.QTable</code> produced by earlier stored-proc executions. <span class="tag u">!</span></p>
+
+<h3 id="m-loadopenpayments">LoadOpenPayments()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadOpenPayments()</code>, lines 907–961. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Instantiate <code>Queries.cRetrievePaymentsByProgProvDateType(Session)</code>. <span class="tag c">C</span></li>
+  <li>Call <code>LoadData(programid, affiliateid, capitationType, LastDayofMonth(capdate), FirstDayofMonth(recondate), eligibleorgid)</code>. <span class="tag c">C</span></li>
+  <li>Exceptions are traced and rethrown. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cRetrievePaymentsByProgProvDateType</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not present; query class calls LDL method <code>RetrievePaymentsByProgProvDateType</code>. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(programid, affiliateid, paytype=capitationType, lastdayofcapdate, firstdayofrecondate, eligibleorgid)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed later:</b> <code>paymentid</code>, <code>paydate</code>, <code>capdate</code> (see <code>LoadOpenPaymentsIntoXML</code>). <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched</h4>
+<p>Not available from retrieved edges for this method. <span class="tag u">!</span></p>
+
+<h3 id="m-loadopenpaymentsxml">LoadOpenPaymentsIntoXML()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadOpenPaymentsIntoXML()</code>, lines 963–984. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Clear <code>m_XMLMessage.OpenPayments</code>. <span class="tag c">C</span></li>
+  <li>If <code>m_openpayments</code> exists and <code>RecordCount &gt; 0</code>, iterate:
+    <ul>
+      <li>Add a new XML node per row and set <code>paydate</code>, <code>paymentid</code>, <code>capdate</code> from fields. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ol>
+
+<h3 id="m-loadprogramcaps">LoadProgramcaps()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadProgramcaps()</code>, lines 986–1048. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Derive <code>sProgramCapType</code>:
+    if <code>capitationType = "MGT"</code> then “M” else “S”. <span class="tag c">C</span>
+  </li>
+  <li>Instantiate <code>Queries.cRetrieveProgramCapsByProgidCapTypeEffdateTermdate(Session)</code> and call
+    <code>LoadData(programid, sProgramCapType, capdate, recondate)</code>. <span class="tag c">C</span>
+  </li>
+  <li>Exceptions traced and rethrown. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><b>Exact SQL:</b> Not retrieved for <code>cRetrieveProgramCapsByProgidCapTypeEffdateTermdate</code>. <span class="tag u">!</span></li>
+</ul>
+
+<h3 id="m-loadprogramcapsxml">LoadProgramcapsIntoXML()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadProgramcapsIntoXML()</code>, lines 1053–1086. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Clear <code>m_XMLMessage.Programcaps</code>. <span class="tag c">C</span></li>
+  <li>If <code>m_programCaps</code> exists, iterate its <code>QTable.Rows</code> and for each row:
+    <ul>
+      <li>Add a new Programcaps node and populate:
+        <code>programid, effdate, termdate, splitmonthday, ageday, firsthalfpercent, sechalfpercent, capmethod, useageday, usetruecap</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ol>
+
+<h3>LoadPolicycopays</h3>
+<div class="plain"><b>Second-pass retrieval:</b> this method body was retrieved in a follow-up pass and the section below supersedes the earlier stub. <span class="tag c">C</span></div>
+
+  <h4>Signature &amp; line range <span class="tag c">C</span></h4>
+  <pre>Private Sub LoadPolicycopays()
+' File: ...\cBuildCapEnrolls.vb  Lines: 1143-1252</pre>
+
+  <h4>Step-by-step logic <span class="tag c">C</span></h4>
+  <ol>
+    <li>
+      Declares <code>l_sql As String</code> but does not build/execute it (the prior inline SQL approach is fully commented out). <span class="tag c">C</span>
+    </li>
+    <li>
+      In <code>Try</code> block, documents (in comments) the intended union logic between:
+      <ul>
+        <li><code>policycopay</code> (no eff/term dates; would use enrollment dates), and</li>
+        <li><code>policycopaygroup</code> + <code>copaygroupdetail</code> (with eff/term dates)</li>
+      </ul>
+      but this is not executed. <span class="tag c">C</span>
+    </li>
+    <li>
+      Uses a data-service query object instead of inline SQL:
+      <ul>
+        <li>Instantiates <code>m_policycopays = New Queries.cSelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail(Session)</code>. <span class="tag c">C</span></li>
+        <li>Calls <code>m_policycopays.LoadData(m_XMLMessage.capdate, m_XMLMessage.recondate, DistinctRateIDSQL(), DistinctEligibleorgIDSQL())</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>
+      Exits the subroutine via <code>Exit Sub</code>. <span class="tag c">C</span>
+    </li>
+    <li>
+      On exception: rethrows (<code>Throw</code>) without additional logging (legacy logging is commented out). <span class="tag c">C</span>
+    </li>
+  </ol>
+
+  <h4>Data access (query class, parameters, consumed columns) <span class="tag c">C</span></h4>
+  <h5>Query: <code>Queries.cSelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail</code> <span class="tag c">C</span></h5>
+  <ul>
+    <li><b>Called from:</b> <code>LoadPolicycopays()</code>. <span class="tag c">C</span></li>
+    <li><b>Parameters passed:</b>
+      <ol>
+        <li><code>capdate = m_XMLMessage.capdate</code></li>
+        <li><code>recondate = m_XMLMessage.recondate</code></li>
+        <li><code>rateIdSql = DistinctRateIDSQL()</code> (string containing a SELECT/UNION query fragment)</li>
+        <li><code>eligibleOrgIdSql = DistinctEligibleorgIDSQL()</code> (string containing a SELECT/UNION query fragment)</li>
+      </ol>
+      <span class="tag c">C</span>
+    </li>
+    <li><b>Exact SQL executed by this query class:</b> not present in retrieved evidence/snippets. <span class="tag u">!</span></li>
+    <li><b>Result columns consumed later by this class:</b> in <code>LoadPolicycopaysIntoXML()</code>, the code reads:
+      <code>copaygroupid</code>, <code>copayid</code>, <code>copay</code>, <code>effdate</code>, <code>termdate</code>, <code>rateid</code>, <code>eligibleorgid</code>. <span class="tag c">C</span>
+    </li>
+  </ul>
+
+  <h5>Tables read (per graph edges on this method) <span class="tag c">C</span></h5>
+  <ul>
+    <li><code>Plandata_Parallel.dbo.policycopay</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.policycopaygroup</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.copaygroupdetail</code> <span class="tag c">C</span></li>
+  </ul>
+
+  
+<h3 id="m-loadpolicycopays">LoadPolicycopays()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadPolicycopays()</code>, lines 1143–1252. <span class="tag c">C</span><br/>
+  <b>Body:</b> Not retrieved in provided evidence set. <span class="tag u">!</span>
+</div>
+<p>
+  The KG shows it invokes <code>DistinctEligibleorgIDSQL()</code> and <code>DistinctRateIDSQL()</code> and reads from
+  <code>Plandata_Parallel.dbo.policycopay</code>, <code>Plandata_Parallel.dbo.policycopaygroup</code>, and
+  <code>Plandata_Parallel.dbo.copaygroupdetail</code>. <span class="tag c">C</span>
+</p>
+
+<h3>CreatePayment</h3>
+  <h4>Status <span class="tag u">!</span></h4>
+  <div class="plain">
+    The knowledge-graph context includes the method node <code>Q.ServiceComponents.Capitation.cBuildCapEnrolls.CreatePayment(ByRef String, ByRef String, ByRef String, ByRef String, ByRef String, ByRef String, ByRef String)</code>
+    with line range 1254–1311, but the <b>VB method body itself was not present</b> in the retrieved source snippets provided to this addendum. <span class="tag u">!</span><br/>
+    Searched/anchored via: <code>search_nodes keyword CreatePayment kind Method</code>, <code>get_subgraph qualified_name Q.ServiceComponents.Capitation.cBuildCapEnrolls depth 1</code>, and attempted <code>get_subgraph qualified_name Q.ServiceComponents.Capitation.cBuildCapEnrolls.CreatePayment() depth 2</code>. <span class="tag u">!</span>
+  </div>
+
+  <h4>What can be confirmed about the insert query class (from retrieved evidence) <span class="tag c">C</span></h4>
+  <ul>
+    <li>
+      The insert query class <code>Q.DataServices.Payment.DataAccess.Queries.cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc</code> exists and exposes:
+      <code>ExecuteQuery(paymentid, programid, provid, payee, paydate, paytype, capmessagequeuid, capmessage, eligibleorgid, processlogid)</code>. <span class="tag c">C</span>
+    </li>
+    <li>
+      That query class delegates to LDL: <code>PaymentLDL.InsertPaymentWithPaymentidProgramidProvidPaytypeEtc(...)</code>, which builds a parameter array of 10 parameters named:
+      <code>&lt;paymentid&gt;, &lt;programid&gt;, &lt;provid&gt;, &lt;payee&gt;, &lt;paydate&gt;, &lt;paytype&gt;, &lt;capmessagequeuid&gt;, &lt;capmessage&gt;, &lt;eligibleorgid&gt;, &lt;processlogid&gt;</code>. <span class="tag c">C</span>
+    </li>
+    <li>
+      The <b>exact SQL text</b> executed by <code>PaymentQuery.PaymentQueries.INSERT_PAYMENT_WITH_PAYMENTID_PROGRAMID_PROVID_PAYTYPE_ETC_</code> is <b>not present</b> in the retrieved snippets/graph evidence shown here. <span class="tag u">!</span>
+    </li>
+  </ul>
+
+  <h4>Tables written <span class="tag u">!</span></h4>
+  <div class="plain">
+    The method body is required to confirm whether the insert targets <code>Plandata_Parallel.dbo.payment</code> vs <code>TMSIS.dbo.payment</code> (or another alias). The retrieved evidence only shows that other methods read <code>TMSIS.dbo.payment</code> and that the insert query is in the Payment data service layer; it does not confirm the physical target table. <span class="tag u">!</span>
+  </div>
+
+  
+<h3 id="m-checkpayholds">CheckPayHolds()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub CheckPayHolds()</code>, lines 1317–1410. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_loginfo</code> (only runs when logging enabled). <span class="tag c">C</span></li>
+  <li><code>m_XMLMessage.capitationType</code>, <code>programid</code>, <code>isCapitatedOnly</code>, <code>capdate</code>, <code>recondate</code>, <code>affiliateid</code>. <span class="tag c">C</span></li>
+  <li><code>lDetailId</code>, <code>lProcessLog</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Logic</h4>
+<ol>
+  <li>If <code>m_loginfo</code> is false, exit without doing anything. <span class="tag c">C</span></li>
+  <li>Derive <code>ismanagementcap</code> from <code>capitationType</code> (“MGT” =&gt; “Y”, else “N”). <span class="tag c">C</span></li>
+  <li>Instantiate <code>Queries.cRetrieveCapitationPayHoldsPlusCapType(Session)</code> and call:
+    <code>LoadData(programid, isCapitatedOnly, ismanagementcap, capdate, recondate, affiliateid)</code>. <span class="tag c">C</span>
+  </li>
+  <li>Iterate results; for each row, if <code>lDetailId &lt;&gt; ""</code> and <code>m_loginfo</code>, write WARNING:
+    “Provider, Fullname (provid), is on payhold and will not be paid cap!”. <span class="tag c">C</span>
+  </li>
+  <li>On exception: rethrow. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cRetrieveCapitationPayHoldsPlusCapType</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not present; query class calls LDL <code>RetrieveCapitationPayHoldsPlusCapType</code>. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(programid, isCapitatedOnly, ismanagementcap, capdate, recondate, affiliateid)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> <code>Fullname</code>, <code>provid</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.provider</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.affiliation</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.benefitplan</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.capitation</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.enrollkeys</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contractinfo</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.memberpcp</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.provmemo</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contract</code> (read) <span class="tag c">C</span></li>
+  <li><code>Claim_Archive_RX_Historic.dbo.MEMO</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-loadglobalcontract">LoadGlobalContractData() As Boolean</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Function LoadGlobalContractData() As Boolean</code>, lines 1412–1475. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.fundid</code>, <code>m_XMLMessage.isCapitatedOnly</code>, <code>m_XMLMessage.capdate</code>, <code>m_XMLMessage.recondate</code>, <code>m_XMLMessage.programid</code>. <span class="tag c">C</span></li>
+  <li><code>m_globalPaytoAffil</code>. <span class="tag c">C</span></li>
+  <li>Date helpers: <code>LastDayofMonth</code>, <code>FirstDayofMonth</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Logic</h4>
+<ol>
+  <li>Instantiate <code>Queries.cSelectGlobalContractData(Session)</code>. <span class="tag c">C</span></li>
+  <li>Call <code>LoadData(fundid, globalPaytoAffil, isCapitatedOnly, LastDayofMonth(capdate), FirstDayofMonth(recondate), programid)</code>. <span class="tag c">C</span></li>
+  <li>Return <code>True</code> if <code>m_globalcapdata.RecordCount &gt; 0</code>, else <code>False</code>. <span class="tag c">C</span></li>
+  <li>On exception: trace and rethrow. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cSelectGlobalContractData</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(fundid, globalPaytoAffil, isCapitatedOnly, lastDayCap, firstDayRecon, programid)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed later:</b> see <code>LoadGlobalContractDataIntoXML</code> (contractid, effdate, termdate, capfundid, capid, captype, haspool, flatfeeamount). <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.capitation</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contract</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.contractinfo</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-loadglobalcontractxml">LoadGlobalContractDataIntoXML()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadGlobalContractDataIntoXML()</code>, lines 1479–1510. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Clear <code>m_XMLMessage.GlobalContractDatas</code>. <span class="tag c">C</span></li>
+  <li>If <code>m_globalcapdata</code> exists and has rows, iterate:
+    <ul>
+      <li>Add node and set:
+        <code>contractid, effdate, termdate, capfundid, capid, captype, haspool</code>. <span class="tag c">C</span></li>
+      <li>Set <code>isflatfee</code> to “Y” when <code>captype</code> equals “CAPFACTORS” (case-insensitive), else “N”. <span class="tag c">C</span></li>
+      <li>Set <code>flatfeeamount</code> and <code>networkid=""</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ol>
+
+<h3 id="m-loadglobalaffil">LoadGlobalAffiliation() As Boolean</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Function LoadGlobalAffiliation() As Boolean</code>, lines 1512–1561. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Instantiate <code>Q.DataServices.Provider.DataAccess.Queries.cSelectAffiliationByAffiliationid(Session)</code>. <span class="tag c">C</span></li>
+  <li>Call <code>LoadData(m_globalPaytoAffil)</code>. <span class="tag c">C</span></li>
+  <li>Return <code>True</code> only if record count equals 1; else <code>False</code>. <span class="tag c">C</span></li>
+  <li>On exception: trace and rethrow. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>cSelectAffiliationByAffiliationid</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(affiliationid = m_globalPaytoAffil)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed later:</b> see <code>LoadGlobalAffiliationIntoXML</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.affiliation</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-loadglobalaffilxml">LoadGlobalAffiliationIntoXML()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub LoadGlobalAffiliationIntoXML()</code>, lines 1563–1588. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ol>
+  <li>Clear <code>m_XMLMessage.GlobalAffiliations</code>. <span class="tag c">C</span></li>
+  <li>If <code>m_affils</code> exists:
+    <ul>
+      <li><code>MoveFirst()</code>, <code>AddNew()</code>, then copy fields:
+        <code>affiliationid, effdate, termdate, payflag, provid, status, affiliateid, affiltype, hospaffiltype, pcp</code>. <span class="tag c">C</span></li>
+      <li>Set <code>networkid=""</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ol>
+
+<h3 id="m-restart">RestartFailedCapRun() As Boolean</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Function RestartFailedCapRun() As Boolean</code>, lines 1594–1751. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.messagequeueid</code>, <code>m_XMLMessage.affiliateid</code>, and XML serialization via <code>m_XMLMessage.XML</code>/<code>GetQFrameMessage()</code>. <span class="tag c">C</span></li>
+  <li><code>m_OriginalXML</code> (passed to <code>cCapPayment.ProcessMessage</code>). <span class="tag c">C</span></li>
+  <li><code>lProcessLog</code>, <code>lHeaderId</code>, <code>lDetailId</code>, <code>m_loginfo</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Load remaining cap messages for the queue:
+    <ul>
+      <li><code>m_enrollments = New Queries.cSelectRemainingCapmessagesByMessagequeueid(Session)</code>. <span class="tag c">C</span></li>
+      <li><code>m_enrollments.LoadData(m_XMLMessage.messagequeueid)</code>. <span class="tag c">C</span></li>
+      <li><code>dtEnrolls = m_enrollments.QTable</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Create <code>ocCapPayment = New cCapPayment(Session, lProcessLog, lHeaderId, lDetailId)</code>. <span class="tag c">C</span></li>
+  <li>Compute <code>Count</code> as sum of <code>remaining</code> across rows (if any). <span class="tag c">C</span></li>
+  <li>If <code>Count &lt;= 0</code>:
+    <ul>
+      <li>Finalize payment via <code>ocCapPayment.ProcessMessage(m_OriginalXML)</code>. <span class="tag c">C</span></li>
+      <li>If returned message contains “RUNNING” or “FAILED”, throw exception. <span class="tag c">C</span></li>
+      <li>Else return <code>True</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Else (remaining enrollments exist):
+    <ul>
+      <li>If <code>dtEnrolls.Rows.Count = 1</code>:
+        <ul>
+          <li>Set <code>firstmessageid</code>, <code>lastmessageid</code>, and <code>batchcount</code> from the single row. <span class="tag c">C</span></li>
+          <li>Instantiate <code>cBatchProcessEnrolls</code> and call <code>ProcessMessage(m_XMLMessage.XML)</code>. <span class="tag c">C</span></li>
+          <li>Return <code>True</code>. <span class="tag c">C</span></li>
+        </ul>
+      </li>
+      <li>Else (multiple rows):
+        <ul>
+          <li>Set <code>m_XMLMessage.batchcount</code> to max(<code>lastid</code>) across rows. <span class="tag c">C</span></li>
+          <li>Build QFrame message template <code>sOutputMsg = m_XMLMessage.GetQFrameMessage()</code>. <span class="tag c">C</span></li>
+          <li>For each row:
+            <ul>
+              <li>Deserialize to <code>CapitationBatchProcessRequestMessageType</code>, set First/Last message ids. <span class="tag c">C</span></li>
+              <li>Dispatch via <code>Proxy.CapitationBatchProcessProxy(Session).ProcessMessage(ObjMessage)</code>. <span class="tag c">C</span></li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+  </li>
+  <li>If <code>lDetailId &lt;&gt; ""</code> and <code>m_loginfo</code>, write ACCEPTED state “BUILDCAPENROLLS Service Finished provider: …”. <span class="tag c">C</span></li>
+  <li>On exception: set return false then rethrow (the code sets <code>RestartFailedCapRun=False</code> but then <code>Throw</code>). <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cSelectRemainingCapmessagesByMessagequeueid</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(messagequeueid)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> <code>remaining</code>, <code>firstid</code>, <code>lastid</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h3>DistinctRateIDSQL</h3>
+<div class="plain"><b>Second-pass retrieval:</b> this method body was retrieved in a follow-up pass and the section below supersedes the earlier stub. <span class="tag c">C</span></div>
+
+  <h4>Signature &amp; line range <span class="tag c">C</span></h4>
+  <pre>Private Function DistinctRateIDSQL() As String
+' File: ...\cBuildCapEnrolls.vb  Lines: 1753-1847</pre>
+
+  <h4>Step-by-step logic <span class="tag c">C</span></h4>
+  <ol>
+    <li>Declares <code>sql</code>, <code>firstdayofcapmonth</code>, <code>ismanagementcap</code>. <span class="tag c">C</span></li>
+    <li>Computes <code>firstdayofcapmonth = FirstDayofMonth(m_XMLMessage.capdate)</code>. <span class="tag c">C</span></li>
+    <li>
+      Sets <code>ismanagementcap</code> based on capitation type:
+      <ul>
+        <li>If <code>m_XMLMessage.capitationType = "MGT"</code> then <code>"Y"</code> else <code>"N"</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>
+      Branches on <code>m_XMLMessage.isGlobal</code>:
+      <ul>
+        <li><b>Global:</b> builds a SQL string that returns distinct <code>enr.rateid</code> from a derived table of enrollment IDs (union of active enrollments and prior capvoucher enrollments), then joins back to <code>enrollkeys</code>. <span class="tag c">C</span></li>
+        <li><b>PCP (non-global):</b> builds a SQL string that returns distinct <code>enr.rateid</code> from a derived table of enrollment IDs based on pay-to affiliations/contracts/capitation/memberpcp/enrollkeys/etc. plus a union with capvoucher enrollments, then joins back to <code>enrollkeys</code>. Includes filters for <code>iscapitatedonly</code> and <code>capitation.ismanagementcap</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>Returns the built string via <code>DistinctRateIDSQL = sql</code>. <span class="tag c">C</span></li>
+  </ol>
+
+  <h4>Exact SQL fragment returned <span class="tag c">C</span></h4>
+  <pre>
+-- Returned string (built via concatenation)
+
+-- If m_XMLMessage.isGlobal Then:
+SELECT distinct enr.rateid FROM ( SELECT enr.enrollid FROM enrollkeys enr (NOLOCK) JOIN benefitplan bplan (NOLOCK) ON bplan.planid = enr.planid and bplan.programid = '{m_XMLMessage.programid}' JOIN policyplans pp (NOLOCK)  ON pp.rateid = enr.rateid JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.status <> 'SUSPENDED' WHERE  enr.segtype = 'INT'  AND bplan.planid = enr.planid AND op.eligibleorgid=enr.eligibleorgid and enr.effdate <= '{m_XMLMessage.capdate}' AND enr.termdate >= '{m_XMLMessage.recondate}' Union SELECT DISTINCT capvoucher.enrollid From capvoucher(NOLOCK) JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid AND payment.programid='{m_XMLMessage.programid}' AND payment.provid = '{m_XMLMessage.affiliateid}' AND payment.paydate < '{firstdayofcapmonth}' AND payment.paydate >= '{m_XMLMessage.recondate}' AND payment.status <> 'INCOMPLETE' AND payment.status <> 'VOID' AND payment.paytype = '{m_XMLMessage.capitationType}' AND capvoucher.enrollid <> '' ) a JOIN enrollkeys enr ON enr.enrollid=a.enrollid
+
+-- Else (non-global / PCP):
+SELECT distinct enr.rateid FROM ( SELECT DISTINCT enr.enrollid FROM affiliation afpayto (NOLOCK) JOIN contractinfo (NOLOCK) ON contractinfo.programid = '{m_XMLMessage.programid}' AND afpayto.affiliationid = contractinfo.affiliationid AND RTrim(contractinfo.servicelocationid) = '' AND (CASE WHEN '{m_XMLMessage.isCapitatedOnly}' = 'Y' THEN contractinfo.iscapitated ELSE 'Y' END ) = 'Y' JOIN contract (NOLOCK) ON contractinfo.contractid = contract.contractid  AND (contract.capid <> '' AND contract.capid IS NOT NULL) JOIN capitation (NOLOCK) ON contract.capid = capitation.capid AND capitation.pcponly <> 0 AND capitation.ismanagementcap = '{ismanagementcap}' JOIN memberpcp pcp (NOLOCK) ON afpayto.affiliationid = pcp.paytoaffilid  AND pcp.effdate <= '{m_XMLMessage.capdate}'   AND pcp.termdate >= '{m_XMLMessage.recondate}' JOIN enrollkeys enr (NOLOCK) ON enr.enrollid = pcp.enrollid  AND enr.segtype = 'INT'  AND enr.effdate <= '{m_XMLMessage.capdate}'  AND enr.termdate >= '{m_XMLMessage.recondate}' JOIN benefitplan bplan (NOLOCK) ON enr.planid = bplan.planid  AND bplan.programid = '{m_XMLMessage.programid}' JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.status <> 'SUSPENDED' JOIN affiliation afprov (NOLOCK)  ON pcp.affiliationid = afprov.affiliationid     AND afprov.effdate <= '{m_XMLMessage.capdate}'     AND afprov.termdate >= '{m_XMLMessage.recondate}'     AND afprov.provid IS NOT NULL JOIN provider prov (NOLOCK)  ON afprov.provid = prov.provid LEFT OUTER JOIN provmemo (NOLOCK) ON afprov.provid = provmemo.provid LEFT OUTER JOIN memo (NOLOCK) ON provmemo.memoid = memo.memoid WHERE afpayto.payflag <> 0 AND afpayto.effdate <= '{m_XMLMessage.capdate}'  AND afpayto.termdate >= '{m_XMLMessage.recondate}' AND afpayto.affiliationid IN (SELECT affiliationid from affiliation WHERE affiliateid = '{m_XMLMessage.affiliateid}' AND payflag <> 0 ) AND ( memo.codeid <> 'HOLD' or memo.codeid is null)  Union  SELECT DISTINCT capvoucher.enrollid From capvoucher(NOLOCK) JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid AND payment.programid='{m_XMLMessage.programid}' AND payment.provid = '{m_XMLMessage.affiliateid}' AND payment.paydate < '{firstdayofcapmonth}' AND payment.paydate >= '{m_XMLMessage.recondate}' AND payment.status <> 'INCOMPLETE' AND payment.status <> 'VOID' AND payment.paytype = '{m_XMLMessage.capitationType}' AND capvoucher.enrollid <> '' ) a JOIN enrollkeys enr ON enr.enrollid = a.enrollid
+</pre>
+
+  <h4>Tables referenced by the returned SQL (per graph edges) <span class="tag c">C</span></h4>
+  <ul>
+    <li><code>Plandata_Parallel.dbo.enrollkeys</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.benefitplan</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.policyplans</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.orgpolicy</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.capvoucher</code> <span class="tag c">C</span></li>
+    <li><code>TMSIS.dbo.payment</code> (the SQL uses <code>payment</code>; graph edge for this method includes <code>TMSIS.dbo.payment</code>) <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.affiliation</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.contractinfo</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.contract</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.capitation</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.memberpcp</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.provider</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.provmemo</code> <span class="tag c">C</span></li>
+    <li><code>Claim_Archive_RX_Historic.dbo.MEMO</code> (referenced as <code>memo</code> in SQL; graph edge includes this table) <span class="tag c">C</span></li>
+  </ul>
+
+  
+<h3>DistinctEligibleorgIDSQL</h3>
+<div class="plain"><b>Second-pass retrieval:</b> this method body was retrieved in a follow-up pass and the section below supersedes the earlier stub. <span class="tag c">C</span></div>
+
+  <h4>Signature &amp; line range <span class="tag c">C</span></h4>
+  <pre>Private Function DistinctEligibleorgIDSQL() As String
+' File: ...\cBuildCapEnrolls.vb  Lines: 1849-1939</pre>
+
+  <h4>Step-by-step logic <span class="tag c">C</span></h4>
+  <ol>
+    <li>Declares <code>sql</code>, <code>firstdayofcapmonth</code>, <code>ismanagementcap</code>. <span class="tag c">C</span></li>
+    <li>Computes <code>firstdayofcapmonth = FirstDayofMonth(m_XMLMessage.capdate)</code>. <span class="tag c">C</span></li>
+    <li>
+      Sets <code>ismanagementcap</code>:
+      <ul>
+        <li>If <code>m_XMLMessage.capitationType = "MGT"</code> then <code>"Y"</code> else <code>"N"</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>
+      Branches on <code>m_XMLMessage.isGlobal</code>:
+      <ul>
+        <li><b>Global:</b> builds SQL returning distinct <code>enr.eligibleorgid</code> from a derived table of enrollment IDs (union of active enrollments and capvoucher enrollments), then joins back to <code>enrollkeys</code>. <span class="tag c">C</span></li>
+        <li><b>PCP (non-global):</b> builds SQL returning distinct <code>enr.eligibleorgid</code> from a derived table of enrollment IDs based on pay-to affiliations/contracts/capitation/memberpcp/enrollkeys/etc. plus capvoucher union, then joins back to <code>enrollkeys</code>. Includes filters for <code>iscapitatedonly</code> and <code>capitation.ismanagementcap</code>. <span class="tag c">C</span></li>
+      </ul>
+    </li>
+    <li>Returns the built string via <code>DistinctEligibleorgIDSQL = sql</code>. <span class="tag c">C</span></li>
+  </ol>
+
+  <h4>Exact SQL fragment returned <span class="tag c">C</span></h4>
+  <pre>
+-- Returned string (built via concatenation)
+
+-- If m_XMLMessage.isGlobal Then:
+SELECT distinct enr.eligibleorgid FROM ( SELECT enr.enrollid FROM enrollkeys enr (NOLOCK) JOIN benefitplan bplan (NOLOCK) ON bplan.planid = enr.planid and bplan.programid = '{m_XMLMessage.programid}' JOIN policyplans pp (NOLOCK)  ON pp.rateid = enr.rateid JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.status <> 'SUSPENDED' WHERE  enr.segtype = 'INT'  AND bplan.planid = enr.planid AND op.eligibleorgid=enr.eligibleorgid and enr.effdate <= '{m_XMLMessage.capdate}' AND enr.termdate >= '{m_XMLMessage.recondate}' Union SELECT DISTINCT capvoucher.enrollid From capvoucher(NOLOCK) JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid AND payment.programid='{m_XMLMessage.programid}' AND payment.provid = '{m_XMLMessage.affiliateid}' AND payment.paydate < '{firstdayofcapmonth}' AND payment.paydate >= '{m_XMLMessage.recondate}' AND payment.status <> 'INCOMPLETE' AND payment.status <> 'VOID' AND payment.paytype = '{m_XMLMessage.capitationType}' AND capvoucher.enrollid <> '' ) a JOIN enrollkeys enr ON enr.enrollid=a.enrollid
+
+-- Else (non-global / PCP):
+SELECT distinct enr.eligibleorgid FROM ( SELECT DISTINCT enr.enrollid FROM affiliation afpayto (NOLOCK) JOIN contractinfo (NOLOCK) ON contractinfo.programid = '{m_XMLMessage.programid}' AND afpayto.affiliationid = contractinfo.affiliationid AND RTrim(contractinfo.servicelocationid) = '' AND (CASE WHEN '{m_XMLMessage.isCapitatedOnly}' = 'Y' THEN contractinfo.iscapitated ELSE 'Y' END ) = 'Y' JOIN contract (NOLOCK) ON contractinfo.contractid = contract.contractid  AND (contract.capid <> '' AND contract.capid IS NOT NULL) JOIN capitation (NOLOCK) ON contract.capid = capitation.capid AND capitation.pcponly <> 0 AND capitation.ismanagementcap = '{ismanagementcap}' JOIN memberpcp pcp (NOLOCK) ON afpayto.affiliationid = pcp.paytoaffilid  AND pcp.effdate <= '{m_XMLMessage.capdate}'   AND pcp.termdate >= '{m_XMLMessage.recondate}' JOIN enrollkeys enr (NOLOCK) ON enr.enrollid = pcp.enrollid  AND enr.segtype = 'INT'  AND enr.effdate <= '{m_XMLMessage.capdate}'  AND enr.termdate >= '{m_XMLMessage.recondate}' JOIN benefitplan bplan (NOLOCK) ON enr.planid = bplan.planid  AND bplan.programid = '{m_XMLMessage.programid}' JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.status <> 'SUSPENDED' JOIN affiliation afprov (NOLOCK)  ON pcp.affiliationid = afprov.affiliationid     AND afprov.effdate <= '{m_XMLMessage.capdate}'     AND afprov.termdate >= '{m_XMLMessage.recondate}'     AND afprov.provid IS NOT NULL JOIN provider prov (NOLOCK)  ON afprov.provid = prov.provid LEFT OUTER JOIN provmemo (NOLOCK) ON afprov.provid = provmemo.provid LEFT OUTER JOIN memo (NOLOCK) ON provmemo.memoid = memo.memoid WHERE afpayto.payflag <> 0 AND afpayto.effdate <= '{m_XMLMessage.capdate}'  AND afpayto.termdate >= '{m_XMLMessage.recondate}' AND afpayto.affiliationid IN (SELECT affiliationid from affiliation WHERE affiliateid = '{m_XMLMessage.affiliateid}' AND payflag <> 0 ) AND ( memo.codeid <> 'HOLD' or memo.codeid is null)  Union  SELECT DISTINCT capvoucher.enrollid From capvoucher(NOLOCK) JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid AND payment.programid='{m_XMLMessage.programid}' AND payment.provid = '{m_XMLMessage.affiliateid}' AND payment.paydate < '{firstdayofcapmonth}' AND payment.paydate >= '{m_XMLMessage.recondate}' AND payment.status <> 'INCOMPLETE' AND payment.status <> 'VOID' AND payment.paytype = '{m_XMLMessage.capitationType}' AND capvoucher.enrollid <> '' ) a JOIN enrollkeys enr ON enr.enrollid = a.enrollid
+</pre>
+
+  <h4>Tables referenced by the returned SQL (per graph edges) <span class="tag c">C</span></h4>
+  <ul>
+    <li><code>Plandata_Parallel.dbo.enrollkeys</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.benefitplan</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.policyplans</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.orgpolicy</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.capvoucher</code> <span class="tag c">C</span></li>
+    <li><code>TMSIS.dbo.payment</code> (SQL uses <code>payment</code>; graph edge includes <code>TMSIS.dbo.payment</code>) <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.affiliation</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.contractinfo</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.contract</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.capitation</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.memberpcp</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.provider</code> <span class="tag c">C</span></li>
+    <li><code>Plandata_Parallel.dbo.provmemo</code> <span class="tag c">C</span></li>
+    <li><code>Claim_Archive_RX_Historic.dbo.MEMO</code> (referenced as <code>memo</code> in SQL; graph edge includes this table) <span class="tag c">C</span></li>
+  </ul>
+
+  
+<h3 id="m-writedebug">WriteDebugMessage(ByVal msg As String)</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub WriteDebugMessage(ByVal msg As String)</code>, lines 1941–1945. <span class="tag c">C</span>
+</div>
+
+<h4>Logic</h4>
+<ul>
+  <li>If <code>m_XMLMessage.loginfo = "Y"</code>, write an application event:
+    source <code>"Q.ServiceComponents.Capitation.BatchProcessEnrolls"</code>, type Information, message <code>msg</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h3 id="m-calccapadj">CalcCapAdjustments()</h3>
+<div class="plain">
+  <b>Signature &amp; range:</b> <code>Private Sub CalcCapAdjustments()</code>, lines 1957–2068. <span class="tag c">C</span>
+</div>
+
+<h4>Inputs read</h4>
+<ul>
+  <li><code>m_XMLMessage.programid</code>, <code>affiliateid</code>, <code>capdate</code>, <code>paymentid</code>. <span class="tag c">C</span></li>
+  <li><code>Session.UserName</code>. <span class="tag c">C</span></li>
+</ul>
+
+<h4>Step-by-step logic</h4>
+<ol>
+  <li>Load pending monetary cap adjustments:
+    <ul>
+      <li><code>m_adjustments = New Queries.cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly(Session)</code>. <span class="tag c">C</span></li>
+      <li><code>m_adjustments.LoadData(programid, affiliateid, capdate)</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>If <code>m_adjustments.RecordCount &gt; 0</code>, iterate:
+    <ul>
+      <li>Create a capvoucher record via <code>Queries.cCreatecapvoucherRecord(Session).ExecuteQuery(...)</code> passing:
+        paymentid, captype “ADJUSTMENT”, enrollid, use_fundid, payto affiliation, amount, processingperiod, capadjustmentid, audit fields, etc. <span class="tag c">C</span></li>
+      <li>Update capadjustment status via <code>Queries.cUpdateCapadjustmentByProcessdatePaymentidStatusEtc(Session).ExecuteQuery(now, paymentid, "PROCESSED", capadjustmentid)</code>. <span class="tag c">C</span></li>
+      <li><code>MoveNext()</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li>Call <code>m_adjustments.store()</code>. <span class="tag c">C</span></li>
+  <li>Set <code>m_adjustCap = False</code>. <span class="tag c">C</span></li>
+</ol>
+
+<h4>Data access</h4>
+<ul>
+  <li><code>Queries.cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Parameters passed:</b> <code>(programid, affiliateid, capdate)</code>. <span class="tag c">C</span></li>
+      <li><b>Columns consumed:</b> <code>enrollid</code>, <code>use_fundid</code>, <code>amount</code>, <code>processingperiod</code>, <code>capadjustmentid</code>. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li><code>Queries.cCreatecapvoucherRecord</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Writes:</b> creates a capvoucher row (implied by name and parameters). <span class="tag c">C</span></li>
+    </ul>
+  </li>
+  <li><code>Queries.cUpdateCapadjustmentByProcessdatePaymentidStatusEtc</code>
+    <ul>
+      <li><b>Exact SQL:</b> Not retrieved. <span class="tag u">!</span></li>
+      <li><b>Writes:</b> updates capadjustment row status/processdate/paymentid. <span class="tag c">C</span></li>
+    </ul>
+  </li>
+</ul>
+
+<h4>Tables touched (from KG edges)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.capadjustment</code> (read) <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.program</code> (read) <span class="tag c">C</span></li>
+</ul>
+
+<h2 id="data-summary">Data Access Summary</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Query class / Procedure</th>
+      <th>Exact SQL available?</th>
+      <th>Tables touched (qualified, per KG)</th>
+      <th>Called from method(s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Plandata_Parallel.dbo.spQ_BuildGlobalCapMessage</code></td>
+      <td>No <span class="tag u">!</span> (DDL body not retrieved; only node exists)</td>
+      <td><code>Plandata_Parallel.dbo.capmessagequeue</code> (reads) <span class="tag c">C</span></td>
+      <td><code>Build_Global_Enrollments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Plandata_Parallel.dbo.spQ_BuildPCPCapMessage</code></td>
+      <td>No <span class="tag u">!</span> (DDL body not retrieved; only node exists)</td>
+      <td><code>Plandata_Parallel.dbo.capmessagequeue</code> (reads) <span class="tag c">C</span></td>
+      <td><code>Build_PCP_Enrollments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cExecuteSpq_buildglobalcapmessage</code> (and adv variant)</td>
+      <td>No <span class="tag u">!</span> (LDL call; SQL not retrieved)</td>
+      <td>Via method edges: <code>capitation</code>, <code>contract</code>, <code>contractinfo</code>, <code>affiliation</code>, <code>capmessagequeue</code> (reads) <span class="tag c">C</span></td>
+      <td><code>Build_Global_Enrollments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cExecuteSpq_buildpcpcapmessagewithtype</code> (and adv variant)</td>
+      <td>No <span class="tag u">!</span> (LDL call; SQL not retrieved)</td>
+      <td><code>capmessagequeue</code> (reads) <span class="tag c">C</span></td>
+      <td><code>Build_PCP_Enrollments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td>Not enumerated in query snippet; method edges show reads from <code>affiliation</code>/<code>contractinfo</code>/<code>contract</code>/<code>capitation</code. <span class="tag c">C</span></td>
+      <td><code>Build_Global_Enrollments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cSelectGlobalContractData</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td><code>Plandata_Parallel.dbo.capitation</code>, <code>contract</code>, <code>contractinfo</code> (reads) <span class="tag c">C</span></td>
+      <td><code>LoadGlobalContractData</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Q.DataServices.Provider...cSelectAffiliationByAffiliationid</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td><code>Plandata_Parallel.dbo.affiliation</code> (reads) <span class="tag c">C</span></td>
+      <td><code>LoadGlobalAffiliation</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cRetrievePaymentsByProgProvDateType</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td>Not enumerated in edges for this method. <span class="tag u">!</span></td>
+      <td><code>LoadOpenPayments</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cRetrieveCapitationPayHoldsPlusCapType</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td><code>provider</code>, <code>affiliation</code>, <code>benefitplan</code>, <code>capitation</code>, <code>enrollkeys</code>, <code>contractinfo</code>, <code>memberpcp</code>, <code>provmemo</code>, <code>contract</code>, <code>Claim_Archive_RX_Historic.dbo.MEMO</code> (reads) <span class="tag c">C</span></td>
+      <td><code>CheckPayHolds</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td>Not enumerated in edges for this method. <span class="tag u">!</span></td>
+      <td><code>ValidateCapFactorProgramFundsForAffiliations</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cSelectRemainingCapmessagesByMessagequeueid</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td>Not enumerated. <span class="tag u">!</span></td>
+      <td><code>RestartFailedCapRun</code> <span class="tag c">C</span></td>
+    </tr>
+    <tr>
+      <td><code>Queries.cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly</code></td>
+      <td>No <span class="tag u">!</span></td>
+      <td><code>Plandata_Parallel.dbo.capadjustment</code>, <code>Plandata_Parallel.dbo.program</code> (reads) <span class="tag c">C</span></td>
+      <td><code>CalcCapAdjustments</code> <span class="tag c">C</span></td>
+    </tr>
+  </tbody>
+</table>
+
+
+<h2>Data Access Inventory — QUERYID map and parameter contracts</h2>
+<div class="plain">
+Generated from the knowledge graph: every query class cBuildCapEnrolls uses, the QUERYID reported
+by the reference analysis (confirm/correct status per row), the parameters the calling method
+passes, and qualified table names from graph edges. The SQL string constants inside the generated
+DataServices files are not yet served by the graph (they require the DataServices source re-ingest
+noted above) — each row states this explicitly rather than reproducing unverified SQL.
+<span class="tag c">C</span>
+</div>
+<h3>Coverage Summary</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Query class</th>
+      <th>Expected QUERYID → confirmed?</th>
+      <th>SQL retrieved?</th>
+      <th>Called from cBuildCapEnrolls method</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>cRetrieveProgramCapsByProgidCapTypeEffdateTermdate</td><td>10980 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>LoadProgramcaps</td></tr>
+    <tr><td>cRetrievePaymentsByProgProvDateType</td><td>10974 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>LoadOpenPayments</td></tr>
+    <tr><td>cRetrieveCapitationPayHoldsPlusCapType</td><td>10973 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>CheckPayHolds</td></tr>
+    <tr><td>cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc</td><td>61 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>Build_Global_Enrollments</td></tr>
+    <tr><td>cSelectAffiliationByAffiliationid</td><td>24636 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>LoadGlobalAffiliation</td></tr>
+    <tr><td>cSelectGlobalContractData</td><td>10573 → <span class="tag u">!</span> (class not evidenced in provided source)</td><td>No <span class="tag u">!</span></td><td>LoadGlobalContractData</td></tr>
+    <tr><td>cExecuteSpq_buildglobalcapmessage</td><td>60 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>Build_Global_Enrollments</td></tr>
+    <tr><td>cExecuteSpq_buildglobalcapmessageforadvreconrun</td><td>65249 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>Build_Global_Enrollments</td></tr>
+    <tr><td>cExecuteSpq_buildpcpcapmessagewithtype</td><td>10977 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>Build_PCP_Enrollments</td></tr>
+    <tr><td>cExecuteSpq_buildpcpcapmessagewithtypeadvreconrun</td><td>65263 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>Build_PCP_Enrollments</td></tr>
+    <tr><td>cSelectcapadjustmentReconDateforAdvanceReconRun</td><td>65248 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>Build_PCP_Enrollments (advreconrun path) / Build_Global_Enrollments (advreconrun path)</td></tr>
+    <tr><td>cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc</td><td>27424 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>ValidateCapFactorProgramFundsForAffiliations</td></tr>
+    <tr><td>cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc</td><td>10975 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>CreatePayment</td></tr>
+    <tr><td>cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly</td><td>10610 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>CalcCapAdjustments</td></tr>
+    <tr><td>cCreatecapvoucherRecord</td><td>98 → <span class="tag u">!</span> (class not evidenced in provided source)</td><td>No <span class="tag u">!</span></td><td>CalcCapAdjustments</td></tr>
+    <tr><td>cUpdateCapadjustmentByProcessdatePaymentidStatusEtc</td><td>10611 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>CalcCapAdjustments</td></tr>
+    <tr><td>cSelectProcessstateFailureCountByDetailId</td><td>65223 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>ProcessMessage (finally block)</td></tr>
+    <tr><td>cSelectRemainingCapmessagesByMessagequeueid</td><td>10574 → <span class="tag u">!</span> (QUERYID not evidenced in retrieved snippet)</td><td>No <span class="tag u">!</span></td><td>RestartFailedCapRun</td></tr>
+    <tr><td>cSelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail</td><td>11335 → <span class="tag c">C</span></td><td>No <span class="tag u">!</span></td><td>LoadPolicycopays</td></tr>
+  </tbody>
+</table>
+
+<!-- Per-query sections -->
+
+<h3>LoadProgramcaps — cRetrieveProgramCapsByProgidCapTypeEffdateTermdate — QUERYID 10980</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\RetrieveProgramCapsByProgidCapTypeEffdateTermdate.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; method delegates to LDL (<code>CAccessPaymentUtility.LDLObject.RetrieveProgramCapsByProgidCapTypeEffdateTermdate</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>LoadProgramcaps passes <code>programid</code> <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@captype</td><td>LoadProgramcaps passes captype “M-or-S” derived from message capitationType (“MGT”→“M”, else “S”) <span class="tag c">C</span></td><td>Programcap cap type</td></tr>
+    <tr><td>@capdate</td><td>LoadProgramcaps passes <code>capdate</code> <span class="tag i">c</span></td><td>Capitation month/date upper bound</td></tr>
+    <tr><td>@recondate</td><td>LoadProgramcaps passes <code>recondate</code> <span class="tag i">c</span></td><td>Reconciliation date lower bound</td></tr>
+  </tbody>
+</table>
+<h4>Downstream columns consumed by cBuildCapEnrolls</h4>
+<ul>
+  <li><code>programid, effdate, termdate, splitmonthday, ageday, firsthalfpercent, sechalfpercent, capmethod, useageday, usetruecap</code> (loaded into XML in <code>LoadProgramcapsIntoXML</code>) <span class="tag c">C</span></li>
+</ul>
+
+<h3>LoadOpenPayments — cRetrievePaymentsByProgProvDateType — QUERYID 10974</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\RetrievePaymentsByProgProvDateType.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.RetrievePaymentsByProgProvDateType</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>LoadOpenPayments passes <code>programid</code> <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@affiliateid</td><td>LoadOpenPayments passes <code>affiliateid</code> <span class="tag i">c</span></td><td>Provider affiliate id</td></tr>
+    <tr><td>@paytype</td><td>LoadOpenPayments passes <code>capitationType</code> <span class="tag i">c</span></td><td>Payment paytype filter</td></tr>
+    <tr><td>@lastdayofcapdate</td><td>LoadOpenPayments passes <code>LastDayofMonth(capdate)</code> <span class="tag i">c</span></td><td>Upper date bound</td></tr>
+    <tr><td>@firstdayofrecondate</td><td>LoadOpenPayments passes <code>FirstDayofMonth(recondate)</code> <span class="tag i">c</span></td><td>Lower date bound</td></tr>
+    <tr><td>@eligibleorgid</td><td>LoadOpenPayments passes <code>eligibleorgid</code> <span class="tag i">c</span></td><td>Eligibility org filter</td></tr>
+  </tbody>
+</table>
+<h4>Downstream columns consumed by cBuildCapEnrolls</h4>
+<ul>
+  <li><code>paydate, paymentid, capdate</code> (loaded into XML in <code>LoadOpenPaymentsIntoXML</code>) <span class="tag c">C</span></li>
+</ul>
+
+<h3>CheckPayHolds — cRetrieveCapitationPayHoldsPlusCapType — QUERYID 10973</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\RetrieveCapitationPayHoldsPlusCapType.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 10973 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.RetrieveCapitationPayHoldsPlusCapType</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>CheckPayHolds passes <code>m_XMLMessage.programid</code> <span class="tag c">C</span></td><td>Program identifier</td></tr>
+    <tr><td>@iscapitated</td><td>CheckPayHolds passes <code>m_XMLMessage.isCapitatedOnly</code> <span class="tag c">C</span></td><td>Capitated-only filter flag</td></tr>
+    <tr><td>@ismanagementcap</td><td>CheckPayHolds passes derived “Y/N” from capitationType (“MGT”→“Y”) <span class="tag c">C</span></td><td>Management cap filter</td></tr>
+    <tr><td>@capdate</td><td>CheckPayHolds passes <code>m_XMLMessage.capdate</code> <span class="tag c">C</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>CheckPayHolds passes <code>m_XMLMessage.recondate</code> <span class="tag c">C</span></td><td>Recon date</td></tr>
+    <tr><td>@affiliateid</td><td>CheckPayHolds passes <code>m_XMLMessage.affiliateid</code> <span class="tag c">C</span></td><td>Affiliate/provider id</td></tr>
+  </tbody>
+</table>
+<h4>Downstream columns consumed by cBuildCapEnrolls</h4>
+<ul>
+  <li><code>Fullname</code>, <code>provid</code> (used to log warning messages) <span class="tag c">C</span></li>
+</ul>
+
+<h3>Build_Global_Enrollments — cSelectGlobalAffiliationsByProgramidCapdateRecondateEtc — QUERYID 61</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\SELECT_Global_Affiliations_BY_programid_capdate_recondate_etc_.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 61 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.SelectGlobalAffiliationsByProgramidCapdateRecondateEtc</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>Build_Global_Enrollments passes <code>programid</code> <span class="tag c">C</span></td><td>Program identifier</td></tr>
+    <tr><td>@capdate</td><td>Build_Global_Enrollments passes <code>capdate</code> <span class="tag c">C</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>Build_Global_Enrollments passes <code>recondate</code> <span class="tag c">C</span></td><td>Recon date</td></tr>
+    <tr><td>@iscapitated</td><td>Build_Global_Enrollments passes <code>isCapitatedOnly</code> <span class="tag c">C</span></td><td>Capitated-only filter</td></tr>
+    <tr><td>@affiliateid</td><td>Build_Global_Enrollments passes <code>affiliateid</code> <span class="tag c">C</span></td><td>Affiliate/provider id</td></tr>
+  </tbody>
+</table>
+<h4>Downstream columns consumed by cBuildCapEnrolls</h4>
+<ul>
+  <li><code>globalpaytoaffil</code> (assigned to <code>m_globalPaytoAffil</code>) <span class="tag c">C</span></li>
+</ul>
+
+<h3>LoadGlobalAffiliation — cSelectAffiliationByAffiliationid — QUERYID 24636</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Provider\Src\QCSI Access Provider\Queries\SELECT_affiliation_BY_affiliationid.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet (only ExecuteQuery shown). <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; delegates to LDL (<code>CAccessProviderUtility.LDLObject.SelectAffiliationByAffiliationid</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@affiliationid</td><td>LoadGlobalAffiliation passes <code>m_globalPaytoAffil</code> <span class="tag c">C</span></td><td>Affiliation primary key</td></tr>
+  </tbody>
+</table>
+<h4>Downstream columns consumed by cBuildCapEnrolls</h4>
+<ul>
+  <li><code>affiliationid, effdate, termdate, payflag, provid, status, affiliateid, affiltype, hospaffiltype, pcp</code> (loaded into XML in <code>LoadGlobalAffiliationIntoXML</code>) <span class="tag c">C</span></li>
+</ul>
+
+<h3>LoadGlobalContractData — cSelectGlobalContractData — QUERYID 10573</h3>
+<div class="plain"><b>Source</b>: Class source not present in provided evidence; only call-site in <code>cBuildCapEnrolls.LoadGlobalContractData()</code> is shown. Searched: <code>cSelectGlobalContractData</code> and <code>SELECT_Global_Contract_Data</code> per prompt anchors. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not retrieved. <span class="tag u">!</span></div>
+
+<h3>Build_Global_Enrollments — cExecuteSpq_buildglobalcapmessage — QUERYID 60</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\Execute_spq_BuildGlobalCapMessage.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet (only ExecuteQuery/LoadData shown). <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved class source; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.ExecuteSpq_buildglobalcapmessage</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>programid <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@capdate</td><td>capdate <span class="tag i">c</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>recondate <span class="tag i">c</span></td><td>Recon date</td></tr>
+    <tr><td>@firstdayofmonth</td><td>firstdayofmonth (computed) <span class="tag i">c</span></td><td>First day of cap month</td></tr>
+    <tr><td>@affiliateid</td><td>affiliateid <span class="tag i">c</span></td><td>Affiliate/provider id</td></tr>
+    <tr><td>@queueid</td><td>queueid <span class="tag i">c</span></td><td>Message queue id</td></tr>
+    <tr><td>@detailid</td><td>detailid <span class="tag i">c</span></td><td>Process log detail id</td></tr>
+    <tr><td>@globalpaytoaffil</td><td>globalPaytoAffil <span class="tag i">c</span></td><td>Global pay-to affiliation</td></tr>
+    <tr><td>@eligibleorgid</td><td>eligibleorgid <span class="tag i">c</span></td><td>Eligibility org</td></tr>
+    <tr><td>@headerid</td><td>headerId <span class="tag i">c</span></td><td>Process log header id</td></tr>
+    <tr><td>@capreqsize</td><td>reqCAPSize <span class="tag i">c</span></td><td>Batch sizing</td></tr>
+    <tr><td>@qcsidbname</td><td>servDBName <span class="tag i">c</span></td><td>Server/DB name string</td></tr>
+  </tbody>
+</table>
+
+<h3>Build_Global_Enrollments — cExecuteSpq_buildglobalcapmessageforadvreconrun — QUERYID 65249</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\ExecuteSpq_buildglobalcapmessageforadvreconrun.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.ExecuteSpq_buildglobalcapmessageforadvreconrun</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>programid <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@capdate</td><td>capdate <span class="tag i">c</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>recondate <span class="tag i">c</span></td><td>Recon date</td></tr>
+    <tr><td>@firstdayofmonth</td><td>firstdayofmonth <span class="tag i">c</span></td><td>First day of cap month</td></tr>
+    <tr><td>@affiliateid</td><td>affiliateid <span class="tag i">c</span></td><td>Affiliate/provider id</td></tr>
+    <tr><td>@queueid</td><td>queueid <span class="tag i">c</span></td><td>Message queue id</td></tr>
+    <tr><td>@headerid</td><td>headerId <span class="tag i">c</span></td><td>Process log header id</td></tr>
+    <tr><td>@detailid</td><td>detailid <span class="tag i">c</span></td><td>Process log detail id</td></tr>
+    <tr><td>@globalpaytoaffil</td><td>globalPaytoAffil <span class="tag i">c</span></td><td>Global pay-to affiliation</td></tr>
+    <tr><td>@eligibleorgid</td><td>eligibleorgid <span class="tag i">c</span></td><td>Eligibility org</td></tr>
+    <tr><td>@capreqsize</td><td>reqCAPSize <span class="tag i">c</span></td><td>Batch sizing</td></tr>
+    <tr><td>@qcsidbname</td><td>servDBName <span class="tag i">c</span></td><td>Server/DB name string</td></tr>
+    <tr><td>@advrecondate</td><td>advrecondate (from cSelectcapadjustmentReconDateforAdvanceReconRun) <span class="tag c">C</span></td><td>Advance recon date</td></tr>
+  </tbody>
+</table>
+
+<h3>Build_PCP_Enrollments — cExecuteSpq_buildpcpcapmessagewithtype — QUERYID 10977</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\Execute_spq_BuildPCPCapMessageWithType.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.ExecuteSpq_buildpcpcapmessagewithtype</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>programid <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@capdate</td><td>capdate <span class="tag i">c</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>recondate <span class="tag i">c</span></td><td>Recon date</td></tr>
+    <tr><td>@firstdayofmonth</td><td>firstdayofmonth <span class="tag i">c</span></td><td>First day of cap month</td></tr>
+    <tr><td>@affiliateid</td><td>affiliateid <span class="tag i">c</span></td><td>Affiliate/provider id</td></tr>
+    <tr><td>@queueid</td><td>queueid <span class="tag i">c</span></td><td>Message queue id</td></tr>
+    <tr><td>@headerid</td><td>headerId <span class="tag i">c</span></td><td>Process log header id</td></tr>
+    <tr><td>@detailid</td><td>detailid <span class="tag i">c</span></td><td>Process log detail id</td></tr>
+    <tr><td>@isCapitatedOnly</td><td>isCapitatedOnly <span class="tag i">c</span></td><td>Capitated-only filter</td></tr>
+    <tr><td>@eligibleorgid</td><td>eligibleorgid <span class="tag i">c</span></td><td>Eligibility org</td></tr>
+    <tr><td>@captype</td><td>capitationType <span class="tag i">c</span></td><td>Capitation type</td></tr>
+    <tr><td>@ismanagementcap</td><td>ismanagementcap <span class="tag i">c</span></td><td>Management cap flag</td></tr>
+    <tr><td>@capreqsize</td><td>reqCAPSize <span class="tag i">c</span></td><td>Batch sizing</td></tr>
+    <tr><td>@qcsidbname</td><td>servDBName <span class="tag i">c</span></td><td>Server/DB name string</td></tr>
+  </tbody>
+</table>
+
+<h3>Build_PCP_Enrollments — cExecuteSpq_buildpcpcapmessagewithtypeadvreconrun — QUERYID 65263</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\ExecuteSpq_buildpcpcapmessagewithtypeadvreconrun.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.ExecuteSpq_buildpcpcapmessagewithtypeadvreconrun</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@programid</td><td>programid <span class="tag i">c</span></td><td>Program identifier</td></tr>
+    <tr><td>@capdate</td><td>capdate <span class="tag i">c</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td>recondate <span class="tag i">c</span></td><td>Recon date</td></tr>
+    <tr><td>@firstdayofmonth</td><td>firstdayofmonth <span class="tag i">c</span></td><td>First day of cap month</td></tr>
+    <tr><td>@affiliateid</td><td>affiliateid <span class="tag i">c</span></td><td>Affiliate/provider id</td></tr>
+    <tr><td>@queueid</td><td>queueid <span class="tag i">c</span></td><td>Message queue id</td></tr>
+    <tr><td>@headerid</td><td>headerId <span class="tag i">c</span></td><td>Process log header id</td></tr>
+    <tr><td>@detailid</td><td>detailid <span class="tag i">c</span></td><td>Process log detail id</td></tr>
+    <tr><td>@isCapitatedOnly</td><td>isCapitatedOnly <span class="tag i">c</span></td><td>Capitated-only filter</td></tr>
+    <tr><td>@eligibleorgid</td><td>eligibleorgid <span class="tag i">c</span></td><td>Eligibility org</td></tr>
+    <tr><td>@captype</td><td>capitationType <span class="tag i">c</span></td><td>Capitation type</td></tr>
+    <tr><td>@ismanagementcap</td><td>ismanagementcap <span class="tag i">c</span></td><td>Management cap flag</td></tr>
+    <tr><td>@capreqsize</td><td>reqCAPSize <span class="tag i">c</span></td><td>Batch sizing</td></tr>
+    <tr><td>@qcsidbname</td><td>servDBName <span class="tag i">c</span></td><td>Server/DB name string</td></tr>
+    <tr><td>@advrecondate</td><td>advrecondate (from cSelectcapadjustmentReconDateforAdvanceReconRun) <span class="tag c">C</span></td><td>Advance recon date</td></tr>
+  </tbody>
+</table>
+
+<h3>Build_PCP_Enrollments / Build_Global_Enrollments (advreconrun) — cSelectcapadjustmentReconDateforAdvanceReconRun — QUERYID 65248</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\SelectcapadjustmentReconDateforAdvanceReconRun.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 65248 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.SelectcapadjustmentReconDateforAdvanceReconRun</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<div class="plain">
+  The call-site in <code>cBuildCapEnrolls</code> is <code>advreconrun.LoadData(m_XMLMessage.programid, m_XMLMessage.affiliateid)</code> <span class="tag c">C</span>.
+  The method signature is not shown in the snippet, but is implied by the call <span class="tag i">c</span>.
+</div>
+
+<h3>ValidateCapFactorProgramFundsForAffiliations — cSelectContractinfoEtcByRequestidlistlistProgramidCapdateEtc — QUERYID 27424</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\Select_ContractInfo_by_AffiliationList_programid_capdate.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (method not shown in snippet). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<div class="plain">
+  Call-site is <code>lInvalidCapFactorFundConfiguration.LoadData(m_XMLMessage.programid, m_XMLMessage.capdate, sAffilsList)</code> <span class="tag c">C</span>.
+  Verified call-site facts in prompt state this query is “Select_ContractInfo_by_AffiliationList_programid_capdate” and takes an affiliation list plus programid/capdate <span class="tag i">c</span>.
+</div>
+
+<h3>CreatePayment — cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc — QUERYID 10975</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\INSERT_payment_WITH_paymentid_programid_provid_paytype_etc_.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 10975 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.InsertPaymentWithPaymentidProgramidProvidPaytypeEtc</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@paymentid</td><td><code>spayid</code> (generated) <span class="tag c">C</span></td><td>New payment id</td></tr>
+    <tr><td>@programid</td><td><code>pProgramid</code> <span class="tag c">C</span></td><td>Program identifier</td></tr>
+    <tr><td>@provid</td><td><code>provID</code> <span class="tag c">C</span></td><td>Provider id</td></tr>
+    <tr><td>@payee</td><td><code>DBFixup(Mid(pPayee,1,60))</code> <span class="tag c">C</span></td><td>Payee name (max 60)</td></tr>
+    <tr><td>@paydate</td><td><code>pDate</code> <span class="tag c">C</span></td><td>Payment date</td></tr>
+    <tr><td>@paytype</td><td><code>m_XMLMessage.capitationType</code> <span class="tag c">C</span></td><td>Capitation type</td></tr>
+    <tr><td>@capmessagequeuid</td><td><code>pmessagequeueid</code> <span class="tag c">C</span></td><td>Queue id</td></tr>
+    <tr><td>@capmessage</td><td><code>pcapmessage</code> <span class="tag c">C</span></td><td>Serialized cap message</td></tr>
+    <tr><td>@eligibleorgid</td><td><code>m_XMLMessage.eligibleorgid</code> <span class="tag c">C</span></td><td>Eligibility org</td></tr>
+    <tr><td>@processlogid</td><td><code>lHeaderId</code> <span class="tag c">C</span></td><td>Process log header id</td></tr>
+  </tbody>
+</table>
+
+<h3>CalcCapAdjustments — cSelectCapadjustmentEtcByProgramidAffiliateidCapdatePendingMonetaryReadonly — QUERYID 10610</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\SELECT_capadjustment_etc_BY_programid_affiliateid_capdate_PENDING_MONETARY_READONLY.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present in retrieved snippet; class is large but SQL constant not evidenced here. <span class="tag u">!</span></div>
+
+<h3>CalcCapAdjustments — cCreatecapvoucherRecord — QUERYID 98</h3>
+<div class="plain"><b>Source</b>: Not retrieved in provided evidence. Searched: <code>cCreatecapvoucherRecord</code>. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not retrieved. <span class="tag u">!</span></div>
+
+<h3>CalcCapAdjustments — cUpdateCapadjustmentByProcessdatePaymentidStatusEtc — QUERYID 10611</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\UPDATE_capadjustment_BY_processdate_paymentid_status_etc_.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 10611 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.UpdateCapadjustmentByProcessdatePaymentidStatusEtc</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@processdate</td><td><code>DateTime.Now().ToString()</code> <span class="tag c">C</span></td><td>Processing timestamp</td></tr>
+    <tr><td>@paymentid</td><td><code>m_XMLMessage.paymentid</code> <span class="tag c">C</span></td><td>Payment id applied to adjustment</td></tr>
+    <tr><td>@status</td><td><code>"PROCESSED"</code> <span class="tag c">C</span></td><td>New adjustment status</td></tr>
+    <tr><td>@capadjustmentid</td><td><code>Trim(m_adjustments.Fields("capadjustmentid").Value)</code> <span class="tag c">C</span></td><td>Adjustment key</td></tr>
+  </tbody>
+</table>
+
+<h3>ProcessMessage (finally) — cSelectProcessstateFailureCountByDetailId — QUERYID 65223</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\ProcessLog\Src\QCSI Access ProcessLog\Queries\SelectProcessstateFailureCountByDetailId.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 65223 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessProcessLogUtility.LDLObject.SelectProcessstateFailureCountByDetailId</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@detailId</td><td><code>lDetailId</code> <span class="tag c">C</span></td><td>Process log detail id</td></tr>
+  </tbody>
+</table>
+
+<h3>RestartFailedCapRun — cSelectRemainingCapmessagesByMessagequeueid — QUERYID 10574</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\SELECT_Remaining_CapMessages_BY_messagequeueid.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: Not evidenced in retrieved snippet. <span class="tag u">!</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (ExecuteQuery not shown in snippet). <span class="tag u">!</span></div>
+
+<h3>LoadPolicycopays — cSelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail — QUERYID 11335</h3>
+<div><b>Source</b>: <code>C:\Users\gt134031\cef_r31\mms-cms-cef\components\QNXT\DataServices\Payment\Src\QCSI Access Payment\Queries\SELECT_BY_capdate_recondate_policycopay_policycopaygroup_copaygroupdetail.cs</code> <span class="tag c">C</span></div>
+<div class="plain"><b>QUERYID</b>: 11335 is present in class comment block <span class="tag c">C</span></div>
+<div class="plain"><b>SQL</b>: Not present; delegates to LDL (<code>CAccessPaymentUtility.LDLObject.SelectByCapdateRecondatePolicycopayPolicycopaygroupCopaygroupdetail</code>). <span class="tag u">!</span></div>
+<h4>Parameters (in order) and mapping</h4>
+<table>
+  <thead><tr><th>@parameter</th><th>Caller argument</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>@capdate</td><td><code>capdate</code> <span class="tag i">c</span></td><td>Cap date</td></tr>
+    <tr><td>@recondate</td><td><code>recondate</code> <span class="tag i">c</span></td><td>Recon date</td></tr>
+    <tr><td>@rateid</td><td><code>DistinctRateIDSQL()</code> (string SQL fragment) <span class="tag c">C</span></td><td>Rate id filter (dynamic SQL fragment)</td></tr>
+    <tr><td>@eligibleorgid</td><td><code>DistinctEligibleorgIDSQL()</code> (string SQL fragment) <span class="tag c">C</span></td><td>Eligible org filter (dynamic SQL fragment)</td></tr>
+  </tbody>
+</table>
+
+<h4>Tables touched (from graph edges / method READS_FROM where available)</h4>
+<ul>
+  <li><code>Plandata_Parallel.dbo.policycopay</code> <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.policycopaygroup</code> <span class="tag c">C</span></li>
+  <li><code>Plandata_Parallel.dbo.copaygroupdetail</code> <span class="tag c">C</span></li>
+</ul>
+
+<h3>Not Retrieved</h3>
+<table>
+  <thead><tr><th>Query class</th><th>What was searched / why missing</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>cSelectGlobalContractData (SELECT_Global_Contract_Data)</td>
+      <td>Search attempted per prompt anchors; class source did not appear in provided evidence snippets. SQL not evidenced. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td>cCreatecapvoucherRecord</td>
+      <td>Searched <code>cCreatecapvoucherRecord</code>; class source not present in provided evidence snippets. SQL not evidenced. <span class="tag u">!</span></td>
+    </tr>
+    <tr>
+      <td>All other queries listed above</td>
+      <td>Wrapper classes were retrieved, but SQL text is not present in the shown source (delegates to LDL). Companion “constants”/LDL SQL sources were not retrieved in evidence. <span class="tag u">!</span></td>
+    </tr>
+  </tbody>
+</table>
+
+
+
+<h2>Stored Procedure Bodies — the enrollment-eligibility rule (verbatim)</h2>
+<div class="plain">
+The reference analysis (CEF-CAP-ENRL-001, section 17 item 1) records these procedure bodies as
+NOT FOUND and calls them "the largest gap in the trace" — they populate <code>capmessagequeue</code>
+and therefore own the rule deciding which enrollments enter a capitation run. The knowledge graph
+holds Procedure nodes for both, anchored to <code>DDL/DDL7/Plandata_Parallel.sql</code>
+(<code>spQ_BuildGlobalCapMessage</code> at line 97804; <code>spQ_BuildPCPCapMessage</code> at line
+98217). The bodies below are extracted verbatim from those graph-located positions — a mechanical
+copy, no generation involved. <span class="tag c">C</span><br/><br/>
+Ingestion note: the graph nodes carried single-line spans due to a LineEnd defect in the SQL
+ingestion (fixed in commit 73b8827); after the DDL re-ingest these bodies are served by the
+standard pipeline directly. The advance-recon variants (<code>...AdvReconRun</code>) and
+<code>spQ_IDSeq</code> are not present in this DDL file <span class="tag u">!</span>.
+</div>
+
+<h3>Plandata_Parallel.dbo.spQ_BuildPCPCapMessage &mdash; 502 lines (Plandata_Parallel.sql lines 98217&ndash;98467)</h3>
+<pre style="max-height:600px">
+
+--
+
+-- DBA000015198
+
+-- Update sqQ_BuildPCPCapMessage &amp; spQ_BuildGlobalCapMessage stored procedures
+
+--
+
+CREATE PROCEDURE [dbo].[spQ_BuildPCPCapMessage] @capprogramid ident, @capdate smalldatetime, @recondate smalldatetime, @firstdayofcapmonth smalldatetime, 
+
+				@affiliateid ident,@capmessagequeueid ident, @processlogheaderid ident, @processlogdetailid ident, @iscapitated char(10), @capeligibleorgid ident,
+
+            @captype char (3), @ismanagementcap yesnotype
+
+as 
+
+--Created by Kevin Harbauer 2.0 cap service pack
+
+--inserts cap messages for pcp enrollments into the capmessagequeue table
+
+--where the cap program can retrieve a manageable set of messages instead of 100K+ at one time
+
+
+
+DECLARE @enrollid ident
+
+DECLARE @planid ident
+
+DECLARE @memid  ident
+
+DECLARE @eligibleorgid ident
+
+DECLARE @carriermemid char(25)
+
+DECLARE @enrollmenttype char(1)
+
+DECLARE @primarystatus char(1)
+
+DECLARE @effdate smalldatetime
+
+DECLARE @termdate smalldatetime
+
+DECLARE @insuredid ident
+
+DECLARE @segtype char(3)
+
+DECLARE @plantype char(15)
+
+DECLARE @enrolltype char(1)
+
+DECLARE @rateid ident
+
+DECLARE @ratecode nametype
+
+DECLARE @delegateto ident
+
+DECLARE @delegatefrom ident
+
+DECLARE @orgeffdate smalldatetime
+
+DECLARE @priorcarrierid ident
+
+DECLARE @covtype zint
+
+DECLARE @matchenrollid ident
+
+DECLARE @priorenrollid ident
+
+DECLARE @coveragedate smalldatetime
+
+DECLARE @retrotermdate smalldatetime
+
+DECLARE @programid ident
+
+DECLARE @sex char(1)
+
+DECLARE @dob datetime
+
+DECLARE @phyzip ziptype
+
+DECLARE @orgpolicystatus ident
+
+DECLARE @orgpolicyasofdate smalldatetime
+
+
+
+DECLARE @messageCount zint
+
+DECLARE @xmldata varchar(4000)
+
+
+
+SET @messageCount = 0
+
+
+
+IF rtrim(@capeligibleorgid) = &#x27;&#x27;
+
+BEGIN
+
+	
+
+	DECLARE BuildCapEnrollmentMessages CURSOR FAST_Forward
+
+	FOR 
+
+	SELECT DISTINCT 
+
+	enr.enrollid,
+
+	enr.planid,
+
+	enr.memid,
+
+	enr.eligibleorgid,
+
+	enr.carriermemid,
+
+	enr.enrollmenttype,
+
+	enr.oldprimstat,
+
+	enr.effdate,
+
+	enr.termdate,
+
+	enr.insuredid,
+
+	enr.segtype,
+
+	enr.plantype,
+
+	enr.enrolltype,
+
+	enr.rateid,
+
+	enr.ratecode,
+
+	enr.delegateto,
+
+	enr.delegatefrom,
+
+	enr.orgeffdate,
+
+	enr.priorcarrierid,
+
+	enr.covtype,
+
+	enr.matchenrollid,
+
+	enr.priorenrollid,
+
+	enr.coveragedate,
+
+	enr.retrotermdate,
+
+	enr.programid, 
+
+	member.dob, 
+
+	member.sex, 
+
+	entity.phyzip, 
+
+	status = isnull(op.status,&#x27;SUSPENDED&#x27;),
+
+	asofdate = isnull(op.asofdate,&#x27;1/1/1900&#x27;)
+
+	FROM (
+
+	SELECT DISTINCT enr.enrollid 
+
+	FROM affiliation afpayto (NOLOCK) 
+
+	JOIN contractinfo (NOLOCK) ON contractinfo.programid = @capprogramid 
+
+	AND afpayto.affiliationid = contractinfo.affiliationid AND rtrim(contractinfo.servicelocationid) = &#x27;&#x27; 
+
+	AND (CASE WHEN @iscapitated = &#x27;Y&#x27; THEN contractinfo.iscapitated ELSE &#x27;Y&#x27; END ) = &#x27;Y&#x27; 
+
+	JOIN contract (NOLOCK) ON contractinfo.contractid = contract.contractid  AND (contract.capid &lt;&gt; &#x27;&#x27; AND contract.capid IS NOT NULL) 
+
+	JOIN capitation (NOLOCK) ON contract.capid = capitation.capid AND capitation.pcponly &lt;&gt; 0 
+
+   	AND (CASE WHEN @ismanagementcap = &#x27;Y&#x27; THEN capitation.ismanagementcap ELSE &#x27;Y&#x27; END ) = &#x27;Y&#x27;  --Added Check for HMSA PER 04021
+
+	JOIN memberpcp pcp (NOLOCK) ON afpayto.affiliationid = pcp.paytoaffilid  AND pcp.effdate &lt;= @capdate   AND pcp.termdate &gt;= @recondate 
+
+	JOIN enrollkeys enr (NOLOCK) ON enr.enrollid = pcp.enrollid  AND enr.segtype = &#x27;INT&#x27;  AND enr.effdate &lt;= @capdate  AND enr.termdate &gt;= @recondate 
+
+	JOIN benefitplan bplan (NOLOCK) ON enr.planid = bplan.planid  AND bplan.programid = @capprogramid 
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid AND (op.status &lt;&gt; &#x27;SUSPENDED&#x27; OR (op.status = &#x27;SUSPENDED&#x27; AND op.asofdate &gt;= @recondate))
+
+	JOIN affiliation afprov (NOLOCK)  ON pcp.affiliationid = afprov.affiliationid 
+
+	    AND afprov.effdate &lt;= @capdate 
+
+	    AND afprov.termdate &gt;= @recondate 
+
+	    AND afprov.provid IS NOT NULL 
+
+	JOIN provider prov (NOLOCK)  ON afprov.provid = prov.provid 
+
+	LEFT OUTER JOIN provmemo (NOLOCK) ON afprov.provid = provmemo.provid 
+
+	LEFT OUTER JOIN memo (NOLOCK) ON provmemo.memoid = memo.memoid 
+
+	WHERE afpayto.payflag &lt;&gt; 0 AND afpayto.effdate &lt;= @capdate  AND afpayto.termdate &gt;= @recondate 
+
+	AND afpayto.affiliationid IN (SELECT affiliationid from affiliation WHERE affiliateid = @affiliateid AND payflag &lt;&gt; 0 ) 
+
+	AND ( memo.codeid &lt;&gt; &#x27;HOLD&#x27; or memo.codeid is null)
+
+	
+
+	UNION  
+
+	
+
+	SELECT DISTINCT capvoucher.enrollid
+
+	FROM capvoucher (NOLOCK)
+
+	JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid 
+
+	AND payment.programid=@capprogramid  
+
+	AND payment.provid = @affiliateid 
+
+	AND payment.paydate &lt; @firstdayofcapmonth
+
+	AND payment.paydate &gt;= @recondate 
+
+	AND payment.status &lt;&gt; &#x27;INCOMPLETE&#x27;
+
+	AND payment.status &lt;&gt; &#x27;VOID&#x27;
+
+   AND payment.paytype = @captype      --Added HMSA PER 04021
+
+	AND capvoucher.enrollid &lt;&gt; &#x27;&#x27;
+
+	
+
+	) a
+
+	JOIN enrollkeys enr ON enr.enrollid = a.enrollid
+
+	JOIN member (NOLOCK) ON member.memid = enr.memid
+
+	JOIN entity (NOLOCK) ON member.entityid=entity.entid
+
+	JOIN eligibilityorg (NOLOCK) ON eligibilityorg.eligibleorgid = enr.eligibleorgid
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid
+
+	order by enr.memid, enr.effdate, enr.termdate
+
+END
+
+ELSE
+
+BEGIN
+
+	
+
+	DECLARE BuildCapEnrollmentMessages CURSOR FAST_Forward
+
+	FOR 
+
+	SELECT DISTINCT 
+
+	enr.enrollid,
+
+	enr.planid,
+
+	enr.memid,
+
+	enr.eligibleorgid,
+
+	enr.carriermemid,
+
+	enr.enrollmenttype,
+
+	enr.oldprimstat,
+
+	enr.effdate,
+
+	enr.termdate,
+
+	enr.insuredid,
+
+	enr.segtype,
+
+	enr.plantype,
+
+	enr.enrolltype,
+
+	enr.rateid,
+
+	enr.ratecode,
+
+	enr.delegateto,
+
+	enr.delegatefrom,
+
+	enr.orgeffdate,
+
+	enr.priorcarrierid,
+
+	enr.covtype,
+
+	enr.matchenrollid,
+
+	enr.priorenrollid,
+
+	enr.coveragedate,
+
+	enr.retrotermdate,
+
+	enr.programid, 
+
+	member.dob, 
+
+	member.sex, 
+
+	entity.phyzip,  
+
+	status = isnull(op.status,&#x27;SUSPENDED&#x27;),
+
+	asofdate = isnull(op.asofdate,&#x27;1/1/1900&#x27;)
+
+	FROM (
+
+	SELECT DISTINCT enr.enrollid 
+
+	FROM affiliation afpayto (NOLOCK) 
+
+	JOIN contractinfo (NOLOCK) ON contractinfo.programid = @capprogramid 
+
+	AND afpayto.affiliationid = contractinfo.affiliationid AND rtrim(contractinfo.servicelocationid) = &#x27;&#x27; 
+
+	AND (CASE WHEN @iscapitated = &#x27;Y&#x27; THEN contractinfo.iscapitated ELSE &#x27;Y&#x27; END ) = &#x27;Y&#x27; 
+
+	JOIN contract (NOLOCK) ON contractinfo.contractid = contract.contractid  AND (contract.capid &lt;&gt; &#x27;&#x27; AND contract.capid IS NOT NULL) 
+
+	JOIN capitation (NOLOCK) ON contract.capid = capitation.capid AND capitation.pcponly &lt;&gt; 0 
+
+   	AND (CASE WHEN @ismanagementcap = &#x27;Y&#x27; THEN capitation.ismanagementcap ELSE &#x27;Y&#x27; END ) = &#x27;Y&#x27;  --Added Check for HMSA PER 04021
+
+	JOIN memberpcp pcp (NOLOCK) ON afpayto.affiliationid = pcp.paytoaffilid  AND pcp.effdate &lt;= @capdate   AND pcp.termdate &gt;= @recondate 
+
+	JOIN enrollkeys enr (NOLOCK) ON enr.enrollid = pcp.enrollid  AND enr.segtype = &#x27;INT&#x27;  AND enr.effdate &lt;= @capdate  AND enr.termdate &gt;= @recondate 
+
+	JOIN benefitplan bplan (NOLOCK) ON enr.planid = bplan.planid  AND bplan.programid = @capprogramid 
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid AND (op.status &lt;&gt; &#x27;SUSPENDED&#x27; OR (op.status = &#x27;SUSPENDED&#x27; AND op.asofdate &gt;= @recondate))
+
+	JOIN affiliation afprov (NOLOCK)  ON pcp.affiliationid = afprov.affiliationid 
+
+	    AND afprov.effdate &lt;= @capdate 
+
+	    AND afprov.termdate &gt;= @recondate 
+
+	    AND afprov.provid IS NOT NULL 
+
+	JOIN provider prov (NOLOCK)  ON afprov.provid = prov.provid 
+
+	LEFT OUTER JOIN provmemo (NOLOCK) ON afprov.provid = provmemo.provid 
+
+	LEFT OUTER JOIN memo (NOLOCK) ON provmemo.memoid = memo.memoid 
+
+	WHERE afpayto.payflag &lt;&gt; 0 AND afpayto.effdate &lt;= @capdate  AND afpayto.termdate &gt;= @recondate 
+
+	AND afpayto.affiliationid IN (SELECT affiliationid from affiliation WHERE affiliateid = @affiliateid AND payflag &lt;&gt; 0 ) 
+
+	AND ( memo.codeid &lt;&gt; &#x27;HOLD&#x27; or memo.codeid is null)
+
+	
+
+	UNION  
+
+	
+
+	SELECT DISTINCT capvoucher.enrollid
+
+	FROM capvoucher (NOLOCK)
+
+	JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid 
+
+	AND payment.programid=@capprogramid  
+
+	AND payment.provid = @affiliateid 
+
+	AND payment.paydate &lt; @firstdayofcapmonth
+
+	AND payment.paydate &gt;= @recondate 
+
+	AND payment.status &lt;&gt; &#x27;INCOMPLETE&#x27;
+
+	AND payment.status &lt;&gt; &#x27;VOID&#x27;
+
+   AND payment.paytype = @captype      --Added HMSA PER 04021
+
+	AND capvoucher.enrollid &lt;&gt; &#x27;&#x27;
+
+	
+
+	) a
+
+	JOIN enrollkeys enr ON enr.enrollid = a.enrollid
+
+	AND enr.eligibleorgid = rtrim(@capeligibleorgid)
+
+	JOIN member (NOLOCK) ON member.memid = enr.memid
+
+	JOIN entity (NOLOCK) ON member.entityid=entity.entid
+
+	JOIN eligibilityorg (NOLOCK) ON eligibilityorg.eligibleorgid = enr.eligibleorgid AND eligibilityorg.nonstdpayment = &#x27;N&#x27;
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid
+
+	order by enr.memid, enr.effdate, enr.termdate
+
+END
+
+
+
+OPEN BuildCapEnrollmentMessages
+
+FETCH NEXT FROM BuildCapEnrollmentMessages INTO
+
+	@enrollid , @planid, @memid, @eligibleorgid, @carriermemid, @enrollmenttype, @primarystatus, @effdate,
+
+	@termdate, @insuredid, @segtype, @plantype, @enrolltype, @rateid, @ratecode, @delegateto, @delegatefrom,
+
+	@orgeffdate, @priorcarrierid, @covtype, @matchenrollid, @priorenrollid, @coveragedate, @retrotermdate,
+
+	@programid, @dob, @sex, @phyzip,@orgpolicystatus,@orgpolicyasofdate
+
+	
+
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+
+
+
+   SET @messageCount = @messageCount + 1
+
+   SET @xmldata =  &#x27;&lt;Enrollment enrollid=&quot;&#x27; + rtrim(@enrollid) + &#x27;&quot; planid=&quot;&#x27; + rtrim(@planid) + &#x27;&quot; memid=&quot;&#x27; + rtrim(@memid) + &#x27;&quot; eligibleorgid=&quot;&#x27; + rtrim(@eligibleorgid) + &#x27;&quot; carriermemid=&quot;&#x27; + rtrim(@carriermemid) + &#x27;&quot; enrollmenttype=&quot;&#x27; + rtrim(@enrollmenttype) + &#x27;&quot; primarystatus=&quot;&#x27; + rtrim(@primarystatus) + &#x27;&quot; effdate=&quot;&#x27; + rtrim(@effdate) + &#x27;&quot; termdate=&quot;&#x27; + rtrim(@termdate) + &#x27;&quot; insuredid=&quot;&#x27; + rtrim(@insuredid) + &#x27;&quot; segtype=&quot;&#x27; + rtrim(@segtype) + &#x27;&quot; plantype=&quot;&#x27; + rtrim(@plantype) + &#x27;&quot; enrolltype=&quot;&#x27; + rtrim(@enrolltype) + &#x27;&quot; rateid=&quot;&#x27; + rtrim(@rateid) + &#x27;&quot; ratecode=&quot;&#x27; + rtrim(@ratecode) + &#x27;&quot; delegateto=&quot;&#x27; + rtrim(@delegateto) + &#x27;&quot; delegatefrom=&quot;&#x27; + rtrim(@delegatefrom) + &#x27;&quot; orgeffdate=&quot;&#x27; + rtrim(@orgeffdate) + &#x27;&quot; priorcarrierid=&quot;&#x27; + rtrim(@priorcarrierid) + &#x27;&quot; covtype=&quot;&#x27; + rtrim(@covtype) + &#x27;&quot; matchenrollid=&quot;&#x27; + rtrim(@matchenrollid) + &#x27;&quot; priorenrollid=&quot;&#x27; + rtrim(@priorenrollid) + &#x27;&quot; coveragedate=&quot;&#x27; + rtrim(@coveragedate) + &#x27;&quot; retrotermdate=&quot;&#x27; + rtrim(@retrotermdate) + &#x27;&quot; programid=&quot;&#x27; + rtrim(@programid) + &#x27;&quot; gender=&quot;&#x27; + rtrim(@sex) + &#x27;&quot; age=&quot;&quot; dob=&quot;&#x27; + rtrim(@dob) + &#x27;&quot; globalpaytoaffil=&quot;&quot; haserrors=&quot;&quot; capadjustmentid=&quot;&quot; queueid=&quot;&#x27; + rtrim(@capmessagequeueid) + &#x27;&quot; messageid=&quot;&#x27; + rtrim(@messagecount) + &#x27;&quot; orgpolicystatus= &quot;&#x27; + rtrim(@orgpolicystatus) + &#x27;&quot; orgpolicyasofdate= &quot;&#x27; + rtrim(@orgpolicyasofdate)+ &#x27;&quot;&gt;&#x27;
+
+
+
+   IF isnull(@xmldata,&#x27;&#x27;) &lt;&gt; &#x27;&#x27; 
+
+   BEGIN
+
+   	INSERT capmessagequeue(CapMessageQueueID,messageid,processlogheaderid,processlogdetailid,xmldata)
+
+	VALUES(@capmessagequeueid,@messageCount,@processlogheaderid,@processlogdetailid,@xmldata)
+
+   END 
+
+   
+
+    FETCH NEXT FROM BuildCapEnrollmentMessages INTO
+
+	@enrollid , @planid, @memid, @eligibleorgid, @carriermemid, @enrollmenttype, @primarystatus, @effdate,
+
+	@termdate, @insuredid, @segtype, @plantype, @enrolltype, @rateid, @ratecode, @delegateto, @delegatefrom,
+
+	@orgeffdate, @priorcarrierid, @covtype, @matchenrollid, @priorenrollid, @coveragedate, @retrotermdate,
+
+	@programid, @dob, @sex, @phyzip,@orgpolicystatus,@orgpolicyasofdate
+
+
+
+END
+
+
+
+CLOSE BuildCapEnrollmentMessages
+
+DEALLOCATE BuildCapEnrollmentMessages
+
+
+
+SELECT count(messageid) FROM capmessagequeue where CapMessageQueueID = @capmessagequeueid
+
+
+
+</pre>
+
+<h3>Plandata_Parallel.dbo.spQ_BuildGlobalCapMessage &mdash; 422 lines (Plandata_Parallel.sql lines 97804&ndash;98014)</h3>
+<pre style="max-height:600px">
+
+CREATE PROCEDURE [dbo].[spQ_BuildGlobalCapMessage] @capprogramid ident, @capdate smalldatetime, @recondate smalldatetime, @firstdayofcapmonth smalldatetime, 
+
+				@affiliateid ident,@capmessagequeueid ident, @processlogheaderid ident, @processlogdetailid ident,@globalpaytoaffil ident, @capeligibleorgid ident  as 
+
+--Created by Kevin Harbauer 2.0 cap service pack
+
+--inserts cap messages for global enrollments into the capmessagequeue table
+
+--where the cap program can retrieve a manageable set of messages instead of 100K+ at one time
+
+
+
+DECLARE @enrollid ident
+
+DECLARE @planid ident
+
+DECLARE @memid  ident
+
+DECLARE @eligibleorgid ident
+
+DECLARE @carriermemid char(25)
+
+DECLARE @enrollmenttype char(1)
+
+DECLARE @primarystatus char(1)
+
+DECLARE @effdate smalldatetime
+
+DECLARE @termdate smalldatetime
+
+DECLARE @insuredid ident
+
+DECLARE @segtype char(3)
+
+DECLARE @plantype char(15)
+
+DECLARE @enrolltype char(1)
+
+DECLARE @rateid ident
+
+DECLARE @ratecode nametype
+
+DECLARE @delegateto ident
+
+DECLARE @delegatefrom ident
+
+DECLARE @orgeffdate smalldatetime
+
+DECLARE @priorcarrierid ident
+
+DECLARE @covtype zint
+
+DECLARE @matchenrollid ident
+
+DECLARE @priorenrollid ident
+
+DECLARE @coveragedate smalldatetime
+
+DECLARE @retrotermdate smalldatetime
+
+DECLARE @programid ident
+
+DECLARE @sex char(1)
+
+DECLARE @dob datetime
+
+DECLARE @phyzip ziptype
+
+DECLARE @orgpolicystatus ident
+
+DECLARE @orgpolicyasofdate smalldatetime
+
+
+
+DECLARE @messageCount zint
+
+DECLARE @xmldata varchar(4000)
+
+
+
+SET @messageCount = 0
+
+
+
+
+
+IF rtrim(@capeligibleorgid) = &#x27;&#x27; 
+
+BEGIN
+
+	DECLARE BuildCapEnrollmentMessages CURSOR FAST_Forward
+
+	FOR 
+
+	
+
+	SELECT DISTINCT 
+
+	enr.enrollid,
+
+	enr.planid,
+
+	enr.memid,
+
+	enr.eligibleorgid,
+
+	enr.carriermemid,
+
+	enr.enrollmenttype,
+
+	enr.oldprimstat,
+
+	enr.effdate,
+
+	enr.termdate,
+
+	enr.insuredid,
+
+	enr.segtype,
+
+	enr.plantype,
+
+	enr.enrolltype,
+
+	enr.rateid,
+
+	enr.ratecode,
+
+	enr.delegateto,
+
+	enr.delegatefrom,
+
+	enr.orgeffdate,
+
+	enr.priorcarrierid,
+
+	enr.covtype,
+
+	enr.matchenrollid,
+
+	enr.priorenrollid,
+
+	enr.coveragedate,
+
+	enr.retrotermdate,
+
+	enr.programid, 
+
+	member.dob, 
+
+	member.sex, 
+
+	entity.phyzip ,
+
+	status = isnull(op.status,&#x27;SUSPENDED&#x27;),
+
+	asofdate = isnull(op.asofdate,&#x27;1/1/1900&#x27;)
+
+	FROM (
+
+	SELECT enr.enrollid
+
+	FROM enrollkeys enr (NOLOCK)
+
+	JOIN benefitplan bplan (NOLOCK) ON bplan.planid = enr.planid and bplan.programid = @capprogramid
+
+	JOIN policyplans pp (NOLOCK)  ON pp.rateid = enr.rateid
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid AND (op.status &lt;&gt; &#x27;SUSPENDED&#x27; OR (op.status = &#x27;SUSPENDED&#x27; AND op.asofdate &gt;= @recondate))
+
+	WHERE  enr.segtype = &#x27;INT&#x27;  AND bplan.planid = enr.planid
+
+	AND op.eligibleorgid=enr.eligibleorgid and enr.effdate &lt;= @capdate AND enr.termdate &gt;= @recondate
+
+	UNION 
+
+	SELECT DISTINCT capvoucher.enrollid
+
+	FROM capvoucher (NOLOCK)
+
+	JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid 
+
+	AND payment.programid=@capprogramid
+
+	AND payment.provid = @affiliateid
+
+	AND payment.paydate &lt; @firstdayofcapmonth
+
+	AND payment.paydate &gt;= @recondate
+
+	AND payment.status &lt;&gt; &#x27;INCOMPLETE&#x27;
+
+	AND payment.status &lt;&gt; &#x27;VOID&#x27;
+
+   AND payment.paytype = &#x27;CAP&#x27;      --Added HMSA PER 04021
+
+	AND capvoucher.enrollid &lt;&gt; &#x27;&#x27;
+
+	) a
+
+	JOIN enrollkeys enr ON enr.enrollid=a.enrollid 
+
+	JOIN member (NOLOCK) ON member.memid=enr.memid
+
+	JOIN entity (nolock) ON member.entityid=entity.entid
+
+	JOIN eligibilityorg (NOLOCK) ON eligibilityorg.eligibleorgid = enr.eligibleorgid
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid
+
+END
+
+ELSE
+
+BEGIN
+
+	DECLARE BuildCapEnrollmentMessages CURSOR FAST_Forward
+
+	FOR 
+
+	
+
+	SELECT DISTINCT 
+
+	enr.enrollid,
+
+	enr.planid,
+
+	enr.memid,
+
+	enr.eligibleorgid,
+
+	enr.carriermemid,
+
+	enr.enrollmenttype,
+
+	enr.oldprimstat,
+
+	enr.effdate,
+
+	enr.termdate,
+
+	enr.insuredid,
+
+	enr.segtype,
+
+	enr.plantype,
+
+	enr.enrolltype,
+
+	enr.rateid,
+
+	enr.ratecode,
+
+	enr.delegateto,
+
+	enr.delegatefrom,
+
+	enr.orgeffdate,
+
+	enr.priorcarrierid,
+
+	enr.covtype,
+
+	enr.matchenrollid,
+
+	enr.priorenrollid,
+
+	enr.coveragedate,
+
+	enr.retrotermdate,
+
+	enr.programid, 
+
+	member.dob, 
+
+	member.sex, 
+
+	entity.phyzip ,
+
+	status = isnull(op.status,&#x27;SUSPENDED&#x27;),
+
+	asofdate = isnull(op.asofdate,&#x27;1/1/1900&#x27;)
+
+	FROM (
+
+	SELECT enr.enrollid
+
+	FROM enrollkeys enr (NOLOCK)
+
+	JOIN benefitplan bplan (NOLOCK) ON bplan.planid = enr.planid and bplan.programid = @capprogramid
+
+	JOIN policyplans pp (NOLOCK)  ON pp.rateid = enr.rateid
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid AND (op.status &lt;&gt; &#x27;SUSPENDED&#x27; OR (op.status = &#x27;SUSPENDED&#x27; AND op.asofdate &gt;= @recondate))
+
+	WHERE  enr.segtype = &#x27;INT&#x27;  AND bplan.planid = enr.planid
+
+	AND op.eligibleorgid=enr.eligibleorgid and enr.effdate &lt;= @capdate AND enr.termdate &gt;= @recondate
+
+	UNION 
+
+	SELECT DISTINCT capvoucher.enrollid
+
+	FROM capvoucher (NOLOCK)
+
+	JOIN payment (NOLOCK) ON payment.paymentid=capvoucher.paymentid 
+
+	AND payment.programid=@capprogramid
+
+	AND payment.provid = @affiliateid
+
+	AND payment.paydate &lt; @firstdayofcapmonth
+
+	AND payment.paydate &gt;= @recondate
+
+	AND payment.status &lt;&gt; &#x27;INCOMPLETE&#x27;
+
+	AND payment.status &lt;&gt; &#x27;VOID&#x27;
+
+   AND payment.paytype = &#x27;CAP&#x27;      --Added HMSA PER 04021
+
+	AND capvoucher.enrollid &lt;&gt; &#x27;&#x27;
+
+	) a
+
+	JOIN enrollkeys enr ON enr.enrollid=a.enrollid 
+
+	AND enr.eligibleorgid = rtrim(@capeligibleorgid)
+
+	JOIN member (NOLOCK) ON member.memid=enr.memid
+
+	JOIN entity (nolock) ON member.entityid=entity.entid
+
+	JOIN eligibilityorg (NOLOCK) ON eligibilityorg.eligibleorgid = enr.eligibleorgid AND eligibilityorg.nonstdpayment = &#x27;N&#x27;
+
+	JOIN policyplans pp (NOLOCK) ON pp.rateid = enr.rateid 
+
+	JOIN orgpolicy op (NOLOCK) ON pp.polid=op.polid  AND op.eligibleorgid=enr.eligibleorgid AND op.orgpolicyid = enr.orgpolicyid
+
+
+
+
+
+END
+
+
+
+OPEN BuildCapEnrollmentMessages
+
+FETCH NEXT FROM BuildCapEnrollmentMessages INTO
+
+	@enrollid , @planid, @memid, @eligibleorgid, @carriermemid, @enrollmenttype, @primarystatus, @effdate,
+
+	@termdate, @insuredid, @segtype, @plantype, @enrolltype, @rateid, @ratecode, @delegateto, @delegatefrom,
+
+	@orgeffdate, @priorcarrierid, @covtype, @matchenrollid, @priorenrollid, @coveragedate, @retrotermdate,
+
+	@programid, @dob, @sex, @phyzip,@orgpolicystatus,@orgpolicyasofdate
+
+
+
+
+
+WHILE @@FETCH_STATUS = 0
+
+BEGIN
+
+
+
+   SET @messageCount = @messageCount + 1
+
+
+
+   SET @xmldata =  &#x27;&lt;Enrollment enrollid=&quot;&#x27; + rtrim(@enrollid) + &#x27;&quot; planid=&quot;&#x27; + rtrim(@planid) + &#x27;&quot; memid=&quot;&#x27; + rtrim(@memid) + &#x27;&quot; eligibleorgid=&quot;&#x27; + rtrim(@eligibleorgid) + &#x27;&quot; carriermemid=&quot;&#x27; + rtrim(@carriermemid) + &#x27;&quot; enrollmenttype=&quot;&#x27; + rtrim(@enrollmenttype) + &#x27;&quot; primarystatus=&quot;&#x27; + rtrim(@primarystatus) + &#x27;&quot; effdate=&quot;&#x27; + rtrim(@effdate) + &#x27;&quot; termdate=&quot;&#x27; + rtrim(@termdate) + &#x27;&quot; insuredid=&quot;&#x27; + rtrim(@insuredid) + &#x27;&quot; segtype=&quot;&#x27; + rtrim(@segtype) + &#x27;&quot; plantype=&quot;&#x27; + rtrim(@plantype) + &#x27;&quot; enrolltype=&quot;&#x27; + rtrim(@enrolltype) + &#x27;&quot; rateid=&quot;&#x27; + rtrim(@rateid) + &#x27;&quot; ratecode=&quot;&#x27; + rtrim(@ratecode) + &#x27;&quot; delegateto=&quot;&#x27; + rtrim(@delegateto) + &#x27;&quot; delegatefrom=&quot;&#x27; + rtrim(@delegatefrom) + &#x27;&quot; orgeffdate=&quot;&#x27; + rtrim(@orgeffdate) + &#x27;&quot; priorcarrierid=&quot;&#x27; + rtrim(@priorcarrierid) + &#x27;&quot; covtype=&quot;&#x27; + rtrim(@covtype) + &#x27;&quot; matchenrollid=&quot;&#x27; + rtrim(@matchenrollid) + &#x27;&quot; priorenrollid=&quot;&#x27; + rtrim(@priorenrollid) + &#x27;&quot; coveragedate=&quot;&#x27; + rtrim(@coveragedate) + &#x27;&quot; retrotermdate=&quot;&#x27; + rtrim(@retrotermdate) + &#x27;&quot; programid=&quot;&#x27; + rtrim(@programid) + &#x27;&quot; gender=&quot;&#x27; + rtrim(@sex) + &#x27;&quot; age=&quot;&quot; dob=&quot;&#x27; + rtrim(@dob) + &#x27;&quot; haserrors=&quot;&quot; capadjustmentid=&quot;&quot; queueid=&quot;&#x27; + rtrim(@capmessagequeueid) + &#x27;&quot; messageid=&quot;&#x27; + rtrim(@messagecount) + &#x27;&quot; globalpaytoaffil=&quot;&#x27; + rtrim(@globalpaytoaffil)+ &#x27;&quot; orgpolicystatus= &quot;&#x27; + rtrim(@orgpolicystatus) + &#x27;&quot; orgpolicyasofdate= &quot;&#x27; + rtrim(@orgpolicyasofdate)+ &#x27;&quot;&gt;&#x27;
+
+
+
+   IF isnull(@xmldata,&#x27;&#x27;) &lt;&gt; &#x27;&#x27; 
+
+   BEGIN
+
+   	INSERT capmessagequeue(CapMessageQueueID,messageid,processlogheaderid,processlogdetailid,xmldata)
+
+	VALUES(@capmessagequeueid,@messageCount,@processlogheaderid,@processlogdetailid,@xmldata)
+
+   END
+
+
+
+   FETCH NEXT FROM BuildCapEnrollmentMessages INTO
+
+	@enrollid , @planid, @memid, @eligibleorgid, @carriermemid, @enrollmenttype, @primarystatus, @effdate,
+
+	@termdate, @insuredid, @segtype, @plantype, @enrolltype, @rateid, @ratecode, @delegateto, @delegatefrom,
+
+	@orgeffdate, @priorcarrierid, @covtype, @matchenrollid, @priorenrollid, @coveragedate, @retrotermdate,
+
+	@programid, @dob, @sex, @phyzip,@orgpolicystatus,@orgpolicyasofdate
+
+
+
+
+
+END
+
+
+
+
+
+CLOSE BuildCapEnrollmentMessages
+
+DEALLOCATE BuildCapEnrollmentMessages
+
+
+
+SELECT count(messageid) FROM capmessagequeue where CapMessageQueueID = @capmessagequeueid
+
+</pre>
+
+<h2 id="open-questions">Open Questions</h2>
+<ul>
+  <li><b>CreatePayment (lines 1254&ndash;1311) body still not retrieved</b> after two passes. The insert
+  query class is confirmed (<code>cInsertPaymentWithPaymentidProgramidProvidPaytypeEtc</code>, 10
+  parameters: paymentid, programid, provid, payee, paydate, paytype, capmessagequeuid, capmessage,
+  eligibleorgid, processlogid, via the Payment LDL), but the method body is needed to confirm it uses
+  that class, the payment-id generation call, the initial status value, and the physical target table
+  (<code>Plandata_Parallel.dbo.payment</code> vs <code>TMSIS.dbo.payment</code>). Next: read
+  cBuildCapEnrolls.vb lines 1254&ndash;1311 directly. <span class="tag u">!</span></li>
+  <li><b>Stored-procedure bodies not ingested</b>: <code>Plandata_Parallel.dbo.spQ_BuildGlobalCapMessage</code>
+  and <code>spQ_BuildPCPCapMessage</code> exist as single-line procedure nodes only. To quote their SQL,
+  ingest the full DDL text around those definitions in Plandata_Parallel.sql. <span class="tag u">!</span></li>
+  <li><b>LDL-backed query SQL</b> (e.g. <code>RetrievePaymentsByProgProvDateType</code>,
+  <code>SelectGlobalContractData</code>, <code>SelectByCapdateRecondatePolicycopay...</code>) is generated
+  data-layer code whose SQL text is not in the graph; only wrapper signatures and parameters are
+  evidenced. To quote exact SQL, ingest the LDL-generated SQL or underlying procedures/views.
+  <span class="tag u">!</span></li>
+</ul>
+
+<hr/>
+<div style="font-size:10pt;color:#444">Generated by csharp-doc-agent (knowledge-graph grounded) — Gainwell Ohio CEF Architecture Assessment
+</p>
+
+<script type="module" src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs"></script>
+<script type="module">
+  mermaid.initialize({ startOnLoad: true });
+</script>
+</body>
+</html>
