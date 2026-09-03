@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Part X – Analysis: 36-Month Summary File Extract – MCP Capitation History</title>
+<style>
+  :root{
+    --confirmed:#0b6b2e; --confirmed-bg:#e5f6ea;
+    --inferred:#8a5a00; --inferred-bg:#fdf3e0;
+    --unknown:#8a1c1c; --unknown-bg:#fbe7e7;
+    --ink:#1c2530; --muted:#5c6b7a; --line:#d7dee6; --accent:#123a63; --accent2:#1f6feb;
+  }
+  *{box-sizing:border-box}
+  body{font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);margin:0;background:#f4f6f9;line-height:1.5}
+  header{background:linear-gradient(135deg,#0f2c4d,#123a63);color:#fff;padding:32px 40px}
+  header h1{margin:0 0 6px;font-size:26px}
+  header .sub{opacity:.9;font-size:14px}
+  main{max-width:1100px;margin:0 auto;padding:28px 32px 80px}
+  h2{color:var(--accent);border-bottom:2px solid var(--line);padding-bottom:6px;margin-top:38px;font-size:20px}
+  h3{color:var(--accent);margin-top:26px;font-size:16px}
+  p,li{font-size:14.5px}
+  code{background:#eef2f7;padding:1px 5px;border-radius:4px;font-family:"Cascadia Code",Consolas,monospace;font-size:12.8px}
+  pre{background:#0f1b2b;color:#d6e2f0;padding:14px 16px;border-radius:8px;overflow:auto;font-size:12.6px;line-height:1.45}
+  pre code{background:none;color:inherit;padding:0}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.4px;background:#fff}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#eaf0f7;color:var(--accent)}
+  tr:nth-child(even) td{background:#fafcfe}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.4px;vertical-align:middle}
+  .t-conf{color:var(--confirmed);background:var(--confirmed-bg);border:1px solid #b6e0c2}
+  .t-inf{color:var(--inferred);background:var(--inferred-bg);border:1px solid #ecd7a6}
+  .t-unk{color:var(--unknown);background:var(--unknown-bg);border:1px solid #edbcbc}
+  .callout{border-left:4px solid var(--accent2);background:#eef4fd;padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0}
+  .callout.warn{border-left-color:#c9861a;background:#fdf5e7}
+  .callout.stop{border-left-color:#b3261e;background:#fbeaea}
+  .path{font-family:Consolas,monospace;font-size:12.4px;color:#0a3d62;word-break:break-all}
+  .kv{font-size:13.5px}
+  .kv b{color:var(--accent)}
+  footer{max-width:1100px;margin:0 auto;padding:20px 32px 60px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line)}
+  ul.tight{margin:6px 0 6px 0}
+  .legend span{margin-right:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Part X – Analysis: 36-Month Summary File Extract – MCP Capitation History</h1>
+  <div class="sub">Gainwell Ohio CEF Architecture Assessment (MSS) &middot; Independent code-level architecture trace &middot; Generated 2026-09-03</div>
+</header>
+<main>
+
+  <div class="callout legend">
+    <b>Evidence tags:</b>
+    <span class="tag t-conf">CONFIRMED</span> file:line evidence &nbsp;
+    <span class="tag t-inf">INFERRED</span> reasoned from evidence &nbsp;
+    <span class="tag t-unk">UNKNOWN</span> not found; search documented
+  </div>
+
+  <!-- 1 -->
+  <h2>1. Executive Summary</h2>
+  <p>
+    An exhaustive, scoped search of the workspace found <b>no single artifact</b> named or structured as a
+    &ldquo;36-Month Summary File Extract &ndash; MCP Capitation History&rdquo; that emits all nine advertised columns
+    (Amount Paid, Days Paid, Member Months, MCP Code, Provider ID, Service Location, County Group, Rate Cell, Service Month)
+    across a rolling 36-month window. <span class="tag t-unk">UNKNOWN</span>
+  </p>
+  <p>
+    Instead, the advertised business description maps onto a <b>family of capitation artifacts</b> that all read the same
+    QNXT/COTS capitation ledger in <code>plandata_parallel</code> (<code>capvoucher</code> + <code>payment</code> +
+    <code>enrollkeys</code> + <code>capitation</code>). Two implementations carry the majority of the described fields:
+  </p>
+  <ul class="tight">
+    <li><b>SSIS flat-file extract</b> &mdash; <code>FINEX00038_PERM_FI_Capitation_Extract</code> (Ohio.ETL). Produces a
+      pipe/flat capitation detail file. <span class="tag t-conf">CONFIRMED</span></li>
+    <li><b>SSRS report + stored procedure</b> &mdash; <code>FINRP00001L Capitation List</code> /
+      <code>usp_FINRP00001L_Capitation_List</code> (OH_FI_Reporting). Carries Service Month, Days Paid, Amount Paid,
+      Provider ID, MCP Code, and the cap-rate (Rate Cell) key. <span class="tag t-conf">CONFIRMED</span></li>
+  </ul>
+  <p>
+    Three of the nine advertised columns &mdash; <b>Member Months</b>, <b>County Group</b>, and the <b>36-month retention
+    window</b> &mdash; were <b>not found</b> as implemented logic anywhere in the searched repositories.
+    <span class="tag t-unk">UNKNOWN</span> The most likely reading is that the &ldquo;36-Month Summary&rdquo; is a
+    <i>logical/actuarial reporting specification</i> assembled downstream (EDW/actuarial), fed by these CEF capitation
+    detail sources, rather than a discrete CEF extract job. <span class="tag t-inf">INFERRED</span>
+  </p>
+
+  <!-- 2 -->
+  <h2>2. Extract Discovery</h2>
+  <p>Search anchors used (case-insensitive): <code>36 Month</code>, <code>36-Month</code>, <code>Summary File Extract</code>,
+    <code>Capitation History</code>, <code>Member Months</code>, <code>MemberMonth</code>, <code>Amount Paid</code>,
+    <code>Days Paid / DaysPaid / daycount</code>, <code>County Group / CountyGroup</code>,
+    <code>Rate Cell / RateCell</code>, <code>MCP / MCO / ManagedCarePlan</code>, <code>Service Month / servicemonthyear</code>,
+    <code>Service Location</code>.</p>
+
+  <p><b>Discovery outcome by anchor:</b></p>
+  <table>
+    <thead><tr><th>Anchor</th><th>Result</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td><code>Capitation Extract</code></td><td>Match <span class="tag t-conf">CONFIRMED</span></td>
+        <td class="path">Ohio.ETL\FINEX00038_PERM_FI_Capitation_Extract\...\FINEX00038_PERM_FI_Capitation_Extract.dtsx</td></tr>
+      <tr><td><code>servicemonthyear</code>, <code>daycount</code>, <code>capamount</code></td><td>Match <span class="tag t-conf">CONFIRMED</span></td>
+        <td class="path">OH_FI_Reporting-main\...\FINRP00001L - Capitation List\[dbo].[usp_FINRP00001L_Capitation_List].sql</td></tr>
+      <tr><td><code>managedcareplancode</code> (MCP Code)</td><td>Match <span class="tag t-conf">CONFIRMED</span></td>
+        <td class="path">OH_FI_Reporting-main\...\FINRP00001L - Capitation List\FINRP00001L - Capitation List.rdl:132</td></tr>
+      <tr><td><code>RateCell</code></td><td>Config/report only <span class="tag t-inf">INFERRED</span></td>
+        <td class="path">Ohio.ETL\MEMIM00065_Rate_Cell_Config_Data_Import; OH_FI_Reporting FINRP00196</td></tr>
+      <tr><td><code>Member Months</code> / <code>MemberMonth</code></td><td>Not in capitation extracts <span class="tag t-unk">UNKNOWN</span></td>
+        <td class="path">Only unrelated hits: MARRP00018 &ldquo;Total Member Months in Quarter&rdquo; (eligibility report), Claims_ProviderAPI.json</td></tr>
+      <tr><td><code>County Group</code> / <code>CountyGroup</code></td><td>Not found <span class="tag t-unk">UNKNOWN</span></td>
+        <td class="path">No SQL/ETL match; only a <code>County</code> column on a West-Virginia HMO table (see &sect;3)</td></tr>
+      <tr><td><code>36 Month</code> / rolling 36-mo window</td><td>Not found <span class="tag t-unk">UNKNOWN</span></td>
+        <td class="path">No <code>DATEADD(month,-36,...)</code> / <code>DATEDIFF &gt;= 36</code> capitation logic in any searched repo</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn">
+    <b>Search-method note.</b> Full-workspace <code>grep</code> repeatedly timed out because of the very large SSIS
+    <code>.dtsx</code> XML files. All searches were therefore scoped per-repository. This is a limitation of coverage, not
+    a conclusion of absence for repositories outside the scoped set (EDW/actuarial code is not present in this workspace).
+    <span class="tag t-inf">INFERRED</span>
+  </div>
+
+  <!-- 3 -->
+  <h2>3. Entry Point &amp; Orchestration</h2>
+
+  <h3>3.1 SSIS extract path (FINEX00038)</h3>
+  <p class="kv">
+    <b>Type:</b> SSIS package (SSDT / <code>.dtsx</code>), <b>Driver:</b> ETL, executed by SQL Agent / ProcessManager schedule.
+    <span class="tag t-inf">INFERRED</span> (the package is a standard Ohio.ETL <code>FINEX</code> extract; no scheduler XML was
+    located inside the package folder itself). The package connects to <code>plandata_parallel</code>, <code>ETLWorkDB</code>,
+    <code>ETLStageDB</code>, <code>UnisysConfig</code>, and <code>Flexi</code>. <span class="tag t-conf">CONFIRMED</span>
+  </p>
+  <pre><code>DTS:ConnectionString="Data Source=OHRDBS01...\OHSITENV03,64093;Initial Catalog=plandata_parallel;..."
+DTS:ConnectionString="Data Source=OHDBS01...\OHSITENV05;Initial Catalog=ETLWorkDB;..."
+DTS:ConnectionString="Data Source=OHDBS01...\OHSITENV01;Initial Catalog=Flexi;..."</code></pre>
+  <p class="path">Evidence: FINEX00038_PERM_FI_Capitation_Extract.dtsx:324, :601, :641</p>
+
+  <h3>3.2 SSRS report path (FINRP00001L)</h3>
+  <p class="kv">
+    <b>Type:</b> SSRS report (<code>.rdl</code>) backed by a stored procedure. <b>Driver:</b> On-demand / scheduled SSRS
+    subscription. <b>Entry point:</b> <code>EXEC usp_FINRP00001L_Capitation_List @PaidBegDate, @PaidEndDate</code>.
+    <span class="tag t-conf">CONFIRMED</span>
+  </p>
+  <p class="path">Evidence: [dbo].[usp_FINRP00001L_Capitation_List].sql (CREATE PROCEDURE); FINRP00001L - Capitation List.rdl</p>
+
+  <!-- 4 -->
+  <h2>4. End-to-End Call Chain</h2>
+
+  <p><b>Chain A &mdash; SSIS flat-file capitation extract (closest to &ldquo;File Extract&rdquo;):</b> <span class="tag t-conf">CONFIRMED</span></p>
+  <pre><code>SQL Agent / ProcessManager schedule            [INFERRED]
+  -&gt; SSIS pkg  FINEX00038_PERM_FI_Capitation_Extract.dtsx
+      -&gt; Data Flow "dft detail extract Finex00038Capitation"
+          -&gt; OLE DB Source  (SqlCommand: capitation SELECT)
+              FROM plandata_parallel..payment pmt
+              JOIN plandata_parallel..capvoucher cv     (paymentid)
+              JOIN plandata_parallel..enrollkeys ek     (enrollid)
+              JOIN plandata_parallel..planprovinfo ppi  (provid)
+              JOIN plandata_parallel..claim / claimdetail
+              JOIN Flexi..APDI apdi                     (INV_NO = paymentid)  -&gt; funding code
+              JOIN plandata_rx_production..memberview mv
+          -&gt; Flat File Destination
+              E:\ETLInterfaceDestinationFilesOH\FINEX00038\PERM_FI_Capitation_Extract.txt</code></pre>
+  <p class="path">Evidence: FINEX00038_PERM_FI_Capitation_Extract.dtsx:783-796 (SELECT + joins);
+    FINEX00038_PERM_FI_Capitation_Extract2.dtsx:632 (flat-file destination), :2651 (<code>'IC' As SOURCE_LOCATION</code>)</p>
+
+  <p><b>Chain B &mdash; SSRS capitation report/summary:</b> <span class="tag t-conf">CONFIRMED</span></p>
+  <pre><code>SSRS request / subscription
+  -&gt; usp_FINRP00001L_Capitation_List  @PaidBegDate,@PaidEndDate
+      -&gt; #temp_cappayments  (payment + capvoucher + capitation + enrollkeys)
+          + enrollrestriction / restrictiontype  (adjustment reason)
+          + membercondition / condition / factorvalues  (capitation code)
+          + planaction / actionreason              (adjustment reason)
+          + memberattribute + providerattribute     (managedcareplancode = MCP)
+      -&gt; RDL dataset  -&gt; FINRP00001L - Capitation List.rdl</code></pre>
+  <p class="path">Evidence: [dbo].[usp_FINRP00001L_Capitation_List].sql:72-150; FINRP00001L - Capitation List.rdl:32-145</p>
+
+  <!-- 5 -->
+  <h2>5. Extract Layout Analysis</h2>
+  <p>Validation of every advertised column against actual code. &ldquo;Best source&rdquo; is the artifact where the field
+    is materialized; where two artifacts carry it, both are cited.</p>
+
+  <table>
+    <thead>
+      <tr><th>Advertised column</th><th>Found?</th><th>Source field &rarr; table</th><th>Evidence (file:line)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Amount Paid</b></td>
+        <td><span class="tag t-conf">CONFIRMED</span></td>
+        <td><code>cv.capamount</code> / <code>p.amountpaid</code> &rarr; <code>capvoucher</code> / <code>payment</code>;
+          extract alias <code>TOTAL_PAID_AMOUNT</code> = <code>cv.capamount</code></td>
+        <td class="path">usp_FINRP00001L_Capitation_List.sql:80-81; FINEX00038 dtsx (cv.capamount AS TOTAL_PAID_AMOUNT)</td>
+      </tr>
+      <tr>
+        <td><b>Days Paid</b></td>
+        <td><span class="tag t-conf">CONFIRMED</span></td>
+        <td><code>cv.daycount</code> &rarr; <code>capvoucher</code></td>
+        <td class="path">usp_FINRP00001L_Capitation_List.sql:79; FINRP00001L - Capitation List.rdl:44-45</td>
+      </tr>
+      <tr>
+        <td><b>Member Months</b></td>
+        <td><span class="tag t-unk">UNKNOWN</span></td>
+        <td>No member-month aggregation found in any capitation extract/report. Nearest proxy is a member <i>roster count</i>
+          (<code>count(distinct carriermemid)</code>) in the monthly MCO totals proc, which is a headcount, not member-months.</td>
+        <td class="path">usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals.sql (RosterCnt / RosterGrand); no "member month" match in Ohio.ETL / OH_FI_Reporting / fin-ohio / fin-hist-ohio</td>
+      </tr>
+      <tr>
+        <td><b>MCP Code</b></td>
+        <td><span class="tag t-conf">CONFIRMED</span></td>
+        <td><code>managedcareplancode</code> &rarr; derived from <code>plandata_parallel.dbo.memberattribute</code>
+          (attributeid = <code>MEMEX00040_MANAGED_CARE_ATTRIBUTEID</code>) joined to <code>providerattribute</code></td>
+        <td class="path">FINRP00001L - Capitation List.rdl:132-133; usp_FINRP00001L_Capitation_List.sql (memberattribute join)</td>
+      </tr>
+      <tr>
+        <td><b>Provider ID</b></td>
+        <td><span class="tag t-conf">CONFIRMED</span></td>
+        <td><code>p.provid</code> &rarr; <code>payment</code>; extract <code>BILLING_PROV_NUM = ppi.planprovid</code></td>
+        <td class="path">usp_FINRP00001L_Capitation_List.sql:95; FINEX00038 dtsx (ppi.planprovid AS BILLING_PROV_NUM)</td>
+      </tr>
+      <tr>
+        <td><b>Service Location</b></td>
+        <td><span class="tag t-inf">INFERRED</span></td>
+        <td>In FINEX00038 the extract column <code>SOURCE_LOCATION</code> is a <b>hard-coded literal</b> <code>'IC'</code>
+          (source system marker), <i>not</i> a servicing-location address. A true service-location id
+          (<code>contractinfo.servicelocationid</code>) exists elsewhere but is not on these capitation outputs.</td>
+        <td class="path">FINEX00038_PERM_FI_Capitation_Extract2.dtsx:2651 (<code>'IC' As SOURCE_LOCATION</code>), :725</td>
+      </tr>
+      <tr>
+        <td><b>County Group</b></td>
+        <td><span class="tag t-unk">UNKNOWN</span></td>
+        <td>No <code>county group</code> / <code>countygroup</code> derivation found. A plain <code>County</code> column
+          exists only on a West-Virginia HMO history table (not Ohio, not MCP). Ohio rate-cell config carries
+          <code>MC_Region</code>/<code>MC_Group</code> concepts but is not joined onto any capitation extract found.</td>
+        <td class="path">HMO_HMOCapitationClaimsbyProviderNumberHistory.Table.sql (WVHMO007/WVFIN065); MEMIM00065_RateCellCode.dtsx (MC_Group/MC_Region)</td>
+      </tr>
+      <tr>
+        <td><b>Rate Cell</b></td>
+        <td><span class="tag t-inf">INFERRED</span></td>
+        <td><code>cv.caprateid</code> (cap-rate key; joined to <code>capitation.capid</code>) is the rate identifier on the
+          voucher; extract exposes it as <code>SERVICE_LINE_PROCEDURE_CODE = cv.caprateid</code> and rate marker
+          <code>BENEFICIARY_RATE_INDICATOR = ek.ratecode</code>. The discrete Ohio &ldquo;rate cell&rdquo; code
+          (<code>RateCell varchar(60)</code>) lives in config/allocation tables, not on these capitation outputs.</td>
+        <td class="path">usp_FINRP00001L_Capitation_List.sql:104 (<code>c.capid = cv.caprateid</code>); FINEX00038 dtsx (caprateid AS SERVICE_LINE_PROCEDURE_CODE); CAPRateExtensions.sql:15; hpfin_CorticonMatrix.sql:40</td>
+      </tr>
+      <tr>
+        <td><b>Service Month</b></td>
+        <td><span class="tag t-conf">CONFIRMED</span></td>
+        <td><code>servicemonthyear</code> = <code>CONCAT(cv.capmonth,'/',YEAR(cv.capdate))</code> &rarr; <code>capvoucher</code>;
+          extract uses <code>cv.capdate</code> for begin/end service dates.</td>
+        <td class="path">usp_FINRP00001L_Capitation_List.sql:74-76; FINRP00001L - Capitation List.rdl:833 ("Service Month/Year")</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <b>Layout verdict:</b> 6 of 9 columns are directly evidenced (Amount Paid, Days Paid, MCP Code, Provider ID, Rate Cell key,
+    Service Month). <b>Service Location</b> on the extract is a literal source marker, not an address.
+    <b>Member Months</b> and <b>County Group</b> have no implemented derivation in the searched code.
+    <span class="tag t-inf">INFERRED</span>
+  </div>
+
+  <!-- 6 -->
+  <h2>6. Data Lineage Matrix</h2>
+  <table>
+    <thead><tr><th>Output field</th><th>&rarr; Dataset/alias</th><th>&rarr; Proc/Package</th><th>&rarr; Source table.column</th></tr></thead>
+    <tbody>
+      <tr><td>Amount Paid</td><td>capamount / amountpaid / TOTAL_PAID_AMOUNT</td><td>usp_FINRP00001L / FINEX00038</td><td>plandata_parallel.capvoucher.capamount; payment.amountpaid</td></tr>
+      <tr><td>Days Paid</td><td>daycount</td><td>usp_FINRP00001L</td><td>plandata_parallel.capvoucher.daycount</td></tr>
+      <tr><td>Member Months</td><td>&mdash;</td><td><span class="tag t-unk">UNKNOWN</span></td><td>no lineage found</td></tr>
+      <tr><td>MCP Code</td><td>managedcareplancode</td><td>usp_FINRP00001L</td><td>plandata_parallel.memberattribute.thevalue (via MANAGED_CARE_ATTRIBUTEID) + providerattribute</td></tr>
+      <tr><td>Provider ID</td><td>provid / BILLING_PROV_NUM</td><td>usp_FINRP00001L / FINEX00038</td><td>plandata_parallel.payment.provid; planprovinfo.planprovid</td></tr>
+      <tr><td>Service Location</td><td>SOURCE_LOCATION</td><td>FINEX00038</td><td>literal <code>'IC'</code> (no table)</td></tr>
+      <tr><td>County Group</td><td>&mdash;</td><td><span class="tag t-unk">UNKNOWN</span></td><td>no lineage found (MC_Group exists in MEMIM00065 config, unjoined)</td></tr>
+      <tr><td>Rate Cell</td><td>caprateid / SERVICE_LINE_PROCEDURE_CODE; ratecode</td><td>usp_FINRP00001L / FINEX00038</td><td>plandata_parallel.capvoucher.caprateid; enrollkeys.ratecode; capitation.capid</td></tr>
+      <tr><td>Service Month</td><td>servicemonthyear / capdate</td><td>usp_FINRP00001L / FINEX00038</td><td>plandata_parallel.capvoucher.capmonth, capvoucher.capdate</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 7 -->
+  <h2>7. Database Dependency Analysis</h2>
+  <p>Grouped by source database (as declared in connection strings and three-part names). <span class="tag t-conf">CONFIRMED</span></p>
+  <table>
+    <thead><tr><th>Database</th><th>Objects used</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>plandata_parallel</code></td>
+        <td>payment, capvoucher, capitation, enrollkeys, planprovinfo, benefitplan, capadjustment, claim, claimdetail, program,
+          membercondition, condition, factorvalues, capfactors, enrollrestriction, restrictiontype, planaction, memberattribute, providerattribute</td>
+        <td>Primary QNXT/COTS capitation ledger &amp; enrollment master</td></tr>
+      <tr><td><code>plandata_rx_production</code></td><td>memberview</td><td>Member demographics (dob/sex) for FINEX00038</td></tr>
+      <tr><td><code>Flexi</code></td><td>APDI</td><td>Accounts-payable distribution / funding code (SUBSTRING(acct_code,...))</td></tr>
+      <tr><td><code>ETLWorkDB</code> / <code>ETLStageDB</code></td><td>Parameter_List_Detail; work/stage tables</td><td>ETL parameters &amp; staging for FINEX00038</td></tr>
+      <tr><td><code>UnisysConfig</code></td><td>SSIS config</td><td>Package configuration</td></tr>
+      <tr><td>Reporting DB (OH_FI_Reporting)</td><td>ADS_Ref_Line_of_Business_Config_Tb, tvf_String_To_Table, svf_MaskType</td><td>Report reference/util functions</td></tr>
+      <tr><td>Config import (Ohio.ETL)</td><td>MEMIM00065_RateCellCode / _GAP / _RCPT (SAK_RATE_CELL, MC_Group, MC_Region, Rate_Cell_Number)</td><td>Rate-cell reference load (candidate County-Group/Rate-Cell source, currently unjoined to the extract)</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 8 -->
+  <h2>8. Business Logic Analysis</h2>
+  <ul>
+    <li><b>Amount Paid</b> = capitation voucher amount <code>cv.capamount</code> (and/or check-level <code>payment.amountpaid</code>).
+      In the monthly MCO totals proc it is split by fund: <code>WITH%</code> funds &rarr; withhold, <code>MONTHLY</code> non-withhold
+      &rarr; non-adjustment, otherwise adjustment. <span class="tag t-conf">CONFIRMED</span>
+      <span class="path">usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals.sql:15-18</span></li>
+    <li><b>Days Paid</b> = <code>cv.daycount</code> straight from the voucher (partial-month proration count). A
+      <code>daycount = 0</code> is business-flagged as a &ldquo;Rate Change&rdquo; adjustment. <span class="tag t-conf">CONFIRMED</span>
+      <span class="path">usp_FINRP00001L_Capitation_List.sql:79, :92</span></li>
+    <li><b>Member Months</b> &mdash; no calculation located. <span class="tag t-unk">UNKNOWN</span> Would normally be a
+      <code>COUNT</code> of distinct member&times;cap-month rows; the nearest implemented concept is a distinct-member roster count. <span class="tag t-inf">INFERRED</span></li>
+    <li><b>County Group</b> &mdash; no derivation located on any capitation output. <span class="tag t-unk">UNKNOWN</span> Ohio rate-cell
+      config carries <code>MC_Group</code>/<code>MC_Region</code> which could source it, but no join exists in the found extracts. <span class="tag t-inf">INFERRED</span></li>
+    <li><b>Rate Cell</b> &mdash; the cap-rate key <code>cv.caprateid</code> (linked to <code>capitation.capid</code>) drives it;
+      selection of the rate cell happens upstream in the COTS capitation runtime (rate-cell selection Query 10794 &rarr;
+      <code>cCapFundAllocation</code>). <span class="tag t-conf">CONFIRMED</span>
+      <span class="path">usp_FINRP00001L_Capitation_List.sql:104; mms-cms-cef Custom "COTS Capitation Runtime — Full Table Read/Write Map":111,172</span></li>
+    <li><b>MCP Code</b> &mdash; looked up from the member&rsquo;s managed-care attribute value
+      (<code>memberattribute.thevalue</code> where <code>attributeid = MEMEX00040_MANAGED_CARE_ATTRIBUTEID</code>). <span class="tag t-conf">CONFIRMED</span></li>
+  </ul>
+  <p>Calculation venue: overwhelmingly <b>SQL</b> (proc + SSIS OLE&nbsp;DB SqlCommand). No calculation of these measures occurs in
+    SSRS expressions or .NET for these artifacts. <span class="tag t-inf">INFERRED</span></p>
+
+  <!-- 9 -->
+  <h2>9. Historical Retention Logic</h2>
+  <p>
+    No 36-month (or any fixed multi-month) retention/window logic was found in the capitation extracts or reports.
+    <span class="tag t-unk">UNKNOWN</span> Both implementations are <b>parameter-driven date ranges</b>:
+  </p>
+  <ul class="tight">
+    <li>FINEX00038: <code>WHERE pmt.paydate &gt;= ? AND pmt.paydate &lt; ?</code> (SSIS parameters). <span class="tag t-conf">CONFIRMED</span></li>
+    <li>FINRP00001L: <code>WHERE p.checkprintdate BETWEEN @PaidBegDate AND @PaidEndDate</code>. <span class="tag t-conf">CONFIRMED</span>
+      <span class="path">usp_FINRP00001L_Capitation_List.sql (WHERE clause), :140 (<code>CapType in ('RECON')</code>)</span></li>
+  </ul>
+  <p>Consequently the &ldquo;36 months&rdquo; is <b>externally configurable at run time</b> (whoever supplies the date parameters),
+    not encoded in the code. There is no evidence of a hard-coded 3-year retention rule. <span class="tag t-inf">INFERRED</span></p>
+
+  <!-- 10 -->
+  <h2>10. Output File Generation Process</h2>
+  <table>
+    <thead><tr><th>Attribute</th><th>FINEX00038 (file extract)</th><th>FINRP00001L (report)</th></tr></thead>
+    <tbody>
+      <tr><td>Format</td><td>Flat file (<code>.txt</code>) <span class="tag t-conf">CONFIRMED</span></td><td>SSRS rendered (PDF/Excel/CSV via subscription) <span class="tag t-inf">INFERRED</span></td></tr>
+      <tr><td>Naming</td><td><code>PERM_FI_Capitation_Extract.txt</code> (variant appends <code>_&lt;DateTime&gt;.txt</code>)</td><td>n/a (report)</td></tr>
+      <tr><td>Location</td><td class="path">E:\ETLInterfaceDestinationFilesOH\FINEX00038\</td><td>SSRS report server</td></tr>
+      <tr><td>Schedule</td><td>ETL schedule <span class="tag t-unk">UNKNOWN</span> (no scheduler artifact in folder)</td><td>SSRS subscription <span class="tag t-unk">UNKNOWN</span></td></tr>
+      <tr><td>Consumer</td><td>&ldquo;PERM&rdquo; = Payment Error Rate Measurement (CMS) capitation submission <span class="tag t-inf">INFERRED</span></td><td>Finance/operations users <span class="tag t-inf">INFERRED</span></td></tr>
+    </tbody>
+  </table>
+  <p class="path">Evidence: FINEX00038_PERM_FI_Capitation_Extract2.dtsx:54, :632 (folder + file); :923/:1081/:1152 (folder variable values)</p>
+
+  <!-- 11 -->
+  <h2>11. Code-Level Findings</h2>
+  <p><b>FINEX00038 &mdash; capitation SELECT (representative fragment):</b> <span class="tag t-conf">CONFIRMED</span></p>
+  <pre><code>select distinct
+  ISNULL(convert(varchar(8),pmt.paydate,112),'')      AS ADJUDICATION_DATE_HEADER,
+  cast('2' as char(14))                               AS ADJUSTMENT_IND,
+  ...
+  ek.carriermemid                                     AS MEMBER_IDENTIFICATION_NUMBER,
+  cv.caprateid                                        AS SERVICE_LINE_PROCEDURE_CODE,
+  ek.ratecode                                         AS BENEFICIARY_RATE_INDICATOR,
+  cv.capamount                                        AS TOTAL_PAID_AMOUNT,
+  'IC'                                                AS SOURCE_LOCATION
+FROM plandata_parallel..payment pmt
+  JOIN Plandata_Parallel..capvoucher cv  ON pmt.paymentid = cv.paymentid
+  JOIN Plandata_Parallel..enrollkeys  ek ON cv.enrollid   = ek.enrollid
+  JOIN plandata_rx_production.dbo.memberview mv ON pmt... = mv.memid
+WHERE pmt.paydate &gt;= ? AND pmt.paydate &lt; ?</code></pre>
+  <p class="path">FINEX00038_PERM_FI_Capitation_Extract.dtsx:779-796; FINEX00038_PERM_FI_Capitation_Extract2.dtsx:2651</p>
+
+  <p><b>FINRP00001L &mdash; capitation SELECT (representative fragment):</b> <span class="tag t-conf">CONFIRMED</span></p>
+  <pre><code>select p.paymentid,
+  CASE WHEN len(cv.capmonth)=1
+       THEN CONCAT('0',cv.capmonth,'/',DATEPART(yyyy,cv.capdate))
+       ELSE CONCAT(cv.capmonth,'/',DATEPART(yyyy,cv.capdate)) END AS servicemonthyear,
+  cv.captype, cv.capdate,
+  cv.daycount,            -- Days Paid
+  cv.capamount,           -- Amount Paid (voucher)
+  p.amountpaid,           -- Amount Paid (check)
+  ...
+  p.provid,               -- Provider ID
+  ...
+from plandata_parallel.dbo.payment p
+  inner join plandata_parallel.dbo.capvoucher cv on p.paymentid = cv.paymentid
+  left  join plandata_parallel.dbo.capitation c  on c.capid = cv.caprateid   -- Rate Cell key
+  left  join plandata_parallel.dbo.enrollkeys ek on cv.enrollid = ek.enrollid
+where p.checkprintdate between @PaidBegDate and @PaidEndDate
+  and Cv.CapType in ('RECON') ...</code></pre>
+  <p class="path">usp_FINRP00001L_Capitation_List.sql:72-140</p>
+
+  <div class="callout warn">
+    <b>Important nuance.</b> FINRP00001L filters to <code>CapType in ('RECON')</code> &mdash; it is a
+    capitation <i>reconciliation/adjustment</i> list, not a full monthly capitation ledger. So while it carries the most
+    matching column names, it is not itself the &ldquo;full 36-month history.&rdquo; <span class="tag t-conf">CONFIRMED</span>
+  </div>
+
+  <!-- 12 -->
+  <h2>12. Evidence Table</h2>
+  <table>
+    <thead><tr><th>#</th><th>Claim</th><th>Tag</th><th>Evidence (file:line)</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>A capitation flat-file extract exists in Ohio.ETL (FINEX00038)</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">FINEX00038_PERM_FI_Capitation_Extract.dtsx (package); ...2.dtsx:632 (output .txt)</td></tr>
+      <tr><td>2</td><td>Output path E:\ETLInterfaceDestinationFilesOH\FINEX00038\PERM_FI_Capitation_Extract.txt</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">FINEX00038_PERM_FI_Capitation_Extract2.dtsx:54, :632</td></tr>
+      <tr><td>3</td><td>Service Location on extract is literal 'IC'</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">...2.dtsx:2651, :725</td></tr>
+      <tr><td>4</td><td>Service Month = capmonth/capdate</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:74-76</td></tr>
+      <tr><td>5</td><td>Days Paid = cv.daycount</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:79; .rdl:44-45</td></tr>
+      <tr><td>6</td><td>Amount Paid = capamount / amountpaid</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:80-81</td></tr>
+      <tr><td>7</td><td>Provider ID = p.provid</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:95</td></tr>
+      <tr><td>8</td><td>Rate Cell key = cv.caprateid (capitation.capid)</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:104</td></tr>
+      <tr><td>9</td><td>MCP Code = managedcareplancode (memberattribute)</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">FINRP00001L - Capitation List.rdl:132-133</td></tr>
+      <tr><td>10</td><td>FINRP00001L is a RECON reconciliation list, not full ledger</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">usp_FINRP00001L_Capitation_List.sql:140</td></tr>
+      <tr><td>11</td><td>Date window is parameter-driven (no 36-month code)</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">FINEX00038 dtsx (paydate &gt;=? &lt;?); usp_FINRP00001L WHERE</td></tr>
+      <tr><td>12</td><td>Member Months has no implemented derivation</td><td><span class="tag t-unk">UNKNOWN</span></td><td class="path">Searched Ohio.ETL, OH_FI_Reporting, mms-bolton-fin-ohio, mms-bolton-fin-hist-ohio, mms-cms-cef — no capitation member-month calc</td></tr>
+      <tr><td>13</td><td>County Group has no implemented derivation on capitation output</td><td><span class="tag t-unk">UNKNOWN</span></td><td class="path">MEMIM00065_RateCellCode.dtsx has MC_Group/MC_Region but unjoined; WV HMO table has County (out of scope)</td></tr>
+      <tr><td>14</td><td>Rate-cell reference load exists (config)</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">Ohio.ETL\MEMIM00065_Rate_Cell_Config_Data_Import\...\MEMIM00065_RateCellCode.dtsx (SAK_RATE_CELL, Rate_Cell_Number)</td></tr>
+      <tr><td>15</td><td>Rate-cell selection happens in COTS capitation runtime</td><td><span class="tag t-conf">CONFIRMED</span></td><td class="path">mms-cms-cef Custom "COTS Capitation Runtime — Full Table Read/Write Map":111,172</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 13 -->
+  <h2>13. Open Questions</h2>
+  <ol>
+    <li>Is the &ldquo;36-Month Summary File Extract&rdquo; produced in a downstream <b>EDW/actuarial</b> layer not present in this
+      workspace (fed by FINEX00038 / capitation ledger)? <span class="tag t-unk">UNKNOWN</span></li>
+    <li>Where is <b>Member Months</b> computed &mdash; is it a COUNT of member&times;cap-month rows at the actuarial layer? <span class="tag t-unk">UNKNOWN</span></li>
+    <li>Is <b>County Group</b> sourced from the rate-cell config (<code>MC_Group</code>/<code>MC_Region</code> in MEMIM00065)
+      or from a county-to-region crosswalk not present here? <span class="tag t-unk">UNKNOWN</span></li>
+    <li>Which scheduler/ProcessManager job triggers FINEX00038, and at what cadence? <span class="tag t-unk">UNKNOWN</span></li>
+    <li>Is the intended &ldquo;full history&rdquo; source the non-RECON capitation ledger (all <code>captype</code>), rather than
+      the RECON-only FINRP00001L? <span class="tag t-inf">INFERRED</span> likely yes.</li>
+  </ol>
+
+  <!-- 14 -->
+  <h2>14. Repo Participation Matrix</h2>
+  <table>
+    <thead><tr><th>Repository</th><th>Participation</th><th>Key artifacts</th></tr></thead>
+    <tbody>
+      <tr><td><b>Ohio.ETL</b></td><td>Primary (extract + rate-cell config)</td><td>FINEX00038_PERM_FI_Capitation_Extract(.dtsx); MEMIM00065_Rate_Cell_Config_Data_Import; MEMSW00013_Rate_Cell_Capitation_Sweep (gitignored)</td></tr>
+      <tr><td><b>OH_FI_Reporting-main</b></td><td>Primary (reports/procs)</td><td>FINRP00001L Capitation List; FINRP00001O Capitation Summary; FINRP00001 MCO Monthly Capitation Payment Cycle Totals; CMS Capitation Summary; FINRP00196 Fund Code Allocation (RateCell)</td></tr>
+      <tr><td><b>mms-cms-cef</b></td><td>Supporting (COTS capitation runtime that writes the ledger)</td><td>COTS Capitation Runtime Read/Write Map; cBuildCapEnrolls / cCapFundAllocation; QNXT capitation queries</td></tr>
+      <tr><td><b>mms-bolton-fin-ohio-main</b></td><td>Supporting (rate-cell in fund allocation)</td><td>hpfin_CorticonMatrix / hpfin_FAAttributesMed (RateCell); OH_Financial_Rule_Project (Corticon)</td></tr>
+      <tr><td><b>mms-bolton-fin-hist-ohio-main</b></td><td>Supporting (check-history capitation load)</td><td>up_hpfin_PRMCapLoadCheckHist; up_hpfin_PRMCapUpdatePaycheck/Payment; Hpfin_ClaimResolution (Capitation seq)</td></tr>
+      <tr><td>act-OH-FIWebSvc-main / others</td><td>None found for this extract</td><td>&mdash; <span class="tag t-unk">UNKNOWN</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- 15 -->
+  <h2>15. Final Verdict</h2>
+  <ol>
+    <li><b>What component generates the extract?</b> No single component emits the exact 9-column / 36-month file. The closest
+      real file-extract is the SSIS package <code>FINEX00038_PERM_FI_Capitation_Extract</code> (Ohio.ETL) writing
+      <code>PERM_FI_Capitation_Extract.txt</code>; the closest report is <code>FINRP00001L Capitation List</code>
+      (OH_FI_Reporting). <span class="tag t-conf">CONFIRMED</span> / composite <span class="tag t-inf">INFERRED</span></li>
+    <li><b>True purpose?</b> To surface QNXT/COTS <b>capitation payment history</b> (voucher + check) per member/provider/rate for
+      finance and CMS PERM reporting &mdash; not, as literally advertised, a purpose-built 36-month MCP summary file. <span class="tag t-inf">INFERRED</span></li>
+    <li><b>Which procedures/tables drive it?</b> <code>usp_FINRP00001L_Capitation_List</code> and the FINEX00038 SqlCommand, over
+      <code>plandata_parallel</code>: <code>capvoucher</code>, <code>payment</code>, <code>enrollkeys</code>,
+      <code>capitation</code>, <code>planprovinfo</code>, <code>memberattribute</code> (+ <code>Flexi..APDI</code>,
+      <code>memberview</code>). <span class="tag t-conf">CONFIRMED</span></li>
+    <li><b>How are Amount Paid, Days Paid, Member Months calculated?</b> Amount Paid = <code>capvoucher.capamount</code> /
+      <code>payment.amountpaid</code>; Days Paid = <code>capvoucher.daycount</code> (both <span class="tag t-conf">CONFIRMED</span>).
+      Member Months = <b>no implemented calculation found</b> <span class="tag t-unk">UNKNOWN</span>.</li>
+    <li><b>How are County Group and Rate Cell derived?</b> Rate Cell = <code>capvoucher.caprateid</code> &rarr;
+      <code>capitation.capid</code>, selected upstream by the COTS capitation runtime <span class="tag t-conf">CONFIRMED</span>.
+      County Group = <b>no derivation found</b> on any capitation output <span class="tag t-unk">UNKNOWN</span> (candidate source
+      <code>MC_Group</code>/<code>MC_Region</code> in MEMIM00065 rate-cell config, currently unjoined).</li>
+    <li><b>Is the 36-month period configurable?</b> There is <b>no 36-month code</b>; both artifacts use run-time date parameters,
+      so the window is externally supplied/configurable rather than hard-coded. <span class="tag t-conf">CONFIRMED</span> (absence) /
+      <span class="tag t-inf">INFERRED</span> (configurability).</li>
+    <li><b>Who consumes the extract?</b> FINEX00038 &rarr; CMS PERM capitation submission (&ldquo;PERM_FI_Capitation&rdquo;);
+      FINRP00001L &rarr; finance/operations reconciliation users. <span class="tag t-inf">INFERRED</span></li>
+    <li><b>Code evidence proving each conclusion?</b> See &sect;12 Evidence Table (15 tagged rows with file:line).</li>
+  </ol>
+
+  <div class="callout stop">
+    <b>Bottom line.</b> The advertised &ldquo;36-Month Summary File Extract &ndash; MCP Capitation History&rdquo; is
+    <b>not implemented as a discrete artifact</b> in the analyzed workspace. Six of nine fields are provably sourced from the
+    <code>plandata_parallel</code> capitation ledger via FINEX00038 and FINRP00001L; <b>Member Months</b>, <b>County Group</b>, and
+    the <b>36-month rolling window</b> have <b>no code evidence</b> and are almost certainly assembled in a downstream EDW/actuarial
+    layer outside this repository set. <span class="tag t-unk">UNKNOWN</span> / <span class="tag t-inf">INFERRED</span>
+  </div>
+
+</main>
+<footer>
+  Independent code-level trace. Every factual claim carries a CONFIRMED / INFERRED / UNKNOWN tag. Line numbers reference the
+  files as present in the workspace at analysis time. Full-workspace grep was constrained by very large SSIS <code>.dtsx</code>
+  files; searches were scoped per repository (Ohio.ETL, OH_FI_Reporting-main, mms-bolton-fin-ohio-main,
+  mms-bolton-fin-hist-ohio-main, mms-cms-cef). No conclusions were drawn from report names or SME commentary alone.
+</footer>
+</body>
+</html>

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Part X – SSRS Reporting Analysis: Capitation Reporting Suite (FINRP00001, FINRP00001L, FINRP00001O, FINRP00020)</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1d2740; --ink:#e7ecf5; --muted:#9fb0cc;
+    --line:#2a3654; --accent:#4da3ff; --good:#37c390; --warn:#f0b429; --bad:#ff6b6b;
+    --chip:#243150;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0c111b,#0f1420 40%);color:var(--ink);
+    font:15px/1.55 "Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:34px 40px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 300px at 10% -50%,rgba(77,163,255,.18),transparent),var(--panel)}
+  header h1{margin:0 0 6px;font-size:24px;letter-spacing:.2px}
+  header .sub{color:var(--muted);font-size:14px}
+  header .meta{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:var(--chip);border:1px solid var(--line);color:var(--muted);
+    padding:4px 10px;border-radius:999px;font-size:12px}
+  main{max-width:1180px;margin:0 auto;padding:28px 24px 90px}
+  nav.toc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:22px 0}
+  nav.toc h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+  nav.toc ol{margin:0;padding-left:20px;columns:2;column-gap:34px}
+  nav.toc a{color:var(--accent);text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px 26px;margin:20px 0;scroll-margin-top:18px}
+  section h2{margin:0 0 4px;font-size:19px}
+  section h3{margin:22px 0 8px;font-size:15px;color:#cfe0ff}
+  section h4{margin:16px 0 6px;font-size:13.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  p{margin:8px 0}
+  code,kbd{background:#0c1322;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-family:"Cascadia Code",Consolas,monospace;font-size:12.5px;color:#d7e6ff}
+  .tag{font-weight:700;font-size:11px;padding:2px 8px;border-radius:6px;letter-spacing:.04em;white-space:nowrap}
+  .c{background:rgba(55,195,144,.15);color:var(--good);border:1px solid rgba(55,195,144,.45)}
+  .i{background:rgba(240,180,41,.14);color:var(--warn);border:1px solid rgba(240,180,41,.45)}
+  .u{background:rgba(255,107,107,.14);color:var(--bad);border:1px solid rgba(255,107,107,.45)}
+  .ev{color:var(--muted);font-size:12.5px}
+  .ev b{color:#bcd0f2;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#cfe0ff;font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  .lead{font-size:15px;color:#dbe6f7}
+  .callout{border-left:3px solid var(--accent);background:var(--panel2);padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .callout.warn{border-left-color:var(--warn)}
+  .callout.bad{border-left-color:var(--bad)}
+  ul.tight{margin:6px 0;padding-left:20px}
+  ul.tight li{margin:3px 0}
+  .path{color:#9fd0ff;font-family:"Cascadia Code",Consolas,monospace;font-size:12px;word-break:break-all}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:820px){nav.toc ol{columns:1}.grid2{grid-template-columns:1fr}}
+  figure{margin:14px 0;background:#0c1322;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto}
+  figcaption{color:var(--muted);font-size:12px;margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-size:12px;color:var(--muted)}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+  .verdict li{margin:10px 0}
+  footer{color:var(--muted);font-size:12px;text-align:center;padding:26px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Part X – SSRS Reporting Analysis: Capitation Reporting Suite</h1>
+  <div class="sub">FINRP00001 &nbsp;·&nbsp; FINRP00001L &nbsp;·&nbsp; FINRP00001O &nbsp;·&nbsp; FINRP00020</div>
+  <div class="meta">
+    <span class="pill">Gainwell Ohio CEF Architecture Assessment (MSS)</span>
+    <span class="pill">Reporting-focused, code-level trace</span>
+    <span class="pill">Evidence: RDL · Stored Proc · SQL · Config</span>
+    <span class="pill">Primary repo: OH_FI_Reporting-main</span>
+  </div>
+  <div class="meta">
+    <span class="legend">
+      <span><span class="sw" style="background:#37c390"></span>[CONFIRMED] file:line evidence</span>
+      <span><span class="sw" style="background:#f0b429"></span>[INFERRED] reasoned from evidence</span>
+      <span><span class="sw" style="background:#ff6b6b"></span>[UNKNOWN] searched, not found</span>
+    </span>
+  </div>
+</header>
+
+<main>
+
+<nav class="toc">
+  <h2>Required Sections</h2>
+  <ol>
+    <li><a href="#s1">Executive Summary</a></li>
+    <li><a href="#s2">Report Inventory</a></li>
+    <li><a href="#s3">Report Architecture</a></li>
+    <li><a href="#s4">FINRP00001 Analysis</a></li>
+    <li><a href="#s5">FINRP00001L Analysis</a></li>
+    <li><a href="#s6">FINRP00001O Analysis</a></li>
+    <li><a href="#s7">FINRP00020 Analysis</a></li>
+    <li><a href="#s8">Dataset Matrix</a></li>
+    <li><a href="#s9">Data Lineage Matrix</a></li>
+    <li><a href="#s10">Database Dependency Diagram (SVG)</a></li>
+    <li><a href="#s11">Report-to-Capitation Process Mapping</a></li>
+    <li><a href="#s12">Code-Level Findings</a></li>
+    <li><a href="#s13">Evidence Table</a></li>
+    <li><a href="#s14">Open Questions</a></li>
+    <li><a href="#s15">Repo Participation Matrix</a></li>
+    <li><a href="#s16">Final Verdict</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================= -->
+<section id="s1">
+  <h2>1. Executive Summary</h2>
+  <p class="lead">The Ohio CEF Capitation SSRS suite is a set of <b>read-only operational and financial reports</b> that
+  render capitation payment data already produced by the QNXT/HealthPAS capitation runtime. Every report in scope is a
+  thin SSRS shell over a single stored procedure that reads the authoritative capitation tables
+  <code>Plandata_Parallel.dbo.capvoucher</code> and <code>Plandata_Parallel.dbo.payment</code>.</p>
+
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> Three of the four named reports exist in <span class="path">OH_FI_Reporting-main</span>: FINRP00001, FINRP00001L, FINRP00001O. A fourth capitation report, <b>CMS Capitation Summary</b>, was discovered adjacent to them.
+      <div class="ev"><b>Evidence:</b> <a href="../CEF Repo/OH_FI_Reporting-main/OH_FI_Reporting-main/Financial">Financial/</a> folder listing — folders <code>FINRP00001 - MCO Monthly Capitation Payment Cycle Totals</code>, <code>FINRP00001L - Capitation List</code>, <code>FINRP00001O - Capitation Operational Report</code>, <code>CMS Capitation Summary</code>.</div>
+    </li>
+    <li><span class="tag u">UNKNOWN</span> <b>FINRP00020 (“Monthly Counts &amp; Detail”) does not exist</b> in any repository searched. No RDL, dataset, or stored procedure by that identifier was found.</li>
+    <li><span class="tag c">CONFIRMED</span> All reports execute stored procedures (<code>CommandType = StoredProcedure</code>) against the shared data source <code>HealthPAS_Reports</code> — no embedded ad-hoc SQL in the RDLs.</li>
+    <li><span class="tag i">INFERRED</span> FINRP00001O is an <b>operational supplement</b> to the same MCO capitation payment data that EDI 820 generation consumes, but the report performs <b>no programmatic reconciliation</b> against EDI 820 output — it never reads the EDI staging tables.</li>
+    <li><span class="tag c">CONFIRMED</span> The capitation reports are pure downstream <b>consumers</b>. None writes back to capitation processing tables. The single write observed is FINRP00001O truncating/loading a reporting helper table <code>HealthPAS_Reports.dbo.FIN1O_MCO_Medicaid_ID</code>.</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section id="s2">
+  <h2>2. Report Inventory</h2>
+  <table>
+    <thead><tr><th>Report</th><th>Repository</th><th>RDL / Proc Path</th><th>Data Source</th><th>Driving Procedure</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>FINRP00001</b><br>MCO Monthly Capitation Payment Cycle Totals</td>
+        <td>OH_FI_Reporting-main</td>
+        <td class="path">Financial/FINRP00001 - MCO Monthly Capitation Payment Cycle Totals/FINRP00001 - MCO Monthly Capitation Payment Cycle Totals.rdl</td>
+        <td><code>/Medicaid/DataSources/HealthPAS_Reports</code></td>
+        <td><code>usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals</code></td>
+        <td><span class="tag c">CONFIRMED</span> RDL L6-30</td>
+      </tr>
+      <tr>
+        <td><b>FINRP00001L</b><br>Capitation List</td>
+        <td>OH_FI_Reporting-main</td>
+        <td class="path">Financial/FINRP00001L - Capitation List/FINRP00001L - Capitation List.rdl</td>
+        <td><code>/Medicaid/DataSources/HealthPAS_Reports</code></td>
+        <td><code>usp_FINRP00001L_Capitation_List</code></td>
+        <td><span class="tag c">CONFIRMED</span> RDL L6-25</td>
+      </tr>
+      <tr>
+        <td><b>FINRP00001O</b><br>Capitation Operational Report</td>
+        <td>OH_FI_Reporting-main</td>
+        <td class="path">Financial/FINRP00001O - Capitation Operational Report/FINRP00001O - Capitation Operational Report.rdl</td>
+        <td><code>HealthPAS_Reports</code></td>
+        <td><code>usp_FINRP00001O_Capitation_Summary</code> (+ 2 lookup procs)</td>
+        <td><span class="tag c">CONFIRMED</span> RDL L6-81</td>
+      </tr>
+      <tr>
+        <td><b>CMS Capitation Summary</b><br>(discovered)</td>
+        <td>OH_FI_Reporting-main</td>
+        <td class="path">Financial/CMS Capitation Summary/CMS Capitation Summary.rdl</td>
+        <td><code>HealthPAS_Reports</code></td>
+        <td><code>usp_CMS_Capitation_Summary</code></td>
+        <td><span class="tag c">CONFIRMED</span> RDL L6-24</td>
+      </tr>
+      <tr>
+        <td><b>FINRP00020</b><br>Monthly Counts &amp; Detail</td>
+        <td>—</td>
+        <td>Not found</td>
+        <td>—</td>
+        <td>—</td>
+        <td><span class="tag u">UNKNOWN</span> see §7</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <b>Shared data source.</b> <span class="tag c">CONFIRMED</span> Every capitation RDL references a single shared data source named <code>HealthPAS_Reports</code>
+    (<code>&lt;DataSourceReference&gt;/Medicaid/DataSources/HealthPAS_Reports&lt;/DataSourceReference&gt;</code> in FINRP00001/FINRP00001L; a report-relative
+    <code>HealthPAS_Reports</code> reference in FINRP00001O and CMS Capitation Summary). No shared <em>datasets</em> (.rsd) are used — each report defines its dataset inline pointing at a stored procedure.
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="s3">
+  <h2>3. Report Architecture</h2>
+  <p>The suite follows one consistent pattern. SSRS is a presentation layer only; all set logic lives in T-SQL.</p>
+  <figure>
+    <svg viewBox="0 0 1080 200" width="100%" role="img" aria-label="Report execution architecture">
+      <defs>
+        <marker id="ar" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#4da3ff"/></marker>
+      </defs>
+      <g font-family="Segoe UI" font-size="13" fill="#e7ecf5">
+        <rect x="10" y="70" width="130" height="52" rx="9" fill="#243150" stroke="#2a3654"/><text x="75" y="100" text-anchor="middle">User / SSRS</text>
+        <rect x="180" y="70" width="150" height="52" rx="9" fill="#1d2740" stroke="#2a3654"/><text x="255" y="92" text-anchor="middle">SSRS Report (.rdl)</text><text x="255" y="110" text-anchor="middle" font-size="11" fill="#9fb0cc">params + Sum()</text>
+        <rect x="370" y="70" width="150" height="52" rx="9" fill="#1d2740" stroke="#2a3654"/><text x="445" y="92" text-anchor="middle">Inline Dataset</text><text x="445" y="110" text-anchor="middle" font-size="11" fill="#9fb0cc">CommandType=SP</text>
+        <rect x="560" y="70" width="170" height="52" rx="9" fill="#1d2740" stroke="#2a3654"/><text x="645" y="92" text-anchor="middle">Stored Procedure</text><text x="645" y="110" text-anchor="middle" font-size="11" fill="#9fb0cc">HealthPAS_Reports DB</text>
+        <rect x="770" y="70" width="180" height="52" rx="9" fill="#22304e" stroke="#2a3654"/><text x="860" y="92" text-anchor="middle">Plandata_Parallel</text><text x="860" y="110" text-anchor="middle" font-size="11" fill="#9fb0cc">capvoucher · payment</text>
+        <rect x="985" y="70" width="85" height="52" rx="9" fill="#22304e" stroke="#2a3654"/><text x="1027" y="94" text-anchor="middle" font-size="11">QNXT Cap</text><text x="1027" y="110" text-anchor="middle" font-size="11" fill="#9fb0cc">runtime</text>
+        <line x1="140" y1="96" x2="176" y2="96" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="330" y1="96" x2="366" y2="96" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="520" y1="96" x2="556" y2="96" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="730" y1="96" x2="766" y2="96" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+        <line x1="950" y1="96" x2="981" y2="96" stroke="#4da3ff" stroke-width="2" marker-end="url(#ar)"/>
+      </g>
+    </svg>
+    <figcaption>Execution chain shared by all four capitation reports. <span class="tag c">CONFIRMED</span> from RDL <code>&lt;CommandType&gt;StoredProcedure&lt;/CommandType&gt;</code> and the <code>from Plandata_Parallel.dbo.capvoucher … inner join … payment</code> pattern in every driving procedure.</figcaption>
+  </figure>
+
+  <h3>Cross-cutting facts</h3>
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> Reporting logic runs in SQL; SSRS only renders and applies <code>=Sum(Fields!…)</code> group/grand totals (FINRP00001 RDL L731-1059).</li>
+    <li><span class="tag c">CONFIRMED</span> Procedures live in the <code>HealthPAS_Reports</code> database but read cross-database from <code>Plandata_Parallel</code> (three-part names throughout each proc).</li>
+    <li><span class="tag i">INFERRED</span> The <code>_Parallel</code> suffix denotes a reporting replica/secondary of the transactional Plandata database; all reads use <code>WITH (NOLOCK)</code> / <code>(nolock)</code> hints, consistent with reporting off a replica.</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section id="s4">
+  <h2>4. FINRP00001 Analysis — MCO Monthly Capitation Payment Cycle Totals</h2>
+  <h4>Business purpose</h4>
+  <p><span class="tag c">CONFIRMED</span> Produces per-provider (MCO/HMO) cycle totals of capitation for a paid-date window: non-adjustment, adjustment, withhold, total capitation payment, and member roster counts.
+  <div class="ev"><b>Evidence:</b> proc select list <code>sum(NonAdjustment) Non_Adjustment, sum(Adjustment) Adjustment, sum(WithHoldAmount) Withhold_Amount, sum(NonAdjustment + Adjustment) Capitation_Payment_Amount, max(distinct RosterCnt) Roster_Counts, max(RosterGrand) Roster_Grand</code> — <code>[dbo].[usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals].sql</code>.</div></p>
+
+  <h4>Parameters</h4>
+  <ul class="tight">
+    <li><code>@startdate</code> / <code>@enddate</code> (smalldatetime) → SSRS params <code>startdate</code> / <code>enddate</code>. <span class="tag c">CONFIRMED</span> RDL L22-27, params L1601-1607.</li>
+    <li><span class="tag c">CONFIRMED</span> Filter is on <code>paydate between @startdate and @enddate</code> (proc cteBase).</li>
+  </ul>
+
+  <h4>Classification logic (CONFIRMED)</h4>
+  <ul class="tight">
+    <li><code>NonAdjustment</code> = <code>captype='MONTHLY' AND fundid NOT LIKE 'WITH%'</code> → capamount.</li>
+    <li><code>Adjustment</code> = <code>captype&lt;&gt;'MONTHLY' AND fundid NOT LIKE 'WITH%'</code> → capamount.</li>
+    <li><code>WithHoldAmount</code> = <code>fundid LIKE 'WITH%'</code> → capamount.</li>
+    <li>Roster = <code>count(distinct carriermemid)</code> per provider and grand total (cross apply).</li>
+  </ul>
+
+  <h4>Tables read</h4>
+  <p><code>capvoucher</code> a → <code>payment</code> b (<code>a.paymentid = b.paymentid</code>) → <code>Enrollkeys</code> m (carriermemid) → <code>planprovinfo</code> c (planprovid). <span class="tag c">CONFIRMED</span> proc FROM/JOIN block.</p>
+  <div class="callout warn"><span class="tag i">INFERRED</span> Despite the “CHIP to MCO” proc name, the report is scoped only by <code>paydate</code> and the <code>fundid/captype</code> classification — there is <b>no explicit program filter</b> in this proc, so it totals all capitation payments in the window grouped by payee provider.</div>
+</section>
+
+<!-- ============================================================= -->
+<section id="s5">
+  <h2>5. FINRP00001L Analysis — Capitation List</h2>
+  <h4>Business purpose</h4>
+  <p><span class="tag c">CONFIRMED</span> A <b>member-level detail list</b> of capitation payments with a derived <em>Adjustment Reason</em> for each row — the drill-down companion to the operational summary.
+  <div class="ev"><b>Evidence:</b> header comment <code>Description: Capitation List Report</code> and the multi-stage temp-table build in <code>[dbo].[usp_FINRP00001L_Capitation_List].sql</code>; displayed fields include <code>servicemonthyear, captype, capdate, capamount, amountpaid, paydate, memid, carriermemid, program, AdjustmentReason, provid, planprovid, npi, Line_of_Business</code> (RDL L29-149).</div></p>
+
+  <h4>Parameters</h4>
+  <ul class="tight">
+    <li>Active: <code>@PaidBegDate</code>, <code>@PaidEndDate</code> → SSRS <code>paidbegdate</code>/<code>paidenddate</code> (“Paid Beg/End Date*”). <span class="tag c">CONFIRMED</span> RDL L17-20, L2311-2317.</li>
+    <li><span class="tag c">CONFIRMED</span> Many parameters (Program, PaymentType, MbrID, PaytoProvID, CapitationCode, ManagedCarePlanCode, AdjustmentReason…) exist in the proc but are <b>commented out</b> — the shipped report filters on paid-date only.</li>
+  </ul>
+
+  <h4>Adjustment-reason cascade (CONFIRMED)</h4>
+  <p>Reason is resolved through a documented fallback chain, materialised across temp tables <code>#temp_cappayments → #temp_planaction → #temp_cappayments_maxplanaction → …_planactionreasons → …_adjustmentreasons → …_Finaladjustmentreasons → …_Member</code>:</p>
+  <ol class="tight">
+    <li><code>daycount = 0</code> → <b>"Rate Change"</b>.</li>
+    <li>Enrollment restriction with <code>appcapitation='Y'</code> → restriction description (<code>restrictiontype</code>).</li>
+    <li>Membercondition cap factor → capitation code / description.</li>
+    <li><code>planaction</code> reason → action reason description; if multiple → enrollment change; if none → actiontype.</li>
+    <li><code>memberpcp</code> term/eff → <b>"PCP Termination"</b> / <b>"Retro PCP Assignment"</b>; else <b>"Unknown"</b>.</li>
+  </ol>
+
+  <h4>Hard-coded scope &amp; masking (CONFIRMED)</h4>
+  <ul class="tight">
+    <li><code>where p.checkprintdate &gt;= '2023-02-01'</code> — floor date embedded in proc.</li>
+    <li><code>and p.status in ('PAIDREMITP','PAIDREMIT')</code> — only remitted/paid.</li>
+    <li><code>(Cv.CapType in ('RECON') or cv.capamount &lt; cf.amount)</code> — recon or below-factor rows.</li>
+    <li><code>top 200000</code> row cap on the member join.</li>
+    <li>VIP masking scaffolding present (<code>svf_MaskType</code>, <code>isvip</code>, <code>*mask</code> columns).</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section id="s6">
+  <h2>6. FINRP00001O Analysis — Capitation Operational Report</h2>
+  <h4>Business purpose</h4>
+  <p><span class="tag c">CONFIRMED</span> By its own header it is <b>"the Operational Report of Capitation List Report @ usp_FINRP00001L_Capitation_List"</b> — an operational/summary presentation of the same capitation payment rows, scoped to managed-care programs, adding <b>check number</b> and <b>withhold amount</b>.
+  <div class="ev"><b>Evidence:</b> header block and <code>CREATE PROCEDURE [dbo].[usp_FINRP00001O_Capitation_Summary]</code> in <code>[dbo].[usp_FINRP00001O_Capitation_Summary].sql</code>.</div></p>
+
+  <h4>Parameters &amp; lookup datasets</h4>
+  <ul class="tight">
+    <li>Main: <code>@PaidBegDate</code>, <code>@PaidEndDate</code>, <code>@PaytoProvNPIID</code>, <code>@PaytoProvSortName</code>, <code>@PaytoProvExternalID</code>. <span class="tag c">CONFIRMED</span> RDL L64-76.</li>
+    <li>Two cascading lookup datasets: <code>usp_Lookup_Line_of_Business</code> and <code>usp_Lookup_ProvSortName</code> (fed by <code>@NameSearch = Parameters!PaytoProvNameSearch.Value</code>). <span class="tag c">CONFIRMED</span> RDL L13-58.</li>
+  </ul>
+
+  <h4>Managed-care scope (CONFIRMED)</h4>
+  <p><code>where p1.programid in ('PGMT00000000133','PGMT00000000132') and p.paydate between @PaidBegDate and @PaidEndDate</code> and <code>p.status in ('PAIDREMIT','PAIDREMITP','PAIDREMITA')</code>.
+  <code>PGMT00000000133</code> resolves to <b>"Medicaid Managed Care"</b>.
+  <div class="ev"><b>Evidence:</b> program-id → label mapping <code>when bp.programid ='PGMT00000000133' then 'Medicaid Managed Care'</code> in <code>Encounter/ENCRP00002 - Encounter Prompt Payment List/[dbo].[usp_ENCRP00002_Encounter_Prompt_Payment].sql</code> L196.</div></p>
+
+  <h4>Extra output columns vs. FINRP00001L (CONFIRMED)</h4>
+  <ul class="tight">
+    <li><code>p.checknbr as CheckNumber</code> — rendered (RDL textbox <code>CheckNumber</code>, L1324-1342).</li>
+    <li><code>case when cv.fundid like '%withld%' then capamount else 0 end as WithholdAmount</code> — rendered (RDL L1365).</li>
+    <li><code>top 10000</code> row cap on <code>#temp_cappayments</code>.</li>
+  </ul>
+
+  <h4>Side-effect write (CONFIRMED)</h4>
+  <div class="callout bad">
+    The procedure <b>truncates and reloads a reporting helper table</b> with the distinct MCO Medicaid IDs it produced:
+    <br><code>truncate table [HealthPAS_Reports].dbo.FIN1O_MCO_Medicaid_ID</code> then <code>insert … select distinct planprovid from #temp_final</code>.
+    <div class="ev"><b>Evidence:</b> <code>[dbo].[usp_FINRP00001O_Capitation_Summary].sql</code> L395-396. No consumer of <code>FIN1O_MCO_Medicaid_ID</code> was found in any repository searched (see §8/§14).</div>
+  </div>
+
+  <h4>Relationship to EDI 820 (special focus)</h4>
+  <table>
+    <thead><tr><th>Question</th><th>Finding</th><th>Tag</th></tr></thead>
+    <tbody>
+      <tr><td>Does it supplement EDI 820 processing?</td><td>Yes — it presents the same MCO capitation payment rows (payment + capvoucher) filtered to managed-care programs, in a human-readable operational form.</td><td><span class="tag i">INFERRED</span></td></tr>
+      <tr><td>Does it reconcile against 820 output?</td><td>No code path compares report rows to 820 output; the proc never joins to EDI results.</td><td><span class="tag c">CONFIRMED</span></td></tr>
+      <tr><td>Does it read EDI staging tables?</td><td>No. The proc reads only <code>Plandata_Parallel</code> and <code>HealthPAS_Reports</code>/<code>ETLStageDB</code> objects; it does not touch <code>edigw_x12_file</code> / <code>edigw_x12_file_info_payment</code>.</td><td><span class="tag c">CONFIRMED</span></td></tr>
+      <tr><td>Does it use remittance data?</td><td>Yes — it filters on payment statuses <code>PAIDREMIT/PAIDREMITP/PAIDREMITA</code> and outputs <code>checknbr</code>.</td><td><span class="tag c">CONFIRMED</span></td></tr>
+      <tr><td>Does it use trading-partner information?</td><td>No. Trading-partner/receiver ID (<code>EDI_820RECVID</code>) is resolved by the separate EDIGW proc, not by this report.</td><td><span class="tag c">CONFIRMED</span></td></tr>
+    </tbody>
+  </table>
+  <p><span class="tag i">INFERRED</span> EDI 820 outbound generation is an <b>independent EDIGW/BizTalk pipeline</b> that reads the same source <code>Plandata_Parallel.dbo.payment</code> (by <code>checknbr</code>/<code>paymentid</code>/<code>provid</code>) and provider attribute <code>EDI_820RECVID</code>, then produces X12 820 files tracked in <code>edigw_x12_file</code> / <code>edigw_x12_file_info_payment</code> under transaction class <b>"Capitation Payments"</b>.
+  <div class="ev"><b>Evidence:</b> <code>sis-inx-edigw-main/…/EDIGW_Common/StoredProcedure/dbo.up_edigw_get_820TPID_by_paymentid.StoredProcedure.sql</code> L13-30 (reads <code>payment</code> + <code>providerattribute EDI_820RECVID</code>); <code>…/EDI_Gateway/StoredProcedure/dbo.up_edigw_x12_perform_transaction_based_search.StoredProcedure.sql</code> L96-130 (<code>@transaction_class='Capitation Payments'</code>, <code>st_type='820'</code>).</div>
+  <b>Conclusion:</b> FINRP00001O <em>supplements</em> the 820 process by reporting the same underlying capitation payments; it does <b>not</b> perform, feed, or reconcile the 820 in code.</p>
+</section>
+
+<!-- ============================================================= -->
+<section id="s7">
+  <h2>7. FINRP00020 Analysis — Monthly Counts &amp; Detail</h2>
+  <div class="callout bad">
+    <span class="tag u">UNKNOWN</span> <b>No artifact named FINRP00020 exists in the workspace.</b> Expected but not found.
+  </div>
+  <h4>Repositories searched</h4>
+  <ul class="tight">
+    <li>OH_FI_Reporting-main (glob <code>**/*FINRP00020*</code> and text search) — no result.</li>
+    <li>mms-cms-v360-main, mms-bolton-fin-ohio-main, mms-bolton-fin-hist-ohio-main — text search, no result.</li>
+    <li>Ohio.ETL, etl-framework-main — text search for <code>FINRP00020</code> / <code>Monthly Counts</code>, no result.</li>
+  </ul>
+  <h4>Search terms used</h4>
+  <p><code>FINRP00020</code>, <code>Monthly Counts</code>, glob <code>**/*FINRP00020*</code>.</p>
+  <h4>Artifacts reviewed</h4>
+  <p>Full <span class="path">OH_FI_Reporting-main/Financial/</span> folder listing (76 report folders enumerated) — no FINRP00020 folder present; the numeric sequence in Financial jumps from FINRP00014 to FINRP00054, so no 00020 report is deployed here.</p>
+  <div class="callout"><span class="tag i">INFERRED</span> The “FINRP00020 – Monthly Counts &amp; Detail” description in the engagement brief could not be tied to any deployed CEF/Ohio artifact. It may be a legacy/base-product report identifier, a different state’s numbering, or a report hosted outside these repositories. Requires SME/SSRS-catalog confirmation (see §14).</div>
+</section>
+
+<!-- ============================================================= -->
+<section id="s8">
+  <h2>8. Dataset Matrix</h2>
+  <table>
+    <thead><tr><th>Report</th><th>Dataset</th><th>Type</th><th>Embedded/Shared</th><th>Proc / Query</th><th>Query params → SSRS params</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td>FINRP00001</td><td><code>usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals</code></td><td>StoredProcedure</td><td>Embedded</td><td><code>usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals</code></td><td><code>@startdate←startdate</code>, <code>@enddate←enddate</code></td><td><span class="tag c">C</span> RDL L18-31</td></tr>
+      <tr><td>FINRP00001L</td><td><code>usp_FINRP00001L_Capitation_List</code></td><td>StoredProcedure</td><td>Embedded</td><td><code>usp_FINRP00001L_Capitation_List</code></td><td><code>@PaidBegDate←paidbegdate</code>, <code>@PaidEndDate←paidenddate</code></td><td><span class="tag c">C</span> RDL L13-25</td></tr>
+      <tr><td>FINRP00001O</td><td><code>usp_FINRP00001O_Capitation_Summary</code></td><td>StoredProcedure</td><td>Embedded</td><td><code>usp_FINRP00001O_Capitation_Summary</code></td><td>PaidBegDate, PaidEndDate, PaytoProvNPIID, PaytoProvSortName, PaytoProvExternalID</td><td><span class="tag c">C</span> RDL L60-81</td></tr>
+      <tr><td>FINRP00001O</td><td><code>usp_Lookup_Line_of_Business</code></td><td>StoredProcedure (lookup)</td><td>Embedded</td><td><code>usp_Lookup_Line_of_Business</code></td><td>—</td><td><span class="tag c">C</span> RDL L13-33</td></tr>
+      <tr><td>FINRP00001O</td><td><code>usp_Lookup_ProvSortName</code></td><td>StoredProcedure (lookup)</td><td>Embedded</td><td><code>usp_Lookup_ProvSortName</code></td><td><code>@NameSearch←PaytoProvNameSearch</code></td><td><span class="tag c">C</span> RDL L34-58</td></tr>
+      <tr><td>CMS Capitation Summary</td><td><code>DataSet1</code></td><td>Text (exec)</td><td>Embedded</td><td><code>exec usp_CMS_Capitation_Summary @PaidBegDate, @PaidEndDate</code></td><td>@PaidBegDate, @PaidEndDate</td><td><span class="tag c">C</span> RDL L13-24</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section id="s9">
+  <h2>9. Data Lineage Matrix</h2>
+  <p>Report field → dataset field → procedure expression → source column (all in <code>Plandata_Parallel.dbo</code> unless noted). <span class="tag c">CONFIRMED</span> from the driving procedures.</p>
+  <table>
+    <thead><tr><th>Report field</th><th>Report(s)</th><th>Procedure expression</th><th>Source table.column</th></tr></thead>
+    <tbody>
+      <tr><td>Capitation_Payment_Amount</td><td>FINRP00001</td><td><code>sum(NonAdjustment + Adjustment)</code></td><td><code>capvoucher.capamount</code></td></tr>
+      <tr><td>Non_Adjustment</td><td>FINRP00001</td><td><code>captype='MONTHLY' &amp; fundid NOT LIKE 'WITH%' → capamount</code></td><td><code>capvoucher.captype</code>, <code>.fundid</code>, <code>.capamount</code></td></tr>
+      <tr><td>Adjustment</td><td>FINRP00001</td><td><code>captype&lt;&gt;'MONTHLY' &amp; fundid NOT LIKE 'WITH%' → capamount</code></td><td><code>capvoucher.captype/.fundid/.capamount</code></td></tr>
+      <tr><td>Withhold_Amount</td><td>FINRP00001</td><td><code>fundid LIKE 'WITH%' → capamount</code></td><td><code>capvoucher.fundid/.capamount</code></td></tr>
+      <tr><td>Roster_Counts / Roster_Grand</td><td>FINRP00001</td><td><code>count(distinct carriermemid)</code></td><td><code>enrollkeys.carriermemid</code></td></tr>
+      <tr><td>PROVID / Name / Medicaidid</td><td>FINRP00001</td><td><code>b.provid / payee / c.planprovid</code></td><td><code>payment.provid</code>, <code>payment.payee</code>, <code>planprovinfo.planprovid</code></td></tr>
+      <tr><td>capamount / amountpaid</td><td>001L / 001O</td><td><code>cv.capamount / p.amountpaid</code></td><td><code>capvoucher.capamount</code>, <code>payment.amountpaid</code></td></tr>
+      <tr><td>servicemonthyear</td><td>001L / 001O</td><td><code>CONCAT(capmonth,'/',year(capdate))</code></td><td><code>capvoucher.capmonth/.capdate</code></td></tr>
+      <tr><td>paydate</td><td>001L / 001O</td><td><code>p.checkprintdate as paydate</code></td><td><code>payment.checkprintdate</code></td></tr>
+      <tr><td>CheckNumber</td><td>001O</td><td><code>p.checknbr</code></td><td><code>payment.checknbr</code></td></tr>
+      <tr><td>WithholdAmount</td><td>001O</td><td><code>fundid like '%withld%' → capamount</code></td><td><code>capvoucher.fundid/.capamount</code></td></tr>
+      <tr><td>AdjustmentReason</td><td>001L / 001O</td><td>cascade (restriction→condition→planaction→pcp)</td><td><code>restrictiontype.description</code>, <code>actionreason.description</code>, <code>memberpcp</code>, <code>planaction.actiontype</code></td></tr>
+      <tr><td>program</td><td>001L / 001O</td><td><code>p1.programid + ' - ' + p1.description</code></td><td><code>Program.programid/.description</code></td></tr>
+      <tr><td>Line_of_Business</td><td>001L / 001O</td><td><code>lbc.Line_of_Business_Code</code></td><td><code>HealthPAS_Reports.dbo.ADS_Ref_Line_of_Business_Config_Tb</code></td></tr>
+      <tr><td>MbrSortName / secondaryid / isvip</td><td>001L / 001O</td><td><code>m.fullname / m.secondaryid / m.isvip</code> (+ mask)</td><td><code>member.fullname/.secondaryid/.isvip</code></td></tr>
+      <tr><td>planprovid / npi</td><td>001L / 001O</td><td><code>ppir.planprovid / p.npi</code></td><td><code>planprovinfo.planprovid</code>, <code>provider.npi</code></td></tr>
+      <tr><td>recipent_medicaid_ID / fund_cd / rate_type_cd / cap_paid_amount</td><td>CMS Cap Summary</td><td><code>ek.memid / cv.fundid / cv.caprateid / cv.capamount</code></td><td><code>enrollkeys.memid</code>, <code>capvoucher.fundid/.caprateid/.capamount</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section id="s10">
+  <h2>10. Database Dependency Diagram (SVG)</h2>
+  <figure>
+    <svg viewBox="0 0 1080 470" width="100%" role="img" aria-label="Database dependency diagram">
+      <defs>
+        <marker id="a2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#6f86b8"/></marker>
+      </defs>
+      <style>
+        .rpt{fill:#243150;stroke:#4da3ff}
+        .db{fill:#12203a;stroke:#37c390}
+        .tbl{fill:#1d2740;stroke:#2a3654}
+        .edi{fill:#2a1d2e;stroke:#f0b429}
+        text{font-family:Segoe UI;fill:#e7ecf5;font-size:12px}
+        .t{font-size:11px;fill:#9fb0cc}
+        line{stroke:#6f86b8;stroke-width:1.5;marker-end:url(#a2)}
+        .dash{stroke-dasharray:5 4;stroke:#f0b429}
+      </style>
+
+      <!-- reports -->
+      <g>
+        <rect class="rpt" x="20" y="30" width="150" height="40" rx="8"/><text x="30" y="55">FINRP00001</text>
+        <rect class="rpt" x="20" y="90" width="150" height="40" rx="8"/><text x="30" y="115">FINRP00001L</text>
+        <rect class="rpt" x="20" y="150" width="150" height="40" rx="8"/><text x="30" y="175">FINRP00001O</text>
+        <rect class="rpt" x="20" y="210" width="150" height="40" rx="8"/><text x="30" y="235">CMS Cap Summary</text>
+      </g>
+
+      <!-- procs -->
+      <g>
+        <rect class="db" x="220" y="30" width="230" height="40" rx="8"/><text x="230" y="47" class="t">usp_Monthly…CHIPtoMCOTotals</text><text x="230" y="62" class="t">HealthPAS_Reports</text>
+        <rect class="db" x="220" y="90" width="230" height="40" rx="8"/><text x="230" y="107" class="t">usp_FINRP00001L_Capitation_List</text><text x="230" y="122" class="t">HealthPAS_Reports</text>
+        <rect class="db" x="220" y="150" width="230" height="40" rx="8"/><text x="230" y="167" class="t">usp_FINRP00001O_Capitation_Summary</text><text x="230" y="182" class="t">HealthPAS_Reports</text>
+        <rect class="db" x="220" y="210" width="230" height="40" rx="8"/><text x="230" y="227" class="t">usp_CMS_Capitation_Summary</text><text x="230" y="242" class="t">HealthPAS_Reports</text>
+      </g>
+
+      <!-- source tables -->
+      <g>
+        <rect class="tbl" x="520" y="20" width="200" height="30" rx="6"/><text x="530" y="40">Plandata_Parallel.capvoucher</text>
+        <rect class="tbl" x="520" y="58" width="200" height="30" rx="6"/><text x="530" y="78">Plandata_Parallel.payment</text>
+        <rect class="tbl" x="520" y="96" width="200" height="30" rx="6"/><text x="530" y="116">enrollkeys</text>
+        <rect class="tbl" x="520" y="134" width="200" height="30" rx="6"/><text x="530" y="154">capitation / capfactors</text>
+        <rect class="tbl" x="520" y="172" width="200" height="30" rx="6"/><text x="530" y="192">planprovinfo / provider</text>
+        <rect class="tbl" x="520" y="210" width="200" height="30" rx="6"/><text x="530" y="230">member / memberpcp</text>
+        <rect class="tbl" x="520" y="248" width="200" height="30" rx="6"/><text x="530" y="268">planaction / actionreason</text>
+        <rect class="tbl" x="520" y="286" width="200" height="30" rx="6"/><text x="530" y="306">enrollrestriction / restrictiontype</text>
+        <rect class="tbl" x="520" y="324" width="200" height="30" rx="6"/><text x="530" y="344">membercondition / condition</text>
+        <rect class="tbl" x="520" y="362" width="200" height="30" rx="6"/><text x="530" y="382">Program</text>
+        <rect class="tbl" x="520" y="400" width="200" height="30" rx="6"/><text x="530" y="420">HealthPAS_Reports.ADS_Ref_LOB_Config</text>
+      </g>
+
+      <!-- write + EDI -->
+      <g>
+        <rect class="edi" x="770" y="150" width="180" height="40" rx="8"/><text x="780" y="167" class="t">HealthPAS_Reports.dbo.</text><text x="780" y="182" class="t">FIN1O_MCO_Medicaid_ID (write)</text>
+        <rect class="edi" x="770" y="250" width="180" height="70" rx="8"/><text x="780" y="270" class="t">EDIGW (separate)</text><text x="780" y="286" class="t">edigw_x12_file /</text><text x="780" y="300" class="t">…_file_info_payment</text><text x="780" y="314" class="t">st_type '820'</text>
+      </g>
+
+      <!-- report->proc -->
+      <line x1="170" y1="50" x2="218" y2="50"/><line x1="170" y1="110" x2="218" y2="110"/><line x1="170" y1="170" x2="218" y2="170"/><line x1="170" y1="230" x2="218" y2="230"/>
+      <!-- proc->tables (fan) -->
+      <line x1="450" y1="50" x2="518" y2="35"/><line x1="450" y1="50" x2="518" y2="73"/><line x1="450" y1="50" x2="518" y2="111"/><line x1="450" y1="50" x2="518" y2="187"/>
+      <line x1="450" y1="110" x2="518" y2="35"/><line x1="450" y1="110" x2="518" y2="73"/><line x1="450" y1="110" x2="518" y2="225"/><line x1="450" y1="110" x2="518" y2="301"/>
+      <line x1="450" y1="170" x2="518" y2="35"/><line x1="450" y1="170" x2="518" y2="73"/><line x1="450" y1="170" x2="518" y2="339"/><line x1="450" y1="170" x2="518" y2="415"/>
+      <line x1="450" y1="230" x2="518" y2="35"/><line x1="450" y1="230" x2="518" y2="73"/><line x1="450" y1="230" x2="518" y2="111"/>
+      <!-- 001O write -->
+      <line x1="450" y1="165" x2="768" y2="168"/>
+      <!-- shared source, dashed inferred link to EDI -->
+      <line class="dash" x1="620" y1="88" x2="768" y2="270"/>
+      <text x="628" y="250" class="t" fill="#f0b429">shared source (inferred, no direct join)</text>
+    </svg>
+    <figcaption>Solid arrows = <span class="tag c">CONFIRMED</span> reads/writes from proc source. Dashed amber = <span class="tag i">INFERRED</span> shared-source relationship between capitation payments and the independent EDIGW 820 pipeline (no direct code join).</figcaption>
+  </figure>
+  <h4>Database dependency inventory</h4>
+  <div class="grid2">
+    <div>
+      <h4>Plandata_Parallel.dbo (source)</h4>
+      <ul class="tight">
+        <li>Tables: capvoucher, payment, enrollkeys, capitation, capfactors, planprovinfo, provider, member, memberpcp, affiliation, planaction, actionreason, enrollrestriction, restrictiontype, membercondition, condition, factorvalues, memberattribute, providerattribute, Program.</li>
+      </ul>
+      <h4>HealthPAS_Reports.dbo</h4>
+      <ul class="tight">
+        <li>Procs: usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals, usp_FINRP00001L_Capitation_List, usp_FINRP00001O_Capitation_Summary, usp_CMS_Capitation_Summary, usp_Lookup_Line_of_Business, usp_Lookup_ProvSortName.</li>
+        <li>Ref table: ADS_Ref_Line_of_Business_Config_Tb.</li>
+        <li>Write target: FIN1O_MCO_Medicaid_ID.</li>
+        <li>Functions: svf_MaskType, tvf_String_To_Table, tvf_Parameter_List.</li>
+      </ul>
+    </div>
+    <div>
+      <h4>ETLStageDB.dbo</h4>
+      <ul class="tight">
+        <li>Parameter_List_Detail, parameter (MEMEX00040 managed-care attribute lookup — referenced in FINRP00001L; commented-out in FINRP00001O).</li>
+      </ul>
+      <h4>EDI_Gateway / EDIGW_Common (separate system)</h4>
+      <ul class="tight">
+        <li>edigw_x12_file, edigw_x12_file_info_payment, edigw_file_archive.</li>
+        <li>Procs: up_edigw_get_820TPID_by_paymentid, up_edigw_x12_perform_transaction_based_search.</li>
+        <li><span class="tag c">CONFIRMED</span> Not referenced by any capitation report proc.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================= -->
+<section id="s11">
+  <h2>11. Report-to-Capitation Process Mapping</h2>
+  <table>
+    <thead><tr><th>Capitation process / object</th><th>FINRP00001</th><th>FINRP00001L</th><th>FINRP00001O</th><th>CMS Cap Summary</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td><b>CapVoucher</b></td><td>Direct</td><td>Direct</td><td>Direct</td><td>Direct</td><td><span class="tag c">C</span> <code>from … capvoucher</code> in all four procs</td></tr>
+      <tr><td><b>Payment generation</b> (payment)</td><td>Direct</td><td>Direct</td><td>Direct</td><td>Direct</td><td><span class="tag c">C</span> <code>join … payment</code> in all four procs</td></tr>
+      <tr><td>Payment / remittance status</td><td>—</td><td>Direct (PAIDREMIT*)</td><td>Direct (PAIDREMIT*)</td><td>—</td><td><span class="tag c">C</span> <code>p.status in (...)</code></td></tr>
+      <tr><td>Fund allocation (fundid)</td><td>Direct</td><td>Indirect</td><td>Direct (withhold)</td><td>Direct (fund_cd)</td><td><span class="tag c">C</span> <code>fundid</code> classification</td></tr>
+      <tr><td>Rate cell / cap rate (capitation, capfactors, caprateid)</td><td>—</td><td>Direct</td><td>Direct</td><td>Direct (rate_type_cd)</td><td><span class="tag c">C</span> <code>capitation c on c.capid=cv.caprateid</code></td></tr>
+      <tr><td>PostCap_SplitPayment</td><td>Not used</td><td>Not used</td><td>Not used</td><td>Not used</td><td><span class="tag c">C</span> no reference in any proc</td></tr>
+      <tr><td>FAAttributesCAP / Financial posting</td><td>Not used</td><td>Not used</td><td>Not used</td><td>Not used</td><td><span class="tag c">C</span> no reference in any proc</td></tr>
+      <tr><td>Flexi posting</td><td>Not used</td><td>Not used</td><td>Not used</td><td>Not used</td><td><span class="tag c">C</span> no reference in any proc</td></tr>
+      <tr><td>EDI 820 generation</td><td>Not used</td><td>Not used</td><td>Shared source only (no direct link)</td><td>Not used</td><td><span class="tag i">INFERRED</span> §6</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section id="s12">
+  <h2>12. Code-Level Findings</h2>
+  <h3>SSRS expression analysis (where calc happens)</h3>
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> Aggregation is split: row-level sums/classification are in SQL; SSRS applies group + grand totals via <code>=Sum(Fields!Non_Adjustment.Value)</code>, <code>=Sum(Fields!Adjustment.Value)</code>, <code>=Sum(Fields!Capitation_Payment_Amount.Value)</code>, <code>=Sum(Fields!Withhold_Amount.Value)</code> (FINRP00001 RDL L731-839 group, L951-1059 report totals).</li>
+    <li><span class="tag c">CONFIRMED</span> No custom <code>&lt;Code&gt;</code> block, RunningValue, or embedded VB was found in the capitation RDLs; all business logic is T-SQL.</li>
+    <li><span class="tag i">INFERRED</span> VIP masking is intended to be an SSRS-visible column set (<code>*mask</code> fields), driven by <code>member.isvip</code> and <code>svf_MaskType('Text')</code> in the proc (FINRP00001O IIF-based masking; FINRP00001L exposes both masked and clear columns).</li>
+  </ul>
+
+  <h3>Performance observations</h3>
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> FINRP00001L / FINRP00001O build long temp-table chains (7+ <code>#temp_*</code> tables) with <code>select distinct</code> at each stage — repeated large scans of capvoucher/payment.</li>
+    <li><span class="tag c">CONFIRMED</span> Row caps in place: FINRP00001L <code>top 200000</code>; FINRP00001O <code>top 10000</code> on <code>#temp_cappayments</code>. These bound output but can silently truncate large windows.</li>
+    <li><span class="tag c">CONFIRMED</span> Correlated <code>max(effdate)</code> subqueries on <code>memberpcp</code> executed per row of the PCP resolution (FINRP00001L/001O).</li>
+    <li><span class="tag c">CONFIRMED</span> FINRP00001O creates a nonclustered index on <code>#memcond</code> to mitigate the membercondition join.</li>
+    <li><span class="tag c">CONFIRMED</span> All source reads use NOLOCK; acceptable on a reporting replica but risks dirty reads if pointed at a live DB.</li>
+  </ul>
+
+  <h3>Data-quality / correctness notes</h3>
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> FINRP00001L embeds a hard floor <code>p.checkprintdate &gt;= '2023-02-01'</code> in addition to the paid-date parameters — results before Feb-2023 are impossible regardless of parameter input.</li>
+    <li><span class="tag c">CONFIRMED</span> Withhold detection differs between reports: FINRP00001 uses <code>fundid LIKE 'WITH%'</code>; FINRP00001O uses <code>fundid like '%withld%'</code>. Divergent string patterns risk inconsistent withhold totals across the suite.</li>
+    <li><span class="tag i">INFERRED</span> FINRP00001O suppresses the planaction date window (<code>createdate</code> between cap/pay date) with a comment “SUPPRESSED THE DATE FOR TESTING IN E2E Need to confirm on PROD”, so its adjustment-reason resolution may differ from FINRP00001L in production.</li>
+  </ul>
+
+  <h3>Security analysis</h3>
+  <ul class="tight">
+    <li><span class="tag c">CONFIRMED</span> Application-level masking of VIP members via <code>member.isvip</code> + <code>svf_MaskType</code> (FINRP00001O / 001L).</li>
+    <li><span class="tag u">UNKNOWN</span> SSRS folder/role security and report-level permissions are not expressed in the RDLs and no SSRS policy export was found in these repos — requires the SSRS catalog to confirm.</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section id="s13">
+  <h2>13. Evidence Table</h2>
+  <table>
+    <thead><tr><th>#</th><th>Claim</th><th>Tag</th><th>File : line</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>FINRP00001 executes SP against HealthPAS_Reports</td><td><span class="tag c">C</span></td><td class="path">Financial/FINRP00001 - MCO Monthly Capitation Payment Cycle Totals/FINRP00001 - MCO Monthly Capitation Payment Cycle Totals.rdl : 6-30</td></tr>
+      <tr><td>2</td><td>FINRP00001 classification &amp; roster counts</td><td><span class="tag c">C</span></td><td class="path">Financial/FINRP00001 …/[dbo].[usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals].sql : 12-40</td></tr>
+      <tr><td>3</td><td>FINRP00001 SSRS grand totals =Sum(...)</td><td><span class="tag c">C</span></td><td class="path">Financial/FINRP00001 …/*.rdl : 731-1059</td></tr>
+      <tr><td>4</td><td>FINRP00001L is the Capitation List detail report</td><td><span class="tag c">C</span></td><td class="path">Financial/FINRP00001L - Capitation List/[dbo].[usp_FINRP00001L_Capitation_List].sql : 5-6</td></tr>
+      <tr><td>5</td><td>FINRP00001L paid-date floor + status filter</td><td><span class="tag c">C</span></td><td class="path">…/[dbo].[usp_FINRP00001L_Capitation_List].sql : where checkprintdate &gt;= '2023-02-01' … status in ('PAIDREMITP','PAIDREMIT')</td></tr>
+      <tr><td>6</td><td>FINRP00001O = "Operational Report of Capitation List"</td><td><span class="tag c">C</span></td><td class="path">Financial/FINRP00001O …/[dbo].[usp_FINRP00001O_Capitation_Summary].sql : 6-13</td></tr>
+      <tr><td>7</td><td>FINRP00001O managed-care program filter</td><td><span class="tag c">C</span></td><td class="path">…/[dbo].[usp_FINRP00001O_Capitation_Summary].sql : where p1.programid in ('PGMT00000000133','PGMT00000000132')</td></tr>
+      <tr><td>8</td><td>PGMT00000000133 = "Medicaid Managed Care"</td><td><span class="tag c">C</span></td><td class="path">Encounter/ENCRP00002 …/[dbo].[usp_ENCRP00002_Encounter_Prompt_Payment].sql : 196</td></tr>
+      <tr><td>9</td><td>FINRP00001O outputs CheckNumber + WithholdAmount</td><td><span class="tag c">C</span></td><td class="path">…/[usp_FINRP00001O_Capitation_Summary].sql (checknbr, fundid like '%withld%'); RDL : 1324-1365</td></tr>
+      <tr><td>10</td><td>FINRP00001O writes FIN1O_MCO_Medicaid_ID (truncate+insert)</td><td><span class="tag c">C</span></td><td class="path">…/[usp_FINRP00001O_Capitation_Summary].sql : 395-396</td></tr>
+      <tr><td>11</td><td>No consumer of FIN1O_MCO_Medicaid_ID found</td><td><span class="tag u">U</span></td><td>grep across OH_FI_Reporting/EDIGW — only the write site returned</td></tr>
+      <tr><td>12</td><td>EDI 820 uses payment + providerattribute EDI_820RECVID</td><td><span class="tag c">C</span></td><td class="path">sis-inx-edigw-main/…/EDIGW_Common/StoredProcedure/dbo.up_edigw_get_820TPID_by_paymentid.StoredProcedure.sql : 13-30</td></tr>
+      <tr><td>13</td><td>EDI 820 "Capitation Payments" search over edigw_x12 st_type '820'</td><td><span class="tag c">C</span></td><td class="path">…/EDI_Gateway/StoredProcedure/dbo.up_edigw_x12_perform_transaction_based_search.StoredProcedure.sql : 96-130</td></tr>
+      <tr><td>14</td><td>CMS Capitation Summary federal-style extract</td><td><span class="tag c">C</span></td><td class="path">Financial/CMS Capitation Summary/[dbo].[usp_CMS_Capitation_Summary].sql : 18-56</td></tr>
+      <tr><td>15</td><td>FINRP00020 not present in any repo</td><td><span class="tag u">U</span></td><td>Financial/ folder listing (76 folders); text search FINRP00020 empty</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section id="s14">
+  <h2>14. Open Questions</h2>
+  <ul class="tight">
+    <li><span class="tag u">UNKNOWN</span> <b>FINRP00020</b> — which physical artifact (if any) does “Monthly Counts &amp; Detail” map to? Confirm against the live SSRS catalog / a repo not in this workspace.</li>
+    <li><span class="tag u">UNKNOWN</span> <b>FIN1O_MCO_Medicaid_ID</b> — what downstream job or 820 step consumes this table? No reader exists in the searched repos; confirm whether an EDIGW/SSIS job outside these repos reads it.</li>
+    <li><span class="tag u">UNKNOWN</span> Definition of program <code>PGMT00000000132</code> (paired with 133 = Medicaid Managed Care) — likely CHIP managed care; confirm from the Program table data.</li>
+    <li><span class="tag i">INFERRED</span> Is the withhold pattern discrepancy (<code>'WITH%'</code> vs <code>'%withld%'</code>) intentional, or a defect causing FINRP00001 and FINRP00001O withhold totals to diverge?</li>
+    <li><span class="tag i">INFERRED</span> Is the “date suppressed for E2E testing” planaction filter in FINRP00001O active in production?</li>
+    <li><span class="tag u">UNKNOWN</span> SSRS folder/role security for the Financial folder — not in RDLs; needs catalog export.</li>
+  </ul>
+</section>
+
+<!-- ============================================================= -->
+<section id="s15">
+  <h2>15. Repo Participation Matrix</h2>
+  <table>
+    <thead><tr><th>Repository</th><th>Role in Capitation reporting</th><th>Evidence</th></tr></thead>
+    <tbody>
+      <tr><td><b>OH_FI_Reporting-main</b></td><td><b>Primary</b> — hosts all capitation RDLs + driving stored procedures.</td><td><span class="tag c">C</span> Financial/ folders + *.sql</td></tr>
+      <tr><td>sis-inx-edigw-main</td><td>Independent EDI 820 outbound (Capitation Payments) — shares source payment data, no report linkage.</td><td><span class="tag c">C</span> EDIGW procs §6/§13</td></tr>
+      <tr><td>mms-cms-cef</td><td>QNXT capitation runtime source (capvoucher/payment producers, e.g. RetrieveCapitationPayHoldsPlusCapType).</td><td><span class="tag i">I</span> QNXT DataServices/Payment</td></tr>
+      <tr><td>mms-bolton-fin-ohio-main</td><td>Corticon financial rules (CAP/Capitation.ers/.erf) — upstream rule authoring, not a report source.</td><td><span class="tag c">C</span> CorticonStudio_Projects/…/RuleSheet/CAP/Capitation.ers</td></tr>
+      <tr><td>act-OH-FIWebSvc-main</td><td>FI SOAP service exposing ContractCapitation(Factor) from VUE360 — not referenced by the reports.</td><td><span class="tag i">I</span> VUE360Services Reference.cs</td></tr>
+      <tr><td>Ohio.ETL / etl-framework-main</td><td>No capitation report artifacts; searched for FINRP00020 — none.</td><td><span class="tag u">U</span></td></tr>
+      <tr><td>mms-bolton-fin-hist-ohio-main, mms-cms-v360-main, ProcessManager-*, finance-corticon-*, LetterManager-*, Baseline.ETLGateway.*, act-oh-OHDDI-main, mms-bolton-distmgr-work</td><td>No capitation SSRS report artifacts found.</td><td><span class="tag u">U</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================= -->
+<section id="s16">
+  <h2>16. Final Verdict</h2>
+  <ol class="verdict">
+    <li><b>What does FINRP00001 actually report?</b> Per-payee (MCO/HMO provider) <b>monthly capitation cycle totals</b> for a paid-date window — non-adjustment, adjustment, withhold, total capitation, and distinct member roster counts. <span class="tag c">CONFIRMED</span> (proc sum/classification; RDL Sum totals).</li>
+    <li><b>What does FINRP00001L actually report?</b> A <b>member-level Capitation List</b> (detail) of paid/remitted capitation vouchers with a derived Adjustment Reason via a restriction→condition→planaction→PCP cascade. <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>What does FINRP00001O actually report?</b> The <b>operational summary</b> of the Capitation List, scoped to managed-care programs (133/132), additionally exposing <b>check number</b> and <b>withhold amount</b>; it stages distinct MCO Medicaid IDs into FIN1O_MCO_Medicaid_ID. <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>Does FINRP00001O support EDI 820 reconciliation?</b> <b>It supplements, it does not reconcile.</b> It reports the same MCO capitation payments the 820 pipeline consumes, but performs no join to, read of, or comparison against EDI 820 staging/output. <span class="tag i">INFERRED</span> supplement / <span class="tag c">CONFIRMED</span> no EDI table access.</li>
+    <li><b>What does FINRP00020 actually report?</b> <b>Unknown</b> — no such artifact exists in the workspace. <span class="tag u">UNKNOWN</span>.</li>
+    <li><b>Which stored procedures drive each report?</b> FINRP00001→<code>usp_MonthlyCapitationPaymentCycleCHIPtoMCOTotals</code>; FINRP00001L→<code>usp_FINRP00001L_Capitation_List</code>; FINRP00001O→<code>usp_FINRP00001O_Capitation_Summary</code> (+ lookups); CMS→<code>usp_CMS_Capitation_Summary</code>. <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>Which tables are authoritative sources?</b> <code>Plandata_Parallel.dbo.capvoucher</code> joined to <code>Plandata_Parallel.dbo.payment</code> are the authoritative capitation-payment sources for every report. <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>Which reports use CapVoucher data?</b> <b>All four</b> (FINRP00001, 001L, 001O, CMS Capitation Summary). <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>Which reports use payment/remittance data?</b> All four read <code>payment</code>; FINRP00001L and FINRP00001O additionally filter on remittance statuses (<code>PAIDREMIT*</code>) and surface check/paydate. <span class="tag c">CONFIRMED</span>.</li>
+    <li><b>What code evidence proves each conclusion?</b> See the Evidence Table (§13) — every conclusion carries a file:line citation to an RDL, stored procedure, or configuration artifact.</li>
+  </ol>
+</section>
+
+<footer>
+  Capitation_SSRS_Reporting_DeepDive.html · Evidence-grounded architecture trace · Generated from workspace source (OH_FI_Reporting-main, sis-inx-edigw-main). No business logic, procedures, tables, or line numbers were fabricated; unfound artifacts are tagged [UNKNOWN].
+</footer>
+
+</main>
+</body>
+</html>
