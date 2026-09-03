@@ -1,0 +1,63 @@
+You are reviewing a sequence diagram against this codebase. The diagram was
+AI-generated, so assume nothing in it is correct until you find it in the code.
+ 
+DIAGRAM UNDER REVIEW:
+<
+[paste the Mermaid / PlantUML source, or describe the image contents here]
+>>>
+ 
+ENTRY POINT: [e.g. POST /api/v1/orders, or OrderController.submit()]
+ 
+Do NOT rely on file or class names alone — open and read the implementation
+before making any claim. Trace the actual call chain from the entry point.
+ 
+Verify each of the following and cite file path + line number as evidence:
+ 
+1. PARTICIPANTS — Does every participant in the diagram exist as a real
+   class/service/component? List any that do not exist. List any real
+   participant in the call chain that the diagram omits.
+ 
+2. MESSAGES — For every arrow, does that method / endpoint / event actually
+   exist with that name? Flag invented or renamed calls. Check the actual
+   HTTP verb and path against route definitions or the OpenAPI spec.
+ 
+3. ORDER — Does the execution order in the code match the diagram's order?
+   Flag any reordered or missing steps.
+ 
+4. SYNC vs ASYNC — Which calls are actually async (queue publish, event emit,
+   background job, fire-and-forget, awaited vs not)? Flag any the diagram
+   draws as synchronous that aren't, and vice versa.
+ 
+5. RETURNS — Does each return arrow match what the method actually returns?
+ 
+6. ERROR / ALTERNATE PATHS — Find every catch block, guard clause, early
+   return, validation failure, timeout, and retry in this call chain. List the
+   ones missing from the diagram that a reader would need to understand the flow.
+ 
+7. CONDITIONAL BRANCHES — Find if/switch logic that changes the call sequence
+   and check whether the diagram represents it with alt/opt fragments.
+ 
+8. LOOPS / BATCHING — Any iteration causing repeated calls that the diagram
+   shows as a single call?
+ 
+9. EXTERNAL DEPENDENCIES — Confirm every DB, cache, queue, and third-party
+   call in the code appears in the diagram, and that nothing in the diagram
+   is a dependency the code doesn't actually have.
+ 
+10. DATA CONCERNS — Note anywhere the diagram shows credentials, tokens, or
+    PII in a message label that shouldn't be exposed in a shared document.
+ 
+OUTPUT FORMAT — a markdown table:
+| # | Diagram element | Finding | Evidence (file:line) | Severity |
+ 
+Severity is one of:
+  BLOCKER  = factually wrong, will mislead a reader
+  SHOULD-FIX = missing path or detail that matters
+  NIT = naming, style, cosmetic
+ 
+After the table, add:
+- A one-line verdict: ACCURATE / NEEDS CHANGES / MAJOR REWORK
+- "Not verifiable": anything you could not confirm from the code, and why.
+ 
+Do not invent findings. If something checks out, say so explicitly rather
+than manufacturing a critique.
