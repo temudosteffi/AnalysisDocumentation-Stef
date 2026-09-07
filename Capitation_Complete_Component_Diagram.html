@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohio CEF Capitation — Complete Component Diagram (Stages 0–10)</title>
+<style>
+:root{--h1:#1a237e;--h2:#283593;--h3:#3949ab;--body-font:'Segoe UI',system-ui,Arial,sans-serif;--mono:'Cascadia Code','Fira Code',Consolas,monospace}
+*{box-sizing:border-box}
+body{font-family:var(--body-font);line-height:1.6;color:#212121;max-width:1400px;margin:0 auto;padding:2rem;background:#fafbff;font-size:11pt}
+h1{color:var(--h1);border-bottom:3px solid var(--h1);padding-bottom:.5rem}
+h2{color:var(--h2);border-bottom:1px solid #c5cae9;padding-bottom:.3rem;margin-top:2rem}
+h3{color:var(--h3);margin-top:1.5rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.88rem}
+th,td{border:1px solid #c5cae9;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#e8eaf6;color:var(--h2);font-weight:600}
+tr:nth-child(even){background:#f5f6ff}
+code{font-family:var(--mono);background:#e8eaf6;padding:1px 5px;border-radius:3px;font-size:.85em}
+.meta-block{background:#e8eaf6;border-left:4px solid #1a237e;padding:1em 1.5em;margin:1em 0;border-radius:0 6px 6px 0}
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;margin:1rem 0;padding:.8rem;background:#f5f5f5;border-radius:6px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:.85rem}
+.legend-color{width:18px;height:18px;border-radius:3px;border:2px solid}
+.svg-container{overflow-x:auto;margin:2rem 0;border:1px solid #e0e0e0;border-radius:8px;padding:1rem;background:#fff}
+.diagram-title{font-weight:700;color:var(--h1);margin-bottom:.5rem;font-size:1.1rem}
+footer{margin-top:3rem;padding-top:1rem;border-top:2px solid #c5cae9;font-size:.85rem;color:#78909c;text-align:center}
+@media print{.svg-container{page-break-inside:avoid}body{margin:1em;font-size:9pt}}
+</style>
+</head>
+<body>
+
+<h1>Ohio CEF Capitation — Complete Component Diagram (Stages 0–10)</h1>
+
+<div class="meta-block">
+<strong>Engagement:</strong> Gainwell Ohio CEF Architecture Assessment (MSS)<br>
+<strong>Scope:</strong> Full capitation pipeline — all stages, solutions, databases, tables, and inter-component relationships<br>
+<strong>Source:</strong> Synthesized from Stage 0, 1a/1b, 4, 5, 6, 7, 8, 9, 10 Deep Dive documents<br>
+<strong>Date:</strong> 2026-08-10
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>1. Master Component Diagram — Full Pipeline</h2>
+
+<div class="svg-container">
+<div class="diagram-title">Figure 1: End-to-End Capitation Component Architecture</div>
+
+<div class="legend">
+<div class="legend-item"><div class="legend-color" style="background:#e8eaf6;border-color:#3949ab"></div>Solution / .NET Component</div>
+<div class="legend-item"><div class="legend-color" style="background:#e3f2fd;border-color:#1976d2"></div>Database</div>
+<div class="legend-item"><div class="legend-color" style="background:#e0f2f1;border-color:#00897b"></div>QFrame Infrastructure</div>
+<div class="legend-item"><div class="legend-color" style="background:#fff8e1;border-color:#f9a825"></div>UI / Entry Point</div>
+<div class="legend-item"><div class="legend-color" style="background:#fce4ec;border-color:#e91e63"></div>SSIS / ETL</div>
+<div class="legend-item"><div class="legend-color" style="background:#f3e5f5;border-color:#9c27b0"></div>External / Finance</div>
+<div class="legend-item"><div class="legend-color" style="background:#ffebee;border-color:#c62828"></div>Risk / Critical Path</div>
+</div>
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 2400" width="1350" height="2400">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#546e7f"/></marker>
+    <marker id="arrBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#1976d2"/></marker>
+    <marker id="arrRed" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#c62828"/></marker>
+    <marker id="arrGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2e7d32"/></marker>
+  </defs>
+
+  <rect width="1350" height="2400" fill="#fafbff" rx="8"/>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STAGE 0 — RUN INVOCATION -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="20" width="1310" height="250" fill="none" stroke="#1a237e" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="45" font-size="14" font-weight="bold" fill="#1a237e" font-family="Segoe UI">STAGE 0 — Run Invocation</text>
+
+  <!-- UI Wizard -->
+  <rect x="50" y="65" width="220" height="80" fill="#fff8e1" stroke="#f9a825" stroke-width="2" rx="6"/>
+  <text x="160" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#f57f17" font-family="Segoe UI">QNXTALL.sln</text>
+  <text x="160" y="103" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CreateCAPPaymentsWiz2.aspx</text>
+  <text x="160" y="117" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">3-Step Wizard UI</text>
+  <text x="160" y="131" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">[UI Submit / UI Schedule / Restart]</text>
+
+  <!-- QTaskScheduler -->
+  <rect x="50" y="160" width="220" height="40" fill="#fff8e1" stroke="#f9a825" stroke-width="1.5" rx="6"/>
+  <text x="160" y="184" text-anchor="middle" font-size="9" font-weight="bold" fill="#f57f17" font-family="Segoe UI">QTaskScheduler.sln (Windows Scheduled Task)</text>
+
+  <!-- Arrow UI → Proxy -->
+  <line x1="270" y1="105" x2="320" y2="105" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Proxy Layer -->
+  <rect x="320" y="65" width="230" height="80" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="435" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">QCSI Proxy Payment.sln</text>
+  <text x="435" y="103" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapSubmitProxy.cs</text>
+  <text x="435" y="117" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapReStartProxy.cs</text>
+  <text x="435" y="131" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapitationBatchProcessProxy.cs</text>
+
+  <!-- Arrow Proxy → Infrastructure -->
+  <line x1="550" y1="105" x2="600" y2="105" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Infrastructure -->
+  <rect x="600" y="55" width="250" height="100" fill="#e0f2f1" stroke="#00897b" stroke-width="2" rx="6"/>
+  <text x="725" y="78" text-anchor="middle" font-size="10" font-weight="bold" fill="#004d40" font-family="Segoe UI">QCSI Internal Proxy.sln</text>
+  <text x="725" y="95" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">OneWayProxy.cs (Fire-and-Forget)</text>
+  <text x="725" y="110" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">BulkProxy.cs</text>
+  <text x="725" y="127" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">3 Transports: HTTP | Svc Broker | ByPass</text>
+  <text x="725" y="142" text-anchor="middle" font-size="8" fill="#c62828" font-family="Segoe UI">⚠ NO SERIALIZATION GUARD</text>
+
+  <!-- Arrow Infra → Hub -->
+  <line x1="850" y1="105" x2="900" y2="105" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Distribution Hub -->
+  <rect x="900" y="65" width="200" height="80" fill="#e0f2f1" stroke="#00897b" stroke-width="2" rx="6"/>
+  <text x="1000" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#004d40" font-family="Segoe UI">DistributionHub.sln</text>
+  <text x="1000" y="103" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">QEnterprise Distribution Hub</text>
+  <text x="1000" y="118" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">HTTP endpoint (Web Service)</text>
+  <text x="1000" y="133" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Routes msgs to Execution Units</text>
+
+  <!-- CapSubmit Agent -->
+  <rect x="600" y="170" width="250" height="55" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="725" y="193" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">CAPSubmit.sln</text>
+  <text x="725" y="208" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapSubmitAgent → XSLT Fan-Out (1 msg → N programs)</text>
+  <text x="725" y="220" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">XSLTCapSubmit.xslt</text>
+
+  <!-- Arrow Hub → CapSubmit -->
+  <line x1="1000" y1="145" x2="1000" y2="160" stroke="#546e7f" stroke-width="1"/>
+  <line x1="1000" y1="160" x2="850" y2="190" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- CapProgram Agent -->
+  <rect x="900" y="170" width="200" height="55" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="1000" y="193" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">QCSI ASC CapitationSetup.sln</text>
+  <text x="1000" y="208" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapProgramAgent.cs</text>
+  <text x="1000" y="220" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">CapProviderActivity.BuildProgramCapitation()</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STAGE 8 — PLANINTEGRATION (Dispatch + State) -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="280" width="1310" height="170" fill="none" stroke="#00897b" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="305" font-size="14" font-weight="bold" fill="#00897b" font-family="Segoe UI">STAGE 8 — PlanIntegration (Dispatch + Run-State + Run-Log)</text>
+
+  <!-- PlanIntegration DB -->
+  <rect x="50" y="320" width="600" height="110" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="8"/>
+  <text x="350" y="343" text-anchor="middle" font-size="11" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">PlanIntegration Database</text>
+  <!-- Tables inside -->
+  <rect x="65" y="355" width="120" height="30" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="125" y="374" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">process (192 chains)</text>
+  <rect x="195" y="355" width="120" height="30" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="255" y="374" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">processstep (~300)</text>
+  <rect x="325" y="355" width="120" height="30" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="385" y="374" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">agent (214 agents)</text>
+  <rect x="455" y="355" width="180" height="30" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="545" y="374" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">processlogheader (871K rows)</text>
+  <rect x="65" y="395" width="180" height="25" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="155" y="412" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">processstate (~2B rows, NOT a lock)</text>
+  <rect x="255" y="395" width="180" height="25" fill="#bbdefb" stroke="#1976d2" stroke-width="1" rx="3"/>
+  <text x="345" y="412" text-anchor="middle" font-size="8" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">processlogdetail (millions)</text>
+
+  <!-- Process Chains -->
+  <rect x="700" y="320" width="280" height="110" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="840" y="340" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Process Chains (logtype)</text>
+  <text x="840" y="358" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">ADV_CAP_PROC → CapProgramAgent</text>
+  <text x="840" y="374" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">ADV_CAP_BATCH → CapitationBatchProcessAgent</text>
+  <text x="840" y="390" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapProvProc → CapitationCreateAgent</text>
+  <text x="840" y="406" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CapReStartProc → CapitationRestartAgent</text>
+  <text x="840" y="422" text-anchor="middle" font-size="8" fill="#c62828" font-family="Segoe UI">PostCap Steps 1,2 → INACTIVE</text>
+
+  <!-- MessageProcessorEngine -->
+  <rect x="1020" y="330" width="200" height="50" fill="#e0f2f1" stroke="#00897b" stroke-width="1.5" rx="6"/>
+  <text x="1120" y="352" text-anchor="middle" font-size="9" font-weight="bold" fill="#004d40" font-family="Segoe UI">MessageProcessorEngine</text>
+  <text x="1120" y="367" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Resolves chain → loads assembly →</text>
+  <text x="1120" y="378" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CreateInstance → ProcessMessage()</text>
+
+  <!-- Arrow PlanIntegration → ProcessorEngine -->
+  <line x1="650" y1="370" x2="698" y2="370" stroke="#1976d2" stroke-width="1" marker-end="url(#arrBlue)"/>
+  <line x1="980" y1="370" x2="1018" y2="360" stroke="#00897b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STAGE 9 — QCSIDB -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="460" width="1310" height="150" fill="none" stroke="#607d8b" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="485" font-size="14" font-weight="bold" fill="#607d8b" font-family="Segoe UI">STAGE 9 — QCSIDB (ID Generation + Engine Configuration)</text>
+
+  <!-- QCSIDB -->
+  <rect x="50" y="500" width="500" height="90" fill="#eceff1" stroke="#607d8b" stroke-width="2" rx="8"/>
+  <text x="300" y="523" text-anchor="middle" font-size="11" font-weight="bold" fill="#37474f" font-family="Segoe UI">QCSIDB Database (COTS)</text>
+  <rect x="65" y="535" width="140" height="24" fill="#cfd8dc" stroke="#607d8b" stroke-width="1" rx="3"/>
+  <text x="135" y="551" text-anchor="middle" font-size="8" font-weight="bold" fill="#37474f" font-family="Segoe UI">idsequence (80+ types)</text>
+  <rect x="215" y="535" width="140" height="24" fill="#ffcdd2" stroke="#c62828" stroke-width="1.5" rx="3"/>
+  <text x="285" y="551" text-anchor="middle" font-size="8" font-weight="bold" fill="#c62828" font-family="Segoe UI">spQ_IDSeq (serialization pt)</text>
+  <rect x="365" y="535" width="80" height="24" fill="#cfd8dc" stroke="#607d8b" stroke-width="1" rx="3"/>
+  <text x="405" y="551" text-anchor="middle" font-size="8" fill="#37474f" font-family="Segoe UI">dbalias</text>
+  <rect x="455" y="535" width="80" height="24" fill="#cfd8dc" stroke="#607d8b" stroke-width="1" rx="3"/>
+  <text x="495" y="551" text-anchor="middle" font-size="8" fill="#37474f" font-family="Segoe UI">envconfig</text>
+  <text x="300" y="580" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">paymentid (type=4) | capitation ID (type=24) | claim ID (type=3) | memo ID (type=5)</text>
+
+  <!-- .NET Wrappers -->
+  <rect x="600" y="500" width="250" height="90" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="725" y="520" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">.NET ID Wrappers</text>
+  <text x="725" y="538" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CNextId.vb (VB.NET → capitation)</text>
+  <text x="725" y="554" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">CQIDSequenceLDL.cs (C# → QFrame)</text>
+  <text x="725" y="570" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">PBIDSequence (batch cache, 20/batch)</text>
+  <text x="725" y="584" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Consumers: 12 of 17 repos</text>
+
+  <!-- Arrow QCSIDB → Wrappers -->
+  <line x1="550" y1="545" x2="598" y2="545" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Ohio shadow -->
+  <rect x="900" y="510" width="250" height="60" fill="#fff3e0" stroke="#e65100" stroke-width="1.5" rx="6"/>
+  <text x="1025" y="530" text-anchor="middle" font-size="9" font-weight="bold" fill="#e65100" font-family="Segoe UI">Ohio Shadow: SQLDEV_IDSequence</text>
+  <text x="1025" y="546" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Deployed in HealthPAS_Common</text>
+  <text x="1025" y="560" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Used by member merge, EVV, claim scripts</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STAGE 6 — QFRAME ENGINE (INNER 7-STEP CHAIN) -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="620" width="1310" height="380" fill="none" stroke="#3949ab" stroke-width="2.5" rx="10"/>
+  <text x="40" y="645" font-size="14" font-weight="bold" fill="#3949ab" font-family="Segoe UI">STAGE 6 — QFrame Calculation Engine (Inner 7-Step Pipeline per Provider/Member)</text>
+  <text x="40" y="662" font-size="10" fill="#666" font-family="Segoe UI">Solution: QCSI ASC Capitation.sln + QCSI ASC CapitationSetup.sln (mms-cms-cef-r23)</text>
+
+  <!-- Step 1: Stage 1a -->
+  <rect x="50" y="680" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="135" y="698" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 1 / Stage 1a</text>
+  <text x="135" y="713" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cBuildCapEnrolls.vb</text>
+  <text x="135" y="726" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Who is on payroll?"</text>
+  <text x="135" y="739" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ enrollkeys, member</text>
+  <text x="135" y="750" text-anchor="middle" font-size="7" fill="#2e7d32" font-family="Segoe UI">Generates paymentid (QCSIDB)</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="220" y1="717" x2="250" y2="717" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 2: Stage 1b -->
+  <rect x="250" y="680" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="335" y="698" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 2 / Stage 1b</text>
+  <text x="335" y="713" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MCO Assignment</text>
+  <text x="335" y="726" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Which MCO pays?"</text>
+  <text x="335" y="739" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ affiliation lookup</text>
+
+  <!-- Arrow 2→3 (Stage 5) -->
+  <line x1="420" y1="717" x2="450" y2="717" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 3: Stage 5 - Affiliations -->
+  <rect x="450" y="680" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="535" y="698" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 3 / Stage 5</text>
+  <text x="535" y="713" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cBuildCapAffils.vb</text>
+  <text x="535" y="726" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"MCO→Contract→Rate"</text>
+  <text x="535" y="739" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ contractinfo, contract, capitation</text>
+  <text x="535" y="750" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">Query 10978</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="535" y1="755" x2="535" y2="780" stroke="#3949ab" stroke-width="2"/>
+  <line x1="535" y1="780" x2="135" y2="780" stroke="#3949ab" stroke-width="1"/>
+  <line x1="135" y1="780" x2="135" y2="800" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 4: cBuildCapAmount -->
+  <rect x="50" y="800" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="135" y="818" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 4</text>
+  <text x="135" y="833" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cBuildCapAmount.vb</text>
+  <text x="135" y="846" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Base rate + Winner Selection"</text>
+  <text x="135" y="859" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ capterm (10-dim scoring)</text>
+  <text x="135" y="870" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">Query 10794</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="220" y1="837" x2="250" y2="837" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 5: cCapFundAllocation -->
+  <rect x="250" y="800" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="335" y="818" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 5</text>
+  <text x="335" y="833" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cCapFundAllocation.vb</text>
+  <text x="335" y="846" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Split $ across funds"</text>
+  <text x="335" y="859" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ programfund, funddetail</text>
+  <text x="335" y="870" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">startamt allocation</text>
+
+  <!-- Arrow 5→6 (Stage 4) -->
+  <line x1="420" y1="837" x2="450" y2="837" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 6: Stage 4 - cCapFundAdjustment -->
+  <rect x="450" y="800" width="170" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="535" y="818" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 6 / Stage 4</text>
+  <text x="535" y="833" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cCapFundAdjustment.vb</text>
+  <text x="535" y="846" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Factor adjustments"</text>
+  <text x="535" y="859" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">→ capfactors, factorvalues</text>
+  <text x="535" y="870" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">endamt = startamt × factors</text>
+
+  <!-- Arrow 6→7 (Stage 7) -->
+  <line x1="620" y1="837" x2="680" y2="837" stroke="#3949ab" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- Step 7a: cStoreCapVoucher -->
+  <rect x="680" y="800" width="180" height="75" fill="#ffebee" stroke="#c62828" stroke-width="2" rx="6"/>
+  <text x="770" y="818" text-anchor="middle" font-size="9" font-weight="bold" fill="#c62828" font-family="Segoe UI">Step 7a / Stage 7</text>
+  <text x="770" y="833" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cStoreCapVoucher.vb</text>
+  <text x="770" y="846" text-anchor="middle" font-size="8" fill="#c62828" font-family="Segoe UI">"INSERT capvoucher"</text>
+  <text x="770" y="859" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">13-column PK</text>
+  <text x="770" y="870" text-anchor="middle" font-size="7" fill="#c62828" font-family="Segoe UI">⚠ NO txn | NO dup guard</text>
+
+  <!-- Arrow 7a→7b -->
+  <line x1="860" y1="837" x2="890" y2="837" stroke="#c62828" stroke-width="2" marker-end="url(#arrRed)"/>
+
+  <!-- Step 7b: cCapPayment -->
+  <rect x="890" y="800" width="180" height="75" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="6"/>
+  <text x="980" y="818" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Step 7b / Stage 7</text>
+  <text x="980" y="833" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">cCapPayment.vb</text>
+  <text x="980" y="846" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">"Fan-In → payment record"</text>
+  <text x="980" y="859" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">N vouchers → 1 payment/affiliate</text>
+  <text x="980" y="870" text-anchor="middle" font-size="7" fill="#2e7d32" font-family="Segoe UI">Status = OPEN</text>
+
+  <!-- Grid topology note -->
+  <rect x="680" y="680" width="600" height="55" fill="#e0f2f1" stroke="#00897b" stroke-width="1.5" rx="6"/>
+  <text x="980" y="698" text-anchor="middle" font-size="10" font-weight="bold" fill="#004d40" font-family="Segoe UI">QFrame Grid Topology</text>
+  <text x="980" y="714" text-anchor="middle" font-size="9" fill="#333" font-family="Segoe UI">Distribution Hub → Application Servers (CapProgramAgent) → Execution Units (7-Step Pipeline)</text>
+  <text x="980" y="728" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Fan-Out: 1 program request → N per-provider messages | Fan-In: N vouchers → 1 payment</text>
+
+  <!-- SelectCapAffiliations.sln note -->
+  <rect x="1100" y="800" width="180" height="55" fill="#e8eaf6" stroke="#3949ab" stroke-width="1" rx="5"/>
+  <text x="1190" y="818" text-anchor="middle" font-size="8" font-weight="bold" fill="#1a237e" font-family="Segoe UI">SelectCapAffiliations.sln</text>
+  <text x="1190" y="832" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CapGlobal.sln / CapPcp.sln</text>
+  <text x="1190" y="846" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">AdjustCapFunds.sln</text>
+  <text x="1190" y="860" text-anchor="middle" font-size="7" fill="#666" font-family="Segoe UI">(Standalone agent .sln files)</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- PRIMARY DATABASE — Plandata_Parallel -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="1010" width="1310" height="200" fill="none" stroke="#1976d2" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="1035" font-size="14" font-weight="bold" fill="#1976d2" font-family="Segoe UI">Plandata_Parallel — Primary Business Data Database</text>
+
+  <!-- Enrollment Tables -->
+  <rect x="50" y="1050" width="200" height="70" fill="#bbdefb" stroke="#1976d2" stroke-width="1.5" rx="5"/>
+  <text x="150" y="1068" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">Enrollment (Stage 1a)</text>
+  <text x="150" y="1083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">enrollkeys, member, enrollid</text>
+  <text x="150" y="1096" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">eligibilityorg, membercondition</text>
+  <text x="150" y="1109" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">pcpkeys, pcptransaction</text>
+
+  <!-- Contract Tables -->
+  <rect x="270" y="1050" width="200" height="70" fill="#bbdefb" stroke="#1976d2" stroke-width="1.5" rx="5"/>
+  <text x="370" y="1068" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">Contracts (Stage 5)</text>
+  <text x="370" y="1083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">contractinfo, contract</text>
+  <text x="370" y="1096" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">capitation, programcap</text>
+  <text x="370" y="1109" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">affiliation, network</text>
+
+  <!-- Rate Tables -->
+  <rect x="490" y="1050" width="200" height="70" fill="#bbdefb" stroke="#1976d2" stroke-width="1.5" rx="5"/>
+  <text x="590" y="1068" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">Rate Config (Stage 4)</text>
+  <text x="590" y="1083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">capterm (rate cells)</text>
+  <text x="590" y="1096" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">capfactors, factorvalues</text>
+  <text x="590" y="1109" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">factortypes, programfund</text>
+
+  <!-- Payment Tables -->
+  <rect x="710" y="1050" width="200" height="70" fill="#c8e6c9" stroke="#388e3c" stroke-width="1.5" rx="5"/>
+  <text x="810" y="1068" text-anchor="middle" font-size="9" font-weight="bold" fill="#1b5e20" font-family="Segoe UI">Payments (Stage 7)</text>
+  <text x="810" y="1083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">capvoucher (13-col PK)</text>
+  <text x="810" y="1096" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">payment, paycheck</text>
+  <text x="810" y="1109" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">funddetail, funddetailadj</text>
+
+  <!-- Fund/Pool Tables -->
+  <rect x="930" y="1050" width="200" height="70" fill="#bbdefb" stroke="#1976d2" stroke-width="1.5" rx="5"/>
+  <text x="1030" y="1068" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">Funds &amp; Pools</text>
+  <text x="1030" y="1083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">pooltrans</text>
+  <text x="1030" y="1096" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">programfund</text>
+  <text x="1030" y="1109" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">capfundid assignments</text>
+
+  <!-- Payment Status Lifecycle -->
+  <rect x="50" y="1135" width="700" height="30" fill="#fff8e1" stroke="#f9a825" stroke-width="1" rx="4"/>
+  <text x="400" y="1155" text-anchor="middle" font-size="9" font-weight="bold" fill="#f57f17" font-family="Segoe UI">Payment Status Lifecycle: OPEN (Stage 7) → INFLEXI (hpfin_APInvoiceUpdate) → PAIDREMIT (Hpfin_ClaimResolution)</text>
+
+  <!-- Connection info -->
+  <text x="850" y="1150" font-size="8" fill="#666" font-family="Segoe UI">Server: OHDBD01.OHAWS.COM\OHDEVENV01,55178</text>
+  <text x="850" y="1165" font-size="8" fill="#666" font-family="Segoe UI">~71 concurrent runs per monthly cycle</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- STAGE 10 — HealthPAS_Common -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="1220" width="1310" height="220" fill="none" stroke="#00897b" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="1245" font-size="14" font-weight="bold" fill="#00897b" font-family="Segoe UI">STAGE 10 — HealthPAS_Common (Shared Reference Data + Financial Staging)</text>
+  <text x="40" y="1262" font-size="9" fill="#666" font-family="Segoe UI">Server: OHDBD01.OHAWS.COM\OHDEVENVRX | SHARED-DB: capitation + claims (FFS) + pharmacy (SPBM) + OMAP all read/write</text>
+
+  <!-- Reference Data -->
+  <rect x="50" y="1275" width="250" height="80" fill="#b2ebf2" stroke="#0097a7" stroke-width="1.5" rx="5"/>
+  <text x="175" y="1293" text-anchor="middle" font-size="9" font-weight="bold" fill="#006064" font-family="Segoe UI">Reference Data (Ohio.ETL loads)</text>
+  <text x="175" y="1308" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMIM00065_RateCellCode_GAP</text>
+  <text x="175" y="1321" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMIM00065_RateCell_GAP</text>
+  <text x="175" y="1334" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMIM00065_MCRegions/MCGroups_GAP</text>
+  <text x="175" y="1347" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">ELGIP00005_SUPP_GAP</text>
+
+  <!-- Corticon Matrix -->
+  <rect x="320" y="1275" width="200" height="80" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5" rx="5"/>
+  <text x="420" y="1293" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c" font-family="Segoe UI">Corticon Decision Output</text>
+  <text x="420" y="1308" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_CorticonMatrix (35 cols)</text>
+  <text x="420" y="1321" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_CFAColumnMapping</text>
+  <text x="420" y="1334" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Rules → GL account mappings</text>
+  <text x="420" y="1347" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Loaded by CreateMatrixTable.sln</text>
+
+  <!-- Financial Staging -->
+  <rect x="540" y="1275" width="230" height="80" fill="#c8e6c9" stroke="#388e3c" stroke-width="1.5" rx="5"/>
+  <text x="655" y="1293" text-anchor="middle" font-size="9" font-weight="bold" fill="#1b5e20" font-family="Segoe UI">Financial Staging</text>
+  <text x="655" y="1308" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_FAAttributesCAP</text>
+  <text x="655" y="1321" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_PRMPymtResolutionStg</text>
+  <text x="655" y="1334" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap WRITES → CFA READS</text>
+  <text x="655" y="1347" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Bridge: Cap Engine → Finance/GL</text>
+
+  <!-- Rate Cell Sweep -->
+  <rect x="790" y="1275" width="230" height="80" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="5"/>
+  <text x="905" y="1293" text-anchor="middle" font-size="9" font-weight="bold" fill="#880e4f" font-family="Segoe UI">Rate Cell Sweep (Ohio.ETL SSIS)</text>
+  <text x="905" y="1308" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMSW00013_Rate_Cell_Cap_Sweep</text>
+  <text x="905" y="1321" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMIM00065_Rate_Cell_Config_Import</text>
+  <text x="905" y="1334" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Assigns rate-cell codes to members</text>
+  <text x="905" y="1347" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">ODM Actuarial CSV → crosswalk tables</text>
+
+  <!-- Ohio Custom Extensions -->
+  <rect x="1040" y="1275" width="250" height="80" fill="#fff8e1" stroke="#f9a825" stroke-width="1.5" rx="5"/>
+  <text x="1165" y="1293" text-anchor="middle" font-size="9" font-weight="bold" fill="#f57f17" font-family="Segoe UI">Ohio Custom (act-oh-OHDDI-main)</text>
+  <text x="1165" y="1308" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CA_Extensions DB</text>
+  <text x="1165" y="1321" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CAPRateExtensions / Rules tables</text>
+  <text x="1165" y="1334" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_PreFundAllocate Groups 1–5</text>
+  <text x="1165" y="1347" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_SplitPayment SP</text>
+
+  <!-- SQLDEV shadow note -->
+  <rect x="50" y="1370" width="380" height="25" fill="#fff3e0" stroke="#e65100" stroke-width="1" rx="3"/>
+  <text x="240" y="1387" text-anchor="middle" font-size="8" fill="#e65100" font-family="Segoe UI">SQLDEV_IDSequence shadow table + SQLDEV_MUM_GET_QCSIDB_ID proc (Ohio-custom ID generation bypass)</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DOWNSTREAM — PostCap + Finance + EDI -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="1450" width="1310" height="280" fill="none" stroke="#9c27b0" stroke-width="2" stroke-dasharray="6,3" rx="10"/>
+  <text x="40" y="1475" font-size="14" font-weight="bold" fill="#9c27b0" font-family="Segoe UI">DOWNSTREAM — PostCap Processing + Finance Pipeline + EDI Export (Stages 11–12+)</text>
+
+  <!-- PostCap Agents (mms-cms-cef-r23 CA_Extensions) -->
+  <rect x="50" y="1495" width="280" height="90" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="190" y="1513" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">PostCap Agents (mms-cms-cef-r23)</text>
+  <text x="190" y="1528" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">QCSI ASC PostCapitationBatchAgent.sln</text>
+  <text x="190" y="1543" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCapitationSplitPaymentAgent</text>
+  <text x="190" y="1558" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCapitationFundAllocationAgent</text>
+  <text x="190" y="1573" text-anchor="middle" font-size="8" fill="#c62828" font-family="Segoe UI">INACTIVE in ADV_CAP_BATCH (Steps 1,2)</text>
+
+  <!-- PostCap SPs (act-oh-OHDDI) -->
+  <rect x="360" y="1495" width="260" height="90" fill="#fff8e1" stroke="#f9a825" stroke-width="1.5" rx="6"/>
+  <text x="490" y="1513" text-anchor="middle" font-size="9" font-weight="bold" fill="#f57f17" font-family="Segoe UI">PostCap SPs (act-oh-OHDDI-main)</text>
+  <text x="490" y="1528" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_PreFundAllocate</text>
+  <text x="490" y="1543" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_PreFundAllocateAdjustments</text>
+  <text x="490" y="1558" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_PreFundAllocateRecons</text>
+  <text x="490" y="1573" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_SplitPayment (weekly dist)</text>
+
+  <!-- Arrow PostCap Agents → SPs -->
+  <line x1="330" y1="1540" x2="358" y2="1540" stroke="#f9a825" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Finance SSIS (mms-bolton-fin-ohio-main) -->
+  <rect x="650" y="1495" width="280" height="90" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="6"/>
+  <text x="790" y="1513" text-anchor="middle" font-size="9" font-weight="bold" fill="#880e4f" font-family="Segoe UI">Finance SSIS (mms-bolton-fin-ohio-main)</text>
+  <text x="790" y="1528" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_ClaimFundAllocation.dtsx (CFA)</text>
+  <text x="790" y="1543" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_APInvoiceUpdate.dtsx (AP)</text>
+  <text x="790" y="1558" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Hpfin_ClaimResolution.dtsx (PRM)</text>
+  <text x="790" y="1573" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">up_hpfin_CFACapAdjFundAlloc SP</text>
+
+  <!-- Arrow PostCap SPs → Finance -->
+  <line x1="620" y1="1540" x2="648" y2="1540" stroke="#e91e63" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Flexi GL -->
+  <rect x="960" y="1495" width="200" height="70" fill="#f3e5f5" stroke="#9c27b0" stroke-width="2" rx="6"/>
+  <text x="1060" y="1518" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a148c" font-family="Segoe UI">Flexi GL (Stage 12)</text>
+  <text x="1060" y="1535" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">TIVH, TIVD, APBH, PIPQ</text>
+  <text x="1060" y="1550" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">GL Distribution Lines Posted</text>
+  <text x="1060" y="1563" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Linked Server (DTC/2PC)</text>
+
+  <!-- Arrow Finance → Flexi -->
+  <line x1="930" y1="1540" x2="958" y2="1530" stroke="#9c27b0" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Corticon Rules -->
+  <rect x="50" y="1610" width="260" height="70" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5" rx="6"/>
+  <text x="180" y="1630" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c" font-family="Segoe UI">Corticon Business Rules</text>
+  <text x="180" y="1645" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">finance-corticon-businessrules-main</text>
+  <text x="180" y="1660" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Vocabulary + RuleSheets + RuleFlows</text>
+  <text x="180" y="1673" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">FinanceMatrix + PayablesMatrix decisions</text>
+
+  <!-- Corticon Loader -->
+  <rect x="340" y="1610" width="260" height="70" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5" rx="6"/>
+  <text x="470" y="1630" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c" font-family="Segoe UI">Corticon Matrix Loader</text>
+  <text x="470" y="1645" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">mms-bolton-fin-hist-ohio-main</text>
+  <text x="470" y="1660" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CreateMatrixTable.sln (C#)</text>
+  <text x="470" y="1673" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">→ hpfin_CorticonMatrix in HealthPAS_Common</text>
+
+  <!-- Arrow Corticon → Loader -->
+  <line x1="310" y1="1645" x2="338" y2="1645" stroke="#9c27b0" stroke-width="1" marker-end="url(#arr)"/>
+
+  <!-- EDI Export -->
+  <rect x="650" y="1610" width="260" height="70" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"/>
+  <text x="780" y="1630" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">EDI 820 Export</text>
+  <text x="780" y="1645" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">sis-inx-edigw-main</text>
+  <text x="780" y="1660" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Reads payment/paycheck</text>
+  <text x="780" y="1673" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Outbound payment remittance</text>
+
+  <!-- OH_FI_Reporting -->
+  <rect x="940" y="1610" width="250" height="70" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="6"/>
+  <text x="1065" y="1630" text-anchor="middle" font-size="9" font-weight="bold" fill="#880e4f" font-family="Segoe UI">SSRS Reporting</text>
+  <text x="1065" y="1645" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">OH_FI_Reporting-main</text>
+  <text x="1065" y="1660" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Capitation Summary, Monthly Totals</text>
+  <text x="1065" y="1673" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">Cap List, Operational Report</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DATA FLOW CONNECTIONS (major cross-layer arrows) -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+
+  <!-- Stage 0 → PlanIntegration (process chain) -->
+  <line x1="725" y1="225" x2="350" y2="318" stroke="#00897b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+  <!-- Stage 6 → Plandata (writes) -->
+  <line x1="770" y1="875" x2="810" y2="1048" stroke="#388e3c" stroke-width="2" marker-end="url(#arrGreen)"/>
+  <line x1="135" y1="755" x2="150" y2="1048" stroke="#1976d2" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrBlue)"/>
+
+  <!-- Stage 6 → QCSIDB (paymentid) -->
+  <line x1="135" y1="680" x2="285" y2="590" stroke="#607d8b" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+  <!-- Plandata → PostCap -->
+  <line x1="810" y1="1120" x2="490" y2="1493" stroke="#f9a825" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+  <!-- HealthPAS_Common → Finance -->
+  <line x1="655" y1="1355" x2="790" y2="1493" stroke="#e91e63" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arr)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- REPO PARTICIPATION MATRIX -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="1740" width="1310" height="320" fill="#f5f5f5" stroke="#9e9e9e" stroke-width="1" rx="8"/>
+  <text x="40" y="1768" font-size="14" font-weight="bold" fill="#37474f" font-family="Segoe UI">Repository Participation Matrix</text>
+
+  <!-- mms-cms-cef-r23 -->
+  <rect x="50" y="1785" width="300" height="70" fill="#e8eaf6" stroke="#3949ab" stroke-width="2" rx="5"/>
+  <text x="200" y="1803" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e" font-family="Segoe UI">mms-cms-cef-r23 (PRIMARY)</text>
+  <text x="200" y="1818" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">All VB.NET/C# business logic (7-step pipeline)</text>
+  <text x="200" y="1831" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Agent orchestration, QFrame infrastructure</text>
+  <text x="200" y="1844" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">UI, Proxies, DataServices, LDL, CA_Extensions</text>
+
+  <!-- act-oh-OHDDI-main -->
+  <rect x="370" y="1785" width="280" height="70" fill="#fff8e1" stroke="#f9a825" stroke-width="1.5" rx="5"/>
+  <text x="510" y="1803" text-anchor="middle" font-size="10" font-weight="bold" fill="#f57f17" font-family="Segoe UI">act-oh-OHDDI-main</text>
+  <text x="510" y="1818" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Ohio-custom PostCap stored procs</text>
+  <text x="510" y="1831" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">PostCap_PreFundAllocate Groups 1–5</text>
+  <text x="510" y="1844" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CAPRateExtensions config tables</text>
+
+  <!-- mms-bolton-fin-ohio-main -->
+  <rect x="670" y="1785" width="280" height="70" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="5"/>
+  <text x="810" y="1803" text-anchor="middle" font-size="10" font-weight="bold" fill="#880e4f" font-family="Segoe UI">mms-bolton-fin-ohio-main</text>
+  <text x="810" y="1818" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Finance SSIS pipeline (CFA, AP, PRM)</text>
+  <text x="810" y="1831" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">up_hpfin_CFACapAdjFundAlloc</text>
+  <text x="810" y="1844" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">OPEN → INFLEXI → PAIDREMIT transitions</text>
+
+  <!-- Ohio.ETL -->
+  <rect x="970" y="1785" width="280" height="70" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="5"/>
+  <text x="1110" y="1803" text-anchor="middle" font-size="10" font-weight="bold" fill="#880e4f" font-family="Segoe UI">Ohio.ETL / Ohio.ETL.2022</text>
+  <text x="1110" y="1818" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">SSIS loaders (rate cell, eligibility)</text>
+  <text x="1110" y="1831" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">MEMIM00065, MEMSW00013, ELGIP00005</text>
+  <text x="1110" y="1844" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">ODM actuarial CSV imports</text>
+
+  <!-- Row 2 repos -->
+  <!-- mms-bolton-fin-hist-ohio-main -->
+  <rect x="50" y="1870" width="260" height="55" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1" rx="5"/>
+  <text x="180" y="1888" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c" font-family="Segoe UI">mms-bolton-fin-hist-ohio-main</text>
+  <text x="180" y="1903" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Corticon matrix loader</text>
+  <text x="180" y="1916" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">CreateMatrixTable.sln → hpfin_CorticonMatrix</text>
+
+  <!-- finance-corticon-businessrules-main -->
+  <rect x="330" y="1870" width="260" height="55" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1" rx="5"/>
+  <text x="460" y="1888" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c" font-family="Segoe UI">finance-corticon-businessrules-main</text>
+  <text x="460" y="1903" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Vocabulary + RuleSheets + RuleFlows</text>
+  <text x="460" y="1916" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Fund allocation business rules</text>
+
+  <!-- sis-inx-edigw-main -->
+  <rect x="610" y="1870" width="240" height="55" fill="#e8eaf6" stroke="#3949ab" stroke-width="1" rx="5"/>
+  <text x="730" y="1888" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">sis-inx-edigw-main</text>
+  <text x="730" y="1903" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">EDI 820 outbound export</text>
+  <text x="730" y="1916" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Reads payment/paycheck for remittance</text>
+
+  <!-- OH_FI_Reporting -->
+  <rect x="870" y="1870" width="240" height="55" fill="#fce4ec" stroke="#e91e63" stroke-width="1" rx="5"/>
+  <text x="990" y="1888" text-anchor="middle" font-size="9" font-weight="bold" fill="#880e4f" font-family="Segoe UI">OH_FI_Reporting-main</text>
+  <text x="990" y="1903" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">SSRS reports (Capitation Summary,</text>
+  <text x="990" y="1916" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">Monthly Totals, Cap List, Operational)</text>
+
+  <!-- mms-cms-v360 -->
+  <rect x="50" y="1940" width="240" height="45" fill="#e8eaf6" stroke="#3949ab" stroke-width="1" rx="5"/>
+  <text x="170" y="1958" text-anchor="middle" font-size="9" font-weight="bold" fill="#1a237e" font-family="Segoe UI">mms-cms-v360-r23</text>
+  <text x="170" y="1973" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">145 QCSIDB refs — IDs + user/role</text>
+
+  <!-- ProcessManager / LetterManager -->
+  <rect x="310" y="1940" width="240" height="45" fill="#eceff1" stroke="#607d8b" stroke-width="1" rx="5"/>
+  <text x="430" y="1958" text-anchor="middle" font-size="9" font-weight="bold" fill="#37474f" font-family="Segoe UI">ProcessManager / LetterManager</text>
+  <text x="430" y="1973" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">QCSIDB consumers (ID gen: memo, letter)</text>
+
+  <!-- etl-framework-main -->
+  <rect x="570" y="1940" width="240" height="45" fill="#eceff1" stroke="#607d8b" stroke-width="1" rx="5"/>
+  <text x="690" y="1958" text-anchor="middle" font-size="9" font-weight="bold" fill="#37474f" font-family="Segoe UI">etl-framework-main</text>
+  <text x="690" y="1973" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">QCSIDB config reader (envconfig)</text>
+
+  <!-- Baseline.ETLGateway -->
+  <rect x="830" y="1940" width="240" height="45" fill="#eceff1" stroke="#607d8b" stroke-width="1" rx="5"/>
+  <text x="950" y="1958" text-anchor="middle" font-size="9" font-weight="bold" fill="#37474f" font-family="Segoe UI">Baseline.ETLGateway.2016.ETL</text>
+  <text x="950" y="1973" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">499 QCSIDB refs — SSIS conn mgrs</text>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DATABASE RELATIONSHIP SUMMARY -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="2010" width="1310" height="180" fill="#fff" stroke="#1a237e" stroke-width="2" rx="8"/>
+  <text x="675" y="2035" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a237e" font-family="Segoe UI">Database Relationship &amp; Table Operations Summary</text>
+
+  <!-- DB 1: Plandata_Parallel -->
+  <rect x="50" y="2050" width="280" height="125" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="6"/>
+  <text x="190" y="2068" text-anchor="middle" font-size="10" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">Plandata_Parallel</text>
+  <text x="190" y="2083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">READ: enrollkeys, member, contractinfo,</text>
+  <text x="190" y="2095" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">contract, capitation, capterm, capfactors,</text>
+  <text x="190" y="2107" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">factorvalues, programcap, programfund,</text>
+  <text x="190" y="2119" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">affiliation, pcpkeys, membercondition</text>
+  <text x="190" y="2135" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">WRITE: capvoucher, payment, paycheck,</text>
+  <text x="190" y="2147" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">funddetail, funddetailadj, pooltrans</text>
+  <text x="190" y="2163" text-anchor="middle" font-size="7" fill="#c62828" font-family="Segoe UI">⚠ NO txn wrap on capvoucher INSERT</text>
+
+  <!-- DB 2: PlanIntegration -->
+  <rect x="360" y="2050" width="240" height="125" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="6"/>
+  <text x="480" y="2068" text-anchor="middle" font-size="10" font-weight="bold" fill="#0d47a1" font-family="Segoe UI">PlanIntegration</text>
+  <text x="480" y="2083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">READ: process, processstep, agent</text>
+  <text x="480" y="2098" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">(chain resolution at dispatch)</text>
+  <text x="480" y="2115" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">WRITE: processlogheader,</text>
+  <text x="480" y="2130" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">processlogdetail, processstate</text>
+  <text x="480" y="2147" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">(audit/run-log — NOT a lock)</text>
+  <text x="480" y="2163" text-anchor="middle" font-size="7" fill="#c62828" font-family="Segoe UI">⚠ No serialization guard</text>
+
+  <!-- DB 3: QCSIDB -->
+  <rect x="630" y="2050" width="220" height="125" fill="#eceff1" stroke="#607d8b" stroke-width="2" rx="6"/>
+  <text x="740" y="2068" text-anchor="middle" font-size="10" font-weight="bold" fill="#37474f" font-family="Segoe UI">QCSIDB</text>
+  <text x="740" y="2083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">READ/WRITE: idsequence</text>
+  <text x="740" y="2098" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">(spQ_IDSeq atomic increment)</text>
+  <text x="740" y="2115" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">READ: dbalias, envconfig,</text>
+  <text x="740" y="2130" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">qenvironment, QueryDefinition</text>
+  <text x="740" y="2147" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">COTS — vendor-managed</text>
+  <text x="740" y="2163" text-anchor="middle" font-size="7" fill="#c62828" font-family="Segoe UI">⚠ Single serialization point (71 runs)</text>
+
+  <!-- DB 4: HealthPAS_Common -->
+  <rect x="880" y="2050" width="250" height="125" fill="#e0f7fa" stroke="#00897b" stroke-width="2" rx="6"/>
+  <text x="1005" y="2068" text-anchor="middle" font-size="10" font-weight="bold" fill="#004d40" font-family="Segoe UI">HealthPAS_Common</text>
+  <text x="1005" y="2083" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">READ: MEMIM00065_*_GAP (crosswalks),</text>
+  <text x="1005" y="2098" text-anchor="middle" font-size="8" fill="#333" font-family="Segoe UI">hpfin_CorticonMatrix, CFAColumnMapping</text>
+  <text x="1005" y="2115" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">WRITE: hpfin_FAAttributesCAP,</text>
+  <text x="1005" y="2130" text-anchor="middle" font-size="8" fill="#2e7d32" font-family="Segoe UI">hpfin_PRMPymtResolutionStg</text>
+  <text x="1005" y="2147" text-anchor="middle" font-size="8" fill="#666" font-family="Segoe UI">SHARED: Cap + FFS + SPBM + OMAP</text>
+  <text x="1005" y="2163" text-anchor="middle" font-size="7" fill="#c62828" font-family="Segoe UI">⚠ #1 shared-state barrier</text>
+
+  <!-- Cross-DB arrows -->
+  <line x1="330" y1="2100" x2="358" y2="2100" stroke="#1976d2" stroke-width="1.5" marker-end="url(#arrBlue)"/>
+  <line x1="600" y1="2100" x2="628" y2="2100" stroke="#607d8b" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="850" y1="2100" x2="878" y2="2100" stroke="#00897b" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- KEY FLOW SUMMARY TEXT -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <rect x="20" y="2200" width="1310" height="180" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="8"/>
+  <text x="675" y="2225" text-anchor="middle" font-size="13" font-weight="bold" fill="#1a237e" font-family="Segoe UI">End-to-End Flow Summary (Read Left-to-Right, Top-to-Bottom)</text>
+
+  <text x="50" y="2250" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">1. TRIGGER:</text>
+  <text x="140" y="2250" font-size="9" fill="#333" font-family="Segoe UI">Admin UI Wizard (QNXTALL.sln) or Windows Scheduled Task (QTaskScheduler.sln) → CapSubmitProxy → OneWayProxy (fire-and-forget)</text>
+
+  <text x="50" y="2270" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">2. DISPATCH:</text>
+  <text x="148" y="2270" font-size="9" fill="#333" font-family="Segoe UI">Distribution Hub → CapSubmitAgent (XSLT fan-out: 1→N programs) → PlanIntegration resolves chain → CapProgramAgent → per-provider fan-out</text>
+
+  <text x="50" y="2290" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">3. CALCULATE:</text>
+  <text x="155" y="2290" font-size="9" fill="#333" font-family="Segoe UI">7-Step Pipeline: BuildEnrolls → MCO Assign → BuildAffils → BuildAmount (winner selection) → FundAlloc → FundAdjust → StoreVoucher+Payment</text>
+
+  <text x="50" y="2310" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">4. WRITE:</text>
+  <text x="120" y="2310" font-size="9" fill="#333" font-family="Segoe UI">capvoucher INSERT (13-col PK) → payment record (status=OPEN) → paycheck per fund [Fan-In: N member vouchers → 1 payment/affiliate]</text>
+
+  <text x="50" y="2330" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">5. POSTCAP:</text>
+  <text x="145" y="2330" font-size="9" fill="#333" font-family="Segoe UI">PostCap_SplitPayment (weekly distribution) → PostCap_PreFundAllocate (Groups 1–5) → hpfin_FAAttributesCAP staging</text>
+
+  <text x="50" y="2350" font-size="10" fill="#333" font-family="Segoe UI" font-weight="bold">6. FINANCE:</text>
+  <text x="140" y="2350" font-size="9" fill="#333" font-family="Segoe UI">CFA SSIS reads FAAttributes + CorticonMatrix → GL distribution lines → Flexi GL (OPEN→INFLEXI→PAIDREMIT) → EDI 820 export</text>
+
+  <text x="50" y="2375" font-size="10" fill="#c62828" font-family="Segoe UI" font-weight="bold">CRITICAL RISKS:</text>
+  <text x="175" y="2375" font-size="9" fill="#c62828" font-family="Segoe UI">No serialization guard (concurrent runs) | No txn on capvoucher write | spQ_IDSeq single bottleneck | HealthPAS_Common shared-state barrier</text>
+
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>2. Solution (.sln) File Inventory by Stage</h2>
+
+<table>
+<tr><th>Stage</th><th>Solution File</th><th>Repo</th><th>Key Classes / Purpose</th></tr>
+<tr><td rowspan="6">0 — Run Invocation</td><td><code>QNXTALL.sln</code></td><td>mms-cms-cef-r23</td><td>UI Wizard (CreateCAPPaymentsW0/Wiz/Wiz2.aspx)</td></tr>
+<tr><td><code>QTaskScheduler.sln</code></td><td>mms-cms-cef-r23</td><td>Windows Task Scheduler COM interop</td></tr>
+<tr><td><code>QCSI Proxy Payment.sln</code></td><td>mms-cms-cef-r23</td><td>CapSubmitProxy, CapReStartProxy, CapitationBatchProcessProxy</td></tr>
+<tr><td><code>QCSI Internal Proxy.sln</code></td><td>mms-cms-cef-r23</td><td>OneWayProxy, BulkProxy (3 transport modes)</td></tr>
+<tr><td><code>DistributionHub.sln</code></td><td>mms-cms-cef-r23</td><td>QEnterprise Distribution Hub (HTTP endpoint)</td></tr>
+<tr><td><code>CAPSubmit.sln</code></td><td>mms-cms-cef-r23</td><td>CapSubmitAgent → XSLT fan-out</td></tr>
+<tr><td rowspan="2">1a/1b — Enrollment</td><td><code>QCSI ASC Capitation.sln</code></td><td>mms-cms-cef-r23</td><td>cBuildCapEnrolls, cBatchProcessEnrolls, CapitationActivity</td></tr>
+<tr><td><code>QCSI ASC CapitationSetup.sln</code></td><td>mms-cms-cef-r23</td><td>CapProgramAgent, CapProviderActivity</td></tr>
+<tr><td>4 — Cap Factor/Term</td><td><code>QCSI ASC Capitation.sln</code></td><td>mms-cms-cef-r23</td><td>cCapFundAdjustment (AdjustCapFunds agent)</td></tr>
+<tr><td rowspan="2">5 — Affiliations</td><td><code>SelectCapAffiliations.sln</code></td><td>mms-cms-cef-r23</td><td>cBuildCapAffils (MCO→Contract→Rate chain)</td></tr>
+<tr><td><code>CapGlobal.sln / CapPcp.sln</code></td><td>mms-cms-cef-r23</td><td>CapGlobalAgent / CapPcpAgent (provider list + XSLT fan-out)</td></tr>
+<tr><td>6 — QFrame Engine</td><td><code>QCSI ASC Capitation.sln</code></td><td>mms-cms-cef-r23</td><td>Full 7-step pipeline (inner chain), Winner Selection Algorithm</td></tr>
+<tr><td>7 — Write Layer</td><td><code>QCSI ASC Capitation.sln</code></td><td>mms-cms-cef-r23</td><td>cStoreCapVoucher, cCapPayment (capvoucher + payment INSERT)</td></tr>
+<tr><td>8 — PlanIntegration</td><td><code>DistributionHub.sln + QCSI Internal Proxy.sln</code></td><td>mms-cms-cef-r23</td><td>MessageProcessorEngine (chain resolution + dispatch)</td></tr>
+<tr><td>9 — QCSIDB</td><td><code>QCSI Payment DAL.sln</code></td><td>mms-cms-cef-r23</td><td>CNextId, CQIDSequenceLDL (spQ_IDSeq wrappers)</td></tr>
+<tr><td rowspan="4">10 — HealthPAS_Common</td><td><code>MEMIM00065_*.dtsx / MEMSW00013_*.dtsx</code></td><td>Ohio.ETL</td><td>Rate-cell crosswalk loaders (SSIS)</td></tr>
+<tr><td><code>CreateMatrixTable.sln</code></td><td>mms-bolton-fin-hist-ohio-main</td><td>Corticon decision → hpfin_CorticonMatrix</td></tr>
+<tr><td><code>hpfin_ClaimFundAllocation.dtsx</code></td><td>mms-bolton-fin-ohio-main</td><td>CFA SSIS pipeline (reads FAAttributes)</td></tr>
+<tr><td><code>QCSI ASC PostCapitationBatchAgent.sln</code></td><td>mms-cms-cef-r23</td><td>PostCap agents (trigger PostCap SPs)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>3. Database × Table × Operation Matrix</h2>
+
+<table>
+<tr><th>Database</th><th>Table</th><th>Operation</th><th>Stage(s)</th><th>Performing Component</th></tr>
+<tr><td rowspan="12">Plandata_Parallel</td><td>enrollkeys, member</td><td>READ</td><td>1a</td><td>cBuildCapEnrolls.vb</td></tr>
+<tr><td>membercondition, pcpkeys</td><td>READ</td><td>1a/1b</td><td>cBuildCapEnrolls.vb</td></tr>
+<tr><td>contractinfo, contract, capitation</td><td>READ</td><td>5</td><td>cBuildCapAffils.vb (Query 10978)</td></tr>
+<tr><td>capterm</td><td>READ</td><td>4, 6</td><td>cBuildCapAmount.vb (Query 10794, winner selection)</td></tr>
+<tr><td>capfactors, factorvalues, factortypes</td><td>READ</td><td>4</td><td>cCapFundAdjustment.vb</td></tr>
+<tr><td>programfund, programcap</td><td>READ</td><td>5, 6</td><td>cCapFundAllocation.vb</td></tr>
+<tr><td>capvoucher (13-col PK)</td><td>INSERT</td><td>7</td><td>cStoreCapVoucher.vb</td></tr>
+<tr><td>payment</td><td>INSERT/UPDATE</td><td>7</td><td>cCapPayment.vb (status=OPEN)</td></tr>
+<tr><td>paycheck</td><td>INSERT</td><td>7</td><td>cCapPayment.vb</td></tr>
+<tr><td>funddetail</td><td>INSERT</td><td>6</td><td>cCapFundAllocation.vb (startamt → endamt)</td></tr>
+<tr><td>funddetailadj</td><td>INSERT</td><td>4</td><td>cCapFundAdjustment.vb</td></tr>
+<tr><td>pooltrans</td><td>INSERT</td><td>6/7</td><td>cCapFundAllocation.vb (pool tracking)</td></tr>
+<tr><td rowspan="4">PlanIntegration</td><td>process, processstep, agent</td><td>READ</td><td>8</td><td>MessageProcessorEngine (chain resolution)</td></tr>
+<tr><td>processlogheader</td><td>INSERT</td><td>8</td><td>All agents (run audit header)</td></tr>
+<tr><td>processlogdetail</td><td>INSERT</td><td>8</td><td>All agents (step-level audit)</td></tr>
+<tr><td>processstate</td><td>INSERT</td><td>8</td><td>All agents (run-state tracking)</td></tr>
+<tr><td rowspan="3">QCSIDB</td><td>idsequence</td><td>READ/UPDATE</td><td>9</td><td>spQ_IDSeq (atomic increment)</td></tr>
+<tr><td>dbalias, envconfig</td><td>READ</td><td>9</td><td>QFrame startup config</td></tr>
+<tr><td>QueryDefinition</td><td>READ</td><td>All</td><td>LDL query resolution</td></tr>
+<tr><td rowspan="6">HealthPAS_Common</td><td>MEMIM00065_*_GAP</td><td>WRITE (ETL) / READ (sweep)</td><td>10</td><td>Ohio.ETL SSIS / MEMSW00013</td></tr>
+<tr><td>ELGIP00005_SUPP_GAP</td><td>WRITE (ETL) / READ (PostCap)</td><td>10</td><td>Ohio.ETL SSIS / PostCap SPs</td></tr>
+<tr><td>hpfin_CorticonMatrix</td><td>WRITE (loader) / READ (CFA)</td><td>10</td><td>CreateMatrixTable.sln / CFA SSIS</td></tr>
+<tr><td>hpfin_FAAttributesCAP</td><td>WRITE (PostCap) / READ (CFA)</td><td>10</td><td>PostCap_PreFundAllocate / CFA SSIS</td></tr>
+<tr><td>hpfin_CFAColumnMapping</td><td>READ</td><td>10</td><td>CFA SSIS (dynamic mapping)</td></tr>
+<tr><td>hpfin_PRMPymtResolutionStg</td><td>WRITE (PRM) / READ</td><td>10</td><td>Hpfin_ClaimResolution.dtsx</td></tr>
+<tr><td rowspan="2">CA_Extensions</td><td>CAPRateExtensions / CAPRateExtensionsRules</td><td>READ</td><td>4/PostCap</td><td>PostCap_PreFundAllocate Groups</td></tr>
+<tr><td>PostCap_* SPs</td><td>EXEC</td><td>PostCap</td><td>PostCapitationFundAllocationAgent</td></tr>
+<tr><td>Flexi GL</td><td>TIVH, TIVD, APBH, PIPQ</td><td>INSERT</td><td>12</td><td>hpfin_APInvoiceUpdate.dtsx (linked server/DTC)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>4. Key Architectural Patterns</h2>
+
+<table>
+<tr><th>Pattern</th><th>Where</th><th>Description</th></tr>
+<tr><td><strong>XSLT Fan-Out</strong></td><td>Stage 0</td><td>XSLTCapSubmit.xslt splits 1 request into N per-program messages</td></tr>
+<tr><td><strong>Per-Provider Fan-Out</strong></td><td>Stage 0</td><td>CapGlobal/CapPcp agents split 1 program into N per-provider messages</td></tr>
+<tr><td><strong>Fan-In Aggregation</strong></td><td>Stage 7</td><td>N member capvoucher rows roll up into 1 payment per pay-to affiliate</td></tr>
+<tr><td><strong>Fire-and-Forget</strong></td><td>Stage 0/8</td><td>OneWayProxy dispatches with no response/acknowledgment</td></tr>
+<tr><td><strong>10-Dimension Winner Selection</strong></td><td>Stage 6 Step 4</td><td>Best-match rate cell from capterm using age, gender, ZIP, plan, etc.</td></tr>
+<tr><td><strong>Centralized ID Generation</strong></td><td>Stage 9</td><td>spQ_IDSeq atomic increment — single point for all business keys</td></tr>
+<tr><td><strong>Process Chain Resolution</strong></td><td>Stage 8</td><td>PlanIntegration.process → processstep → agent → Assembly.Load()</td></tr>
+<tr><td><strong>Shared-DB Bridge</strong></td><td>Stage 10</td><td>HealthPAS_Common bridges Cap Engine output → Finance/GL pipeline</td></tr>
+<tr><td><strong>3-Tier Grid Compute</strong></td><td>Stage 6</td><td>Distribution Hub → Application Servers → Execution Units</td></tr>
+</table>
+
+<footer>
+Generated from Deep Dive documents: Stages 0, 1a/1b, 4, 5, 6, 7, 8, 9, 10 | Ohio CEF Architecture Assessment
+</footer>
+
+</body>
+</html>
