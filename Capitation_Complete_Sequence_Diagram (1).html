@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohio CEF Capitation — Stage-by-Stage Sequence Diagrams</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+:root{--h1:#1a237e;--h2:#283593;--h3:#3949ab;--body-font:'Segoe UI',system-ui,Arial,sans-serif;--mono:'Cascadia Code','Fira Code',Consolas,monospace}
+*{box-sizing:border-box}
+body{font-family:var(--body-font);line-height:1.7;color:#212121;max-width:1200px;margin:0 auto;padding:2rem 1.5rem;background:#fafbff;font-size:11pt}
+h1{color:var(--h1);border-bottom:3px solid var(--h1);padding-bottom:.5rem}
+h2{color:var(--h2);border-bottom:1px solid #c5cae9;padding-bottom:.3rem;margin-top:2.5rem}
+h3{color:var(--h3);margin-top:1.5rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.9rem}
+th,td{border:1px solid #c5cae9;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#e8eaf6;color:var(--h2);font-weight:600}
+tr:nth-child(even){background:#f5f6ff}
+code{font-family:var(--mono);background:#e8eaf6;padding:1px 5px;border-radius:3px;font-size:.85em}
+.meta-block{background:#e8eaf6;border-left:4px solid var(--h1);padding:1rem 1.2rem;margin:1rem 0;border-radius:0 6px 6px 0}
+.diagram-container{margin:1.5rem 0;padding:1.5rem;border:1px solid #e0e0e0;border-radius:8px;background:#fff;overflow-x:auto}
+.diagram-title{font-weight:700;color:var(--h2);margin-bottom:.5rem;font-size:1.05rem}
+.stage-desc{background:#f5f5f5;border-left:4px solid var(--h3);padding:1rem 1.2rem;margin:1rem 0 2rem 0;border-radius:0 6px 6px 0;font-size:.95rem}
+.stage-desc strong{color:var(--h3)}
+.stage-desc ul{margin:.5rem 0;padding-left:1.5rem}
+.stage-desc li{margin:.3rem 0}
+.status-flow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:1rem 0;padding:1rem;background:#f5f5f5;border-radius:6px}
+.status-box{padding:6px 14px;border-radius:6px;font-weight:700;font-size:.9rem}
+.status-incomplete{background:#eceff1;color:#546e7a;border:2px solid #90a4ae}
+.status-open{background:#e8f5e9;color:#2e7d32;border:2px solid #4caf50}
+.status-inflexi{background:#fff8e1;color:#f57f17;border:2px solid #ffc107}
+.status-paidremit{background:#c8e6c9;color:#1b5e20;border:2px solid #2e7d32}
+.status-arrow{font-size:1.2rem;color:#546e7f}
+.toc{background:#f5f5f5;border:1px solid #e0e0e0;padding:1.2rem 1.5rem;border-radius:6px;margin:1.5rem 0}
+.toc a{color:var(--h2);text-decoration:none}
+.toc a:hover{text-decoration:underline}
+.toc ul{margin:0;padding-left:1.2rem}
+.toc li{margin:.3rem 0}
+footer{margin-top:3rem;padding-top:1rem;border-top:2px solid #c5cae9;font-size:.85rem;color:#78909c;text-align:center}
+@media print{.diagram-container{page-break-inside:avoid}body{font-size:9pt;padding:1rem}h2{page-break-before:always}}
+</style>
+</head>
+<body>
+
+<h1>Ohio CEF Capitation — Stage-by-Stage Sequence Diagrams</h1>
+
+<div class="meta-block">
+<strong>Engagement:</strong> Gainwell Ohio CEF Architecture Assessment (MSS)<br>
+<strong>Scope:</strong> Stages 0 → 1a → 1b → 3 → 4 → 5 → 7 → PostCap → 10/11 (Full Pipeline)<br>
+<strong>Sources:</strong> Deep Dive documents for Stages 0, 1a/1b, 4, 5, 6, 7, 8, 9, 10<br>
+<strong>Date:</strong> 2026-08-10<br>
+<strong>Primary Repository:</strong> mms-cms-cef-r23 (QCSI ASC Capitation.sln)
+</div>
+
+<div class="toc">
+<strong>Table of Contents</strong>
+<ul>
+<li><a href="#overview">Pipeline Overview &amp; Payment Status Lifecycle</a></li>
+<li><a href="#stage0">Stage 0 — Run Invocation &amp; XSLT Fan-Out</a></li>
+<li><a href="#stage1a">Stage 1a — Enrollment Build</a></li>
+<li><a href="#stage1b">Stage 1b — MCO-Assignment Resolution</a></li>
+<li><a href="#stage3">Stage 3 — Base Amount Calculation</a></li>
+<li><a href="#stage4">Stage 4 — Fund Allocation &amp; Winner Selection</a></li>
+<li><a href="#stage5">Stage 5 — Cap Factor Adjustments</a></li>
+<li><a href="#stage7">Stage 7 — Write Layer (capvoucher + Payment Finalization)</a></li>
+<li><a href="#stage89">Stage 8/9 — PlanIntegration Dispatch &amp; QCSIDB ID Generation</a></li>
+<li><a href="#postcap">Post-Cap — Fund Allocation &amp; Split Payment</a></li>
+<li><a href="#stage1011">Stage 10/11 — HealthPAS_Common &amp; Finance Pipeline</a></li>
+</ul>
+</div>
+
+<h2 id="overview">Pipeline Overview &amp; Payment Status Lifecycle</h2>
+
+<div class="status-flow">
+<span class="status-box status-incomplete">INCOMPLETE</span>
+<span class="status-arrow">→</span>
+<span class="status-box status-open">OPEN</span>
+<span class="status-arrow">→</span>
+<span class="status-box status-inflexi">INFLEXI</span>
+<span class="status-arrow">→</span>
+<span class="status-box status-paidremit">PAIDREMIT</span>
+</div>
+<p style="font-size:.9rem;color:#546e7f;margin-top:.5rem">
+<strong>INCOMPLETE</strong> (Stage 1a: payment created) →
+<strong>OPEN</strong> (Stage 7: cCapPayment finalizes) →
+<strong>INFLEXI</strong> (Stage 11: APInvoiceUpdate loads to Flexi GL) →
+<strong>PAIDREMIT</strong> (Stage 11: ClaimResolution confirms posting)
+</p>
+
+<div class="diagram-container">
+<div class="diagram-title">Pipeline Overview — High-Level Stage Flow</div>
+<pre class="mermaid">
+sequenceDiagram
+    participant UI as Stage 0<br/>Run Invocation
+    participant S1a as Stage 1a<br/>Enrollment Build
+    participant S1b as Stage 1b<br/>MCO Assignment
+    participant S3 as Stage 3<br/>Base Amount
+    participant S4 as Stage 4<br/>Winner Selection
+    participant S5 as Stage 5<br/>Cap Factors
+    participant S7 as Stage 7<br/>Write + Finalize
+    participant PC as PostCap<br/>Split + Fund Alloc
+    participant S11 as Stage 11<br/>Finance + GL
+
+    UI->>S1a: CapProviderMessage (per provider)
+    S1a->>S1b: Enriched XML + paymentid
+    S1b->>S3: + affiliations + month schedule
+    S3->>S4: + base amounts
+    S4->>S5: + selected capterm + funddetail
+    S5->>S7: + factor-adjusted endamt
+    S7->>PC: payment status = OPEN
+    PC->>S11: hpfin_FAAttributesCAP staged
+    S11->>S11: OPEN → INFLEXI → PAIDREMIT
+</pre>
+</div>
+
+<h2 id="stage0">Stage 0 — Run Invocation &amp; XSLT Fan-Out</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 1: Stage 0 — UI Wizard → Proxy Dispatch → XSLT Fan-Out</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant User as QNXT Admin UI<br/>(CreateCAPPaymentsWiz)
+    participant Proxy as CapSubmitProxy<br/>(BulkProxy)
+    participant PlanInt as PlanIntegration DB
+    participant CapSubmit as CapSubmitAgent
+    participant CapProg as CapProgramAgent<br/>(CapProviderActivity)
+    participant Plandata as Plandata_Parallel DB
+
+    User->>Plandata: Step 1: READ ELIGIBILITYORG_ENTITY (nonstandard sponsors)
+    User->>Plandata: Step 2: READ PROGVIEW_CARRIERVIEW_PROGRAMTYPE (programs)
+    User->>User: Step 3: Set CapDate, ReconMonths, Mode (Complete/PCP/Global)
+    User->>Proxy: btFinish_Click() → GenerateMessages(isGlobal)
+    Note over User,Proxy: Constructs CapSubmitRequestMessageType[] (one per program x eligOrg)
+    Proxy->>PlanInt: cProcessLog.CreatePLHeader(ADV_CAP_PROC, STARTED)
+    Proxy->>CapSubmit: BulkProxy.Invoke() — fire-and-forget (no serialization guard)
+    CapSubmit->>CapSubmit: Load XSLTCapSubmit.xslt
+    CapSubmit->>CapSubmit: XSLT for-each //ProgramList/Program
+    Note over CapSubmit: 1 request → N CapProgramMessages (one per program)
+    CapSubmit->>CapProg: Dispatch per-program message (OneWayProxy)
+    CapProg->>Plandata: LoadProgramAndCaps(programid, captype)
+    Plandata-->>CapProg: programcap config (capmethod, splitmonthday, usetruecap)
+    CapProg->>Plandata: Query affiliation + contractinfo (provider list)
+    Plandata-->>CapProg: N providers for this program
+    CapProg->>CapProg: XSLT fan-out: XSLTCapGlobal / XSLTCapPcp (per provider)
+    Note over CapProg: N programs x M providers = per-provider CapProviderMessages
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 0 (Run Invocation):</strong>
+<ul>
+<li><strong>Entry Point:</strong> QNXT Administrator clicks "Create Capitation Payments" wizard (3-step UI in <code>QNXTALL.sln</code>).</li>
+<li><strong>UI Steps:</strong> (1) Select nonstandard sponsors, (2) Select Carrier/Programs + CapDate + operational mode (Complete Run, PCPs Only, Global Only, Management, Restart), (3) Set reconciliation parameters and submit.</li>
+<li><strong>Dispatch:</strong> <code>CapSubmitProxy</code> (extends <code>BulkProxy</code>) sends messages via one of three transports: HTTP POST to Distribution Hub, SQL Service Broker queue, or direct ByPassQEnterprise.</li>
+<li><strong>Fan-Out Pattern:</strong> <code>CapSubmitAgent</code> applies <code>XSLTCapSubmit.xslt</code> to split into per-program messages. Then <code>CapProgramAgent</code> applies <code>XSLTCapGlobal.xslt</code> / <code>XSLTCapPcp.xslt</code> to fan-out per provider.</li>
+<li><strong>Key .sln Files:</strong> <code>QNXTALL.sln</code> (UI), <code>CAPSubmit.sln</code> (CapSubmitAgent), <code>QCSI Proxy Payment.sln</code> (proxies), <code>QCSI ASC CapitationSetup.sln</code> (CapProgramAgent).</li>
+<li><strong>DB Tables:</strong> READ: <code>ELIGIBILITYORG_ENTITY</code>, <code>PROGVIEW_CARRIERVIEW_PROGRAMTYPE</code>, <code>PROGRAM</code>, <code>programcap</code>, <code>affiliation</code>, <code>contractinfo</code>. WRITE: <code>processlogheader</code> (PlanIntegration).</li>
+</ul>
+</div>
+
+<h2 id="stage1a">Stage 1a — Enrollment Build</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 2: Stage 1a — Build Enrollment List &amp; Pre-Allocate paymentid</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant CapProg as CapProgramAgent
+    participant Stage1a as cBuildCapEnrolls<br/>(Stage 1a)
+    participant Plandata as Plandata_Parallel DB
+    participant QCSIDB as QCSIDB<br/>(IDSequence)
+    participant PlanInt as PlanIntegration DB
+
+    CapProg->>Stage1a: CapitationActivity.BuildCapEnrolls(message)
+    Stage1a->>Stage1a: XMLAdvCap.InitXML(xml) — parse message
+    Stage1a->>Plandata: LoadProgramcaps() → programcap (effdate, capmethod, usetruecap)
+    Stage1a->>Plandata: LoadOpenPayments() → payment + capvoucher (avoid duplicates)
+    alt isGlobal = True
+        Stage1a->>Plandata: Build_Global_Enrollments() → spq_BuildGlobalCapMessage
+        Note over Stage1a,Plandata: Joins: affiliation + contractinfo + contract + capitation
+    else isGlobal = False
+        Stage1a->>Plandata: Build_PCP_Enrollments() → spq_BuildPCPCapMessageWithType
+        Stage1a->>Plandata: CheckPayHolds() → provider pay-hold status
+    end
+    Plandata-->>Stage1a: Enrollment list (members for this provider/program/month)
+    Stage1a->>QCSIDB: CNextId.GetStringID(QCS_ID_PAYABLE=4) → spQ_IDSeq
+    Note over QCSIDB: UPDATE idsequence SET rawval += 1 WHERE idtype=4 (row-level lock)
+    QCSIDB-->>Stage1a: Unique paymentid (e.g. QP00012744)
+    Stage1a->>Plandata: CreatePayment() → INSERT payment (paymentid, status=INCOMPLETE)
+    Stage1a->>Stage1a: m_XMLMessage.paymentid = paymentid (embed in XML)
+    Stage1a->>PlanInt: CreatePLDetailState(INFORMATION)
+    Note over Stage1a: If enrollments > 500: batch via CapitationBatchProcessProxy
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 1a (Enrollment Build):</strong>
+<ul>
+<li><strong>Purpose:</strong> Answers "Who is on the payroll this month?" — builds the roster of members eligible for capitation for a given provider/program/month.</li>
+<li><strong>Entry Point:</strong> <code>CapitationActivity.BuildCapEnrolls(message)</code> → creates <code>cBuildCapEnrolls</code> instance.</li>
+<li><strong>Key Operations:</strong> (1) Load program cap config, (2) Query enrollments via stored procedures, (3) Generate unique <code>paymentid</code> from <code>QCSIDB.spQ_IDSeq</code>, (4) INSERT payment record with status='INCOMPLETE', (5) Dispatch batches of 500 members.</li>
+<li><strong>Critical Architecture:</strong> ONE paymentid per (provider, run) — ALL subsequent vouchers share this single paymentid. It travels in the XML message through ALL downstream stages.</li>
+<li><strong>DB Tables:</strong> READ: <code>programcap</code>, <code>affiliation</code>, <code>contractinfo</code>, <code>contract</code>, <code>capitation</code>, <code>payment</code>, <code>capvoucher</code>. WRITE: <code>payment</code> (INSERT), <code>IDSequence</code> (UPDATE in QCSIDB).</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cBuildCapEnrolls.vb).</li>
+</ul>
+</div>
+
+<h2 id="stage1b">Stage 1b — MCO-Assignment Resolution</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 3: Stage 1b — Resolve Affiliations &amp; Build Month Schedule</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage1a as cBuildCapEnrolls
+    participant Stage1b as cBuildCapAffils<br/>(Stage 1b)
+    participant Plandata as Plandata_Parallel DB
+
+    Stage1a->>Stage1b: CapitationActivity.SelectCapAffiliations(message)
+    Stage1b->>Plandata: LoadRateCodes() → enrollcoverage (rate code list)
+    Stage1b->>Plandata: LoadPolicycopaysIntoXML() → policycopay + groups
+    alt isGlobal = True
+        Stage1b->>Plandata: BuildGlobal() → load restrictions, memberpcp, carveouts
+        loop For each month (capdate backwards to recondate)
+            Stage1b->>Plandata: GetGlobalCapData() → contractid, capid, captype
+            Stage1b->>Plandata: GetPCP(date, enrollid) → memberpcp filter
+            Stage1b->>Plandata: HasCarveOuts() → contcapcat
+            Stage1b->>Stage1b: Calculate eligible days
+            Stage1b->>Plandata: RemoveRestrictions() → enrollrestriction
+        end
+    else isGlobal = False
+        Stage1b->>Plandata: BuildPCP() → cRetrievePCPAffiliationsByEnrollid
+        loop For each month
+            Stage1b->>Plandata: GetCapData() → Query 10978 (contract chain)
+            Plandata-->>Stage1b: contractid, capfundid, capid, captype, pcptype
+            Stage1b->>Stage1b: GetPCPDays() — billable days per segment
+        end
+    end
+    Note over Stage1b: Output: affiliations + month schedule + days + contract terms
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 1b (MCO-Assignment Resolution):</strong>
+<ul>
+<li><strong>Purpose:</strong> Answers "Which department does each person's salary get charged to?" — resolves the chain: Member → MCO Assignment → Provider Contract → Capitation Table → Rate.</li>
+<li><strong>Entry Point:</strong> <code>CapitationActivity.SelectCapAffiliations(message)</code> → creates <code>cBuildCapAffils</code>.</li>
+<li><strong>Key Operations:</strong> (1) Load rate codes from enrollcoverage, (2) Load policy copays, (3) Resolve contract→cap table linkage via Query 10978, (4) Build month-by-month schedule with eligible days, (5) Apply carve-outs and enrollment restrictions.</li>
+<li><strong>Critical Logic:</strong> The <code>GetPCP()</code> function uses a simple date filter (<code>effdate &lt;= date AND termdate &gt;= date</code>). Overlapping PCP dates result in days=0 (silent zero-pay).</li>
+<li><strong>Query 10978:</strong> <code>SELECT contractid, capfundid, capid, captype, haspool, isflatfee, pcptype FROM contractinfo JOIN contract JOIN capitation WHERE affiliationid=@id AND programid=@prog</code></li>
+<li><strong>DB Tables:</strong> READ: <code>enrollcoverage</code>, <code>policycopay</code>, <code>policycopaygroup</code>, <code>copaygroupdetail</code>, <code>contractinfo</code>, <code>contract</code>, <code>capitation</code>, <code>memberpcp</code>, <code>contcapcat</code>, <code>enrollrestriction</code>, <code>restrictiontype</code>, <code>programcap</code>.</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cBuildCapAffils.vb).</li>
+</ul>
+</div>
+
+<h2 id="stage3">Stage 3 — Base Amount Calculation</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 4: Stage 3 — Calculate Base Capitation Amounts</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage1b as cBuildCapAffils
+    participant Stage3 as cBuildCapAmount<br/>(Stage 3)
+    participant Plandata as Plandata_Parallel DB
+
+    Stage1b->>Stage3: CapitationActivity.AllocateCapAmounts(message)
+    Stage3->>Stage3: Parse XML — iterate affiliations and months
+    alt captype = capterms (Standard PMPM)
+        Stage3->>Stage3: UseCapTermAmount() — rate from capterm table
+        Note over Stage3: Amount resolved by winner selection in Stage 4
+    else captype = capfactors (Flat Fee)
+        Stage3->>Stage3: UseFlatFeeAmount() — from contractinfo.flatfeeamount
+    else Days-Based (Premium method)
+        Stage3->>Plandata: Query premiuminvoice + detail + subdetail
+        Plandata-->>Stage3: Premium amounts for date range
+        Stage3->>Stage3: Compute: daily rate x enrolled days
+    end
+    Note over Stage3: Output: base amount per affiliation/month
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 3 (Base Amount Calculation):</strong>
+<ul>
+<li><strong>Purpose:</strong> Determines the raw capitation amount before fund allocation and factor adjustments. Routes to one of three calculation methods based on <code>captype</code>.</li>
+<li><strong>Entry Point:</strong> <code>CapitationActivity.AllocateCapAmounts(message)</code> → creates <code>cBuildCapAmount</code>.</li>
+<li><strong>Three Cap Methods:</strong> <strong>S (Standard PMPM):</strong> Fixed amount from <code>capterm.capamount</code>. <strong>F (Flat Fee):</strong> Fixed fee from <code>contractinfo.flatfeeamount</code>. <strong>D (Days-Based):</strong> Daily rate × enrolled days from premium invoice tables.</li>
+<li><strong>Note:</strong> For "capterms" type, the actual rate lookup happens in Stage 4 via the 10-dimension winner-selection algorithm (Query 10794).</li>
+<li><strong>DB Tables:</strong> READ: <code>premiuminvoice</code>, <code>premiuminvoicedetail</code>, <code>premiuminvoicesubdetail</code> (only for days-based method).</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cBuildCapAmount.vb).</li>
+</ul>
+</div>
+
+<h2 id="stage4">Stage 4 — Fund Allocation &amp; Winner Selection</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 5: Stage 4 — 10-Dimension Rate-Cell Winner Selection (Query 10794)</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage3 as cBuildCapAmount
+    participant Stage4 as cCapFundAllocation<br/>(Stage 4)
+    participant Plandata as Plandata_Parallel DB
+
+    Stage3->>Stage4: CapitationActivity.AllocateCapFunds(message)
+    Stage4->>Stage4: Compute current_age = DateDiff(Month, DOB, capdate)
+    Note over Stage4: Age in MONTHS not years! (360 = 30 years, sentinel 1320 = 110yrs)
+    Stage4->>Stage4: Build policycopaygroupselect SQL fragment
+    Stage4->>Stage4: Build servicezipwhere clause (PCP service ZIP)
+    Stage4->>Plandata: Query 10794: SELECT matched, possible, capterm.*
+    Note over Plandata: FROM capitation JOIN capterm WHERE capid=@capid AND effdate/termdate
+    Plandata-->>Stage4: Candidate rate cells with matched/possible scores
+    Stage4->>Stage4: Sort: possible DESC, matched DESC, agemax ASC, agemin ASC, capamount DESC
+    Stage4->>Stage4: Accept FIRST row where matched = possible AND matched > 0
+    Note over Stage4: Winner = most specific cell satisfying ALL defined criteria
+    loop For each winning capterm (per fund)
+        Stage4->>Plandata: WriteFundDetail() → INSERT funddetail (startamt, endamt)
+    end
+    Note over Stage4: Output: captermid + fundid + startamt per affiliation/month
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 4 (Fund Allocation &amp; Winner Selection):</strong>
+<ul>
+<li><strong>Purpose:</strong> Selects the single best-matching rate cell from all candidate <code>capterm</code> rows using a 10-dimension scoring algorithm, then allocates the amount across configured funds.</li>
+<li><strong>Entry Point:</strong> <code>CapitationActivity.AllocateCapFunds(message)</code> → creates <code>cCapFundAllocation</code>.</li>
+<li><strong>Winner Selection Rule:</strong> A rate cell is valid <strong>if and only if <code>matched = possible</code></strong> — the member must satisfy EVERY criterion the cell defines.</li>
+<li><strong>10 Scoring Dimensions:</strong> ZIP, ratecode, gender (sex), agemin, agemax, planid, copaygroupid, copayid+copayamt (paired).</li>
+<li><strong>Tie-Break Sort:</strong> <code>"possible DESC, matched DESC, agemax ASC, agemin ASC, capamount DESC"</code> — narrower age ranges (more specific) win.</li>
+<li><strong>CRITICAL:</strong> Age is in <strong>MONTHS</strong> (not years). A reimplementation using years will select wrong rate cells and pay wrong amounts.</li>
+<li><strong>DB Tables:</strong> READ: <code>capitation</code>, <code>capterm</code> (Query 10794). WRITE: <code>funddetail</code> (INSERT with startamt).</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cCapFundAllocation.vb), <code>QCSI Access Payment.sln</code> (10794.xml).</li>
+</ul>
+</div>
+
+<h2 id="stage5">Stage 5 — Cap Factor Adjustments</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 6: Stage 5 — Apply Cap Factors (AGE/GENDER, BENEFIT PLAN, RATE CODE, CONDITION)</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage4 as cCapFundAllocation
+    participant Stage5 as cCapFundAdjustment<br/>(Stage 5)
+    participant Plandata as Plandata_Parallel DB
+
+    Stage4->>Stage5: CapitationActivity.AdjustCapFunds(message)
+    Stage5->>Plandata: Query 87: capfactors JOIN factorvalues JOIN factortypes
+    Plandata-->>Stage5: All cap factors for this cap arrangement
+    Stage5->>Plandata: Query 86: membercondition WHERE memid=@memid
+    Plandata-->>Stage5: Active member conditions
+    Stage5->>Stage5: Loop affiliations → months → branch on captype
+    alt captype = capterms
+        Stage5->>Stage5: AdjustCapTermAmount() — apply capmethod
+    else captype = capfactors
+        Stage5->>Stage5: AdjustCapFactorAmount() — iterate factor types
+    end
+    loop For each matching factor
+        Note over Stage5: AGE/GENDER | BENEFIT PLAN | RATE CODE | CONDITION
+        Stage5->>Stage5: If amounttype=P: (amount/100) x startamt, else flat $
+        Stage5->>Stage5: endamt = endamt + adjustment (ADDITIVE composition)
+        Stage5->>Plandata: Query 131: UPDATE funddetail SET endamt=@endamt
+        Stage5->>Plandata: Query 138: INSERT funddetailadj (audit record)
+    end
+    alt capmethod = S
+        Stage5->>Stage5: PayBySplitmonth() — split at configured day
+    else capmethod = F
+        Stage5->>Stage5: PayByFrontEndBackEndWash() — zero if past midpoint
+    else default
+        Stage5->>Stage5: AdjustForDays() — pro-rate by enrolled days
+    end
+    Note over Stage5: Output: final adjusted endamt per fund
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 5 (Cap Factor Adjustments):</strong>
+<ul>
+<li><strong>Purpose:</strong> Takes the base amount from Stage 4 and applies configured adjustments, then handles special payment methods (split-month, front/back wash, true-cap pro-ration).</li>
+<li><strong>Entry Point:</strong> <code>CapitationActivity.AdjustCapFunds(message)</code> → creates <code>cCapFundAdjustment</code>.</li>
+<li><strong>Factor Composition:</strong> Factors are <strong>ADDITIVE</strong> — each factor's percentage is applied against the original <code>startamt</code> (not accumulated endamt), then added to the running total.</li>
+<li><strong>Four Factor Types:</strong> AGE/GENDER (minval/maxval + sex B/M/F), BENEFIT PLAN (planid), RATE CODE (rateid + ratecode list), CONDITION (active membercondition).</li>
+<li><strong>Cap Methods:</strong> "S" = split month at splitmonthday with firsthalfpercent/sechalfpercent, "F" = zero if PCP effective after midpoint or term before midpoint, default = true-cap pro-ration by days.</li>
+<li><strong>DB Tables:</strong> READ: <code>capfactors</code>, <code>factorvalues</code>, <code>factortypes</code> (Query 87), <code>membercondition</code> (Query 86). WRITE: <code>funddetail</code> (UPDATE endamt), <code>funddetailadj</code> (INSERT audit).</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cCapFundAdjustment.vb).</li>
+</ul>
+</div>
+
+<h2 id="stage7">Stage 7 — Write Layer (capvoucher + Payment Finalization)</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 7: Stage 7 — Persist Vouchers &amp; Finalize Payment (INCOMPLETE → OPEN)</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage5 as cCapFundAdjustment
+    participant Stage7W as cStoreCapVoucher<br/>(Write)
+    participant Stage7F as cCapPayment<br/>(Finalize)
+    participant Plandata as Plandata_Parallel DB
+
+    Stage5->>Stage7W: CapitationActivity.StoreCapVoucher(message)
+    Stage7W->>Plandata: SELECT recon history (capvoucher JOIN payment)
+    Stage7W->>Stage7W: Compare current vs history → compute deltas
+    loop For each enrollment (member x fund)
+        alt RECON month (changed)
+            Stage7W->>Plandata: INSERT capvoucher (captype=RECON, delta)
+        else Primary cap month
+            Stage7W->>Plandata: INSERT capvoucher (captype=MONTHLY)
+        end
+    end
+    Note over Stage7W,Plandata: Bare INSERT — 13-col PK, NO transaction, NO MERGE
+    Stage7W->>Plandata: DELETE funddetailadj/funddetail (where amounts match)
+    Stage7W->>Plandata: DELETE capmessagequeue (cleanup)
+
+    Stage7W->>Stage7F: CapitationActivity.FinalizeCapPayment(message)
+    Stage7F->>Plandata: isCapFinished() → capmessagequeue batchstatus
+    alt All batches FINISHED
+        Stage7F->>Plandata: CalcCapAdjustments() → INSERT ADJUSTMENT vouchers
+        Stage7F->>Plandata: UPDATE capadjustment SET status=PROCESSED
+        Stage7F->>Plandata: DELETE capvoucher WHERE capamount=0
+        Stage7F->>Plandata: SELECT fundid, SUM(capamount) GROUP BY fundid
+        Stage7F->>Plandata: INSERT/UPDATE paycheck (one per fund)
+        Stage7F->>Plandata: BuildPool() → INSERT pooltrans
+        Stage7F->>Plandata: UPDATE payment SET status=OPEN, amountpaid=@total
+        Note over Stage7F: INCOMPLETE → OPEN (ready for finance pipeline)
+    else Still RUNNING
+        Stage7F-->>Stage7F: Return RUNNING — wait for other batches
+    end
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 7 (Write Layer):</strong>
+<ul>
+<li><strong>Purpose:</strong> The point where computed amounts become permanent database records. Two sub-steps: (1) <code>cStoreCapVoucher</code> writes individual voucher rows, (2) <code>cCapPayment</code> aggregates into the final payment.</li>
+<li><strong>Fan-In:</strong> N member-level capvoucher rows roll up into 1 payment per pay-to affiliate (inverse of Stage 0 fan-out).</li>
+<li><strong>capvoucher PK (13 columns):</strong> paymentid, captype, caprateid, captermid, capmonth, affiliationid, enrollid, fundid, paytoaffilid, networkid, recondate, factorvalueid, capadjustmentid.</li>
+<li><strong>CRITICAL RISK:</strong> Bare INSERT, NO transaction, NO MERGE/upsert, NO scope-clear. Restart reuses original paymentid → PK violation. Production evidence: 153,071 collisions per RECON run.</li>
+<li><strong>Finalization:</strong> Waits for all batches, deletes $0 vouchers, aggregates by fund, creates paycheck, sets <code>payment.status='OPEN'</code>.</li>
+<li><strong>DB Tables:</strong> R/W: <code>capvoucher</code>, <code>payment</code>, <code>paycheck</code>, <code>pooltrans</code>, <code>funddetail</code>/<code>funddetailadj</code>, <code>capmessagequeue</code>, <code>capadjustment</code>.</li>
+<li><strong>.sln:</strong> <code>QCSI ASC Capitation.sln</code> (cStoreCapVoucher.vb, cCapPayment.vb).</li>
+</ul>
+</div>
+
+<h2 id="stage89">Stage 8/9 — PlanIntegration Dispatch &amp; QCSIDB ID Generation</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 8: Stage 8/9 — Process Chain Resolution &amp; ID Generation</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Proxy as OneWayProxy<br/>(Dispatch)
+    participant Engine as MessageProcessorEngine
+    participant PlanInt as PlanIntegration DB
+    participant Host as ProcessExecutionHost
+    participant Agent as Capitation Agent
+    participant QCSIDB as QCSIDB<br/>(IDSequence)
+
+    Proxy->>Engine: ProcessRequest(session, message)
+    Engine->>PlanInt: RetrieveProcessByLogType(ADV_CAP_BATCH)
+    PlanInt-->>Engine: process record (logtype, description)
+    Engine->>PlanInt: RetrieveProcessStepsByProcessLogType
+    PlanInt-->>Engine: processstep rows (active/inactive flags)
+    Engine->>PlanInt: RetrieveAgent(agentId) per active step
+    PlanInt-->>Engine: agent.assembly + agent.creatableClass
+    Engine->>Host: ProcessExecutionHost.Execute()
+    Host->>Host: Assembly.Load(agent.Assembly) from GAC
+    Host->>Host: assembly.CreateInstance(agent.CreatableClass)
+    Host->>PlanInt: LogState(ready to execute) → INSERT processstate
+    Host->>Agent: agent.ConsumeMessage(session, payloadXML)
+    Note over Agent: Executes capitation pipeline (7-step chain)
+    Agent->>QCSIDB: CNextId.GetStringID() → spQ_IDSeq (when IDs needed)
+    Note over QCSIDB: Exclusive row-lock on idsequence WHERE idtype=@type
+    QCSIDB-->>Agent: Generated ID (paymentid, queueid, etc.)
+    Host->>PlanInt: LogState(finished) → INSERT processstate
+    Host->>PlanInt: UpdateProcessLogHeader(STOPLOG)
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 8 (PlanIntegration) &amp; Stage 9 (QCSIDB):</strong>
+<ul>
+<li><strong>PlanIntegration (Stage 8):</strong> The "control tower" — 192 process chains, 214 agents, ~2B rows in <code>processstate</code>. At dispatch, <code>ProcessManager</code> reads <code>process</code> → <code>processstep</code> → <code>agent</code> to resolve which .NET assembly to load.</li>
+<li><strong>CRITICAL:</strong> <code>processstate</code> is NOT a serialization lock. It only records what happened AFTER the fact. Nothing prevents concurrent runs for the same scope.</li>
+<li><strong>QCSIDB (Stage 9):</strong> COTS engine infrastructure (38 tables). Primary function: centralized ID generation via <code>spQ_IDSeq</code> (~430 lines T-SQL). 80+ ID types. 12 of 17 repos consume it.</li>
+<li><strong>ID Serialization:</strong> <code>UPDATE idsequence SET rawval += @iterations WHERE idtype=@idtype</code> acquires exclusive row lock. All ~71 concurrent cap runs serialize through idtype=4.</li>
+<li><strong>Capitation Chains:</strong> <code>ADV_CAP_PROC</code> (program), <code>ADV_CAP_BATCH</code> (batch + inactive PostCap), <code>CapProvProc</code> (provider), <code>CapReStartProc</code> (restart).</li>
+<li><strong>DB Tables:</strong> PlanIntegration: <code>process</code>, <code>processstep</code>, <code>agent</code> (READ), <code>processstate</code>, <code>processlogheader</code>/<code>detail</code> (WRITE). QCSIDB: <code>idsequence</code> (UPDATE), <code>dbalias</code>, <code>envconfig</code> (READ).</li>
+<li><strong>.sln:</strong> QCSI Process Execution, QCSI IDSequence LDL.sln, QCSI Process Log.sln, DistributionHub.sln.</li>
+</ul>
+</div>
+
+<h2 id="postcap">Post-Cap — Fund Allocation &amp; Split Payment</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 9: Post-Cap — PostCap_PreFundAllocate &amp; PostCap_SplitPayments</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Stage7F as cCapPayment<br/>(status=OPEN)
+    participant PostCap as PostCap SPs<br/>(CA_Extensions)
+    participant Plandata as Plandata_Parallel DB
+    participant HPC as HealthPAS_Common DB
+    participant QCSIDB as QCSIDB
+
+    Stage7F->>PostCap: PostCapFundAllocationAgent.ProcessMessage()
+    Note over PostCap: EXEC PostCap_PreFundAllocate
+    PostCap->>Plandata: SELECT capvoucher JOIN payment (PayType=CAP, Status=OPEN)
+    PostCap->>Plandata: JOIN enrollkeys, affiliation, member, membercondition
+    PostCap->>Plandata: JOIN factorvalues, capfactordescmapping
+    PostCap->>HPC: LEFT JOIN ELGIP00005_SUPP_GAP (supplemental income)
+    PostCap->>PostCap: Build #PreFundCapTBL (UNION of two queries)
+    PostCap->>PostCap: UPDATE SET iGroup = RCGroup FROM CAPRateExtensions
+    Note over PostCap: Groups 1-5 determine RateCodeExtn rules
+    PostCap->>PostCap: Apply group rules → RateCodeExtn (REG/ACA/MFP/BCC/SCH)
+    PostCap->>HPC: INSERT hpfin_FAAttributesCAP (finance staging)
+
+    Note over PostCap: PostCap_SplitPayments (weekly fund distribution)
+    PostCap->>Plandata: SELECT payment WHERE PayType=CAP AND Status=OPEN
+    loop For each OPEN cap payment
+        PostCap->>QCSIDB: EXEC spQ_IDSeq 4,1 → NEW paymentid
+        QCSIDB-->>PostCap: New paymentid for split
+        PostCap->>Plandata: INSERT new payment row (weekly fund)
+        PostCap->>Plandata: UPDATE capvoucher SET paymentid = @newId
+        PostCap->>Plandata: UPDATE paycheck SET paymentid = @newId
+    end
+    Note over PostCap: Original payment split into weekly distributions
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Post-Cap (Fund Allocation + Split Payment):</strong>
+<ul>
+<li><strong>Purpose:</strong> Ohio-custom processing after cap engine. (1) Classify vouchers for GL fund allocation, (2) Split payments across weekly distribution funds.</li>
+<li><strong>Trigger:</strong> <code>PostCapitationFundAllocationAgent</code> / <code>PostCapitationSplitPaymentAgent</code> (ADV_CAP_BATCH steps 1-2 are INACTIVE — actual trigger unknown).</li>
+<li><strong>PostCap_PreFundAllocate:</strong> Joins 10+ Plandata tables + HealthPAS_Common, assigns RCGroup (1-5) via <code>CAPRateExtensions</code>, determines <code>RateCodeExtn</code>, INSERTs into <code>hpfin_FAAttributesCAP</code>.</li>
+<li><strong>PostCap_SplitPayments:</strong> For each OPEN cap payment, generates NEW paymentid(s) via <code>spQ_IDSeq</code>, creates new payment rows, reassigns capvoucher/paycheck to new IDs.</li>
+<li><strong>RISK:</strong> PostCap directly modifies <code>capvoucher.paymentid</code> — concurrent restart = data corruption.</li>
+<li><strong>DB Tables:</strong> READ: <code>capvoucher</code>, <code>payment</code>, <code>enrollkeys</code>, <code>membercondition</code> (Plandata); <code>ELGIP00005_SUPP_GAP</code> (HPC). WRITE: <code>hpfin_FAAttributesCAP</code> (HPC); <code>payment</code>, <code>capvoucher</code>, <code>paycheck</code> (Plandata).</li>
+<li><strong>Repos:</strong> <code>act-oh-OHDDI-main</code> (SPs), <code>mms-cms-cef-r23</code> (C# agents).</li>
+</ul>
+</div>
+
+<h2 id="stage1011">Stage 10/11 — HealthPAS_Common &amp; Finance Pipeline</h2>
+
+<div class="diagram-container">
+<div class="diagram-title">Figure 10: Stage 10/11 — Reference Data Loading + Finance GL Pipeline</div>
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant ETL as Ohio.ETL SSIS<br/>(Reference Loaders)
+    participant HPC as HealthPAS_Common DB
+    participant Corticon as Corticon Rules<br/>(CreateMatrixTable.sln)
+    participant Finance as Finance SSIS<br/>(mms-bolton-fin-ohio)
+    participant Plandata as Plandata_Parallel DB
+    participant Flexi as Flexi GL<br/>(Linked Server)
+
+    Note over ETL,HPC: STAGE 10 — Pre-scheduled Reference Data Loading
+    ETL->>HPC: MEMIM00065_RateCellCode.dtsx → TRUNCATE + INSERT crosswalks
+    ETL->>HPC: MEMIM00065_RateCell.dtsx → rate-cell configuration
+    ETL->>HPC: ELGIP00005_GAP_Supp_Inc.dtsx → supplemental income types
+    Corticon->>HPC: CreateMatrixTable.sln → INSERT hpfin_CorticonMatrix (35 cols)
+    ETL->>Plandata: MEMSW00013 reads crosswalks → writes MemberCondition
+
+    Note over Finance,Flexi: STAGE 11 — Finance Pipeline (OPEN → INFLEXI → PAIDREMIT)
+    Finance->>HPC: ClaimFundAllocation: READ hpfin_FAAttributesCAP
+    Finance->>HPC: READ hpfin_CorticonMatrix + hpfin_CFAColumnMapping
+    Finance->>Finance: up_hpfin_CFALoadDistrLines → GL distribution lines
+
+    Finance->>Plandata: APInvoiceUpdate: READ payment WHERE status=OPEN
+    Finance->>Finance: up_hpfin_APILoadTIVH/TIVD/APBH (invoice creation)
+    Finance->>Flexi: INSERT TIVH, TIVD, APBH, PIPQ (2PC via linked server)
+    Finance->>Plandata: up_hpfin_APISetINFLEXIPaymentStatus → status=INFLEXI
+    Note over Finance: OPEN → INFLEXI
+
+    Finance->>Finance: ClaimResolution (after Flexi confirms)
+    Finance->>Plandata: up_hpfin_PRMCapUpdatePayment → status=PAIDREMIT
+    Finance->>Plandata: up_hpfin_PRMCapLoadCheckHist → INSERT CheckHistory
+    Note over Finance: INFLEXI → PAIDREMIT (terminal state)
+</pre>
+</div>
+
+<div class="stage-desc">
+<strong>Description — Stage 10 (HealthPAS_Common) &amp; Stage 11 (Finance Pipeline):</strong>
+<ul>
+<li><strong>Stage 10 (Reference Data):</strong> HealthPAS_Common is the shared reference-data database and financial staging area — the mandatory bridge between cap engine (Plandata) and finance/GL (Flexi).</li>
+<li><strong>Reference Loaders (Ohio.ETL):</strong>
+    <ul>
+        <li><code>MEMIM00065</code>: Rate-cell crosswalks from ODM actuarial CSV files.</li>
+        <li><code>ELGIP00005</code>: Supplemental eligibility data (income type codes).</li>
+        <li><code>CreateMatrixTable.sln</code>: Corticon decision-service output → <code>hpfin_CorticonMatrix</code> (35-column rule→account mappings).</li>
+        <li><code>MEMSW00013</code>: Rate sweep — reads crosswalks, writes <code>MemberCondition</code> (used by Stage 5).</li>
+    </ul>
+</li>
+<li><strong>Stage 11 (Finance):</strong> Three SSIS packages:
+    <ul>
+        <li><code>hpfin_ClaimFundAllocation.dtsx</code>: Reads FAAttributesCAP + CorticonMatrix → GL distribution lines.</li>
+        <li><code>hpfin_APInvoiceUpdate.dtsx</code>: Creates AP invoices → Flexi GL (2PC) → status='INFLEXI'.</li>
+        <li><code>Hpfin_ClaimResolution.dtsx</code>: After Flexi confirms → status='PAIDREMIT' + CheckHistory.</li>
+    </ul>
+</li>
+<li><strong>DB Tables:</strong> HPC: <code>MEMIM00065_*_GAP</code>, <code>ELGIP00005_SUPP_GAP</code>, <code>hpfin_FAAttributesCAP</code>, <code>hpfin_CorticonMatrix</code>, <code>hpfin_CFAColumnMapping</code>. Flexi: TIVH, TIVD, APBH, PIPQ. Plandata: <code>payment</code> (UPDATE status).</li>
+<li><strong>Repos:</strong> <code>Ohio.ETL</code>/<code>Ohio.ETL.2022</code>, <code>mms-bolton-fin-ohio-main</code>, <code>mms-bolton-fin-hist-ohio-main</code>, <code>finance-corticon-businessrules-main</code>.</li>
+</ul>
+</div>
+
+<h2>Summary — Database &amp; Solution Participation</h2>
+
+<table>
+<tr><th>Database</th><th>Role</th><th>Key Tables</th><th>Stage(s)</th></tr>
+<tr><td><strong>Plandata_Parallel</strong></td><td>Primary business data</td><td>capvoucher, payment, paycheck, enrollkeys, affiliation, memberpcp, contract, contractinfo, capitation, capterm, capfactors, funddetail, membercondition</td><td>All</td></tr>
+<tr><td><strong>QCSIDB</strong></td><td>ID generation + config</td><td>IDSequence (spQ_IDSeq), dbalias, envconfig, QueryDefinition</td><td>1a, PostCap, 8/9</td></tr>
+<tr><td><strong>PlanIntegration</strong></td><td>Dispatch + logging</td><td>process, processstep, agent, processstate (~2B rows), processlogheader/detail</td><td>0, 8/9</td></tr>
+<tr><td><strong>HealthPAS_Common</strong></td><td>Reference data + finance staging</td><td>MEMIM00065_*_GAP, ELGIP00005_SUPP_GAP, hpfin_FAAttributesCAP, hpfin_CorticonMatrix</td><td>10, PostCap, 11</td></tr>
+<tr><td><strong>CA_Extensions</strong></td><td>Ohio-custom PostCap</td><td>PostCap_PreFundAllocate, CAPRateExtensions, CAPRateExtensionsRules</td><td>PostCap</td></tr>
+<tr><td><strong>Flexi (GL)</strong></td><td>General Ledger</td><td>TIVH, TIVD, APBH, PIPQ</td><td>11</td></tr>
+</table>
+
+<table>
+<tr><th>Stage</th><th>Solution (.sln)</th><th>Key Components</th></tr>
+<tr><td>0 (UI)</td><td>QNXTALL.sln, CAPSubmit.sln, QCSI Proxy Payment.sln</td><td>CreateCAPPaymentsWiz, CapSubmitAgent, BulkProxy</td></tr>
+<tr><td>0 (Dispatch)</td><td>QCSI ASC CapitationSetup.sln</td><td>CapProgramAgent, CapProviderActivity</td></tr>
+<tr><td>1a–7 (Engine)</td><td>QCSI ASC Capitation.sln</td><td>cBuildCapEnrolls, cBuildCapAffils, cBuildCapAmount, cCapFundAllocation, cCapFundAdjustment, cStoreCapVoucher, cCapPayment</td></tr>
+<tr><td>4 (Queries)</td><td>QCSI Access Payment.sln</td><td>Query 10794, 10978, 87, 86, 88, 131, 138</td></tr>
+<tr><td>PostCap</td><td>QCSI ASC PostCapitationBatchAgent.sln</td><td>PostCapFundAllocationAgent, PostCapSplitPaymentAgent</td></tr>
+<tr><td>8/9 (Infra)</td><td>QCSI Internal Proxy.sln, DistributionHub.sln, QCSI IDSequence LDL.sln</td><td>OneWayProxy, MessageProcessorEngine, CNextId, spQ_IDSeq</td></tr>
+<tr><td>10 (ETL)</td><td>MEMIM00065_*.dtsx, ELGIP00005_*.dtsx, CreateMatrixTable.sln</td><td>SSIS loaders, Corticon matrix loader</td></tr>
+<tr><td>11 (Finance)</td><td>hpfin_ClaimFundAllocation.dtsx, hpfin_APInvoiceUpdate.dtsx, Hpfin_ClaimResolution.dtsx</td><td>CFA/API/PRM stored procedures</td></tr>
+</table>
+
+<footer>
+Generated by GitHub Copilot — Gainwell Ohio CEF Architecture Assessment — 2026-08-10
+</footer>
+
+<script>
+mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    sequence: {
+        diagramMarginX: 15,
+        diagramMarginY: 15,
+        actorMargin: 40,
+        width: 180,
+        height: 45,
+        boxMargin: 6,
+        boxTextMargin: 5,
+        noteMargin: 8,
+        messageMargin: 28,
+        mirrorActors: true,
+        useMaxWidth: true,
+        rightAngles: false,
+        showSequenceNumbers: true
+    }
+});
+</script>
+</body>
+</html>
