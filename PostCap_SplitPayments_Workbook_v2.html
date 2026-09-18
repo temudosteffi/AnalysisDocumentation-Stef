@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PostCap_SplitPayment — Step-by-Step Workbook (v2)</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#ffffff; --ink:#1f2933; --muted:#5b6672;
+    --line:#e1e6eb; --accent:#2563eb; --accent2:#0f766e;
+    --before:#fef3c7; --beforeln:#f59e0b; --after:#dcfce7; --afterln:#16a34a;
+    --code:#0f172a; --codeink:#e2e8f0; --pill:#eef2ff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.55;}
+  header{background:linear-gradient(135deg,#1e3a8a,#0f766e);color:#fff;
+    padding:34px 40px;box-shadow:0 2px 10px rgba(0,0,0,.15);}
+  header h1{margin:0 0 6px;font-size:26px;}
+  header .v{display:inline-block;background:#fbbf24;color:#78350f;font-weight:700;
+    font-size:12px;padding:2px 10px;border-radius:20px;margin-left:8px;vertical-align:middle;}
+  header p{margin:0;opacity:.9;font-size:14px;}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:22px 26px;margin:22px 0;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  h2{font-size:20px;margin:0 0 4px;color:var(--accent);
+    border-left:5px solid var(--accent);padding-left:12px;}
+  h2 .num{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;
+    font-size:13px;padding:1px 9px;margin-right:8px;vertical-align:middle;}
+  h3{font-size:15px;margin:18px 0 8px;color:var(--accent2);}
+  p.desc{color:var(--muted);margin:6px 0 14px;font-size:14.5px;}
+  .grid2{display:grid;grid-template-columns:1fr;gap:16px;}
+  @media(min-width:900px){.grid2{grid-template-columns:1fr 1fr;}}
+  table{border-collapse:collapse;width:100%;font-size:12.6px;margin:6px 0 4px;}
+  th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;white-space:nowrap;}
+  th{background:#f1f5f9;font-weight:600;color:#334155;}
+  .tbl-title{font-weight:600;font-size:13px;margin:14px 0 4px;display:flex;align-items:center;gap:8px;}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .tag.before{background:var(--before);color:#92400e;border:1px solid var(--beforeln);}
+  .tag.after{background:var(--after);color:#166534;border:1px solid var(--afterln);}
+  tr.new td{background:#ecfdf5;}
+  tr.m2 td{background:#f8fafc;}
+  td.chg{background:#fef9c3;font-weight:600;}
+  td.new{background:#dcfce7;font-weight:600;}
+  td.wk{color:#1d4ed8;font-weight:600;}
+  td.wh{color:#b45309;font-weight:600;}
+  code,.mono{font-family:"Cascadia Code",Consolas,monospace;font-size:12px;}
+  pre{background:var(--code);color:var(--codeink);border-radius:8px;padding:14px 16px;
+    overflow:auto;font-size:12.4px;line-height:1.5;margin:10px 0;}
+  pre .kw{color:#7dd3fc;} pre .cm{color:#86efac;} pre .st{color:#fca5a5;}
+  .pill{display:inline-block;background:var(--pill);color:#3730a3;border-radius:6px;
+    padding:1px 8px;font-size:12px;font-family:monospace;margin:1px 2px;}
+  .callout{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px;margin:14px 0;font-size:13.5px;}
+  .callout.warn{background:#fef2f2;border-color:#fecaca;}
+  .callout.good{background:#f0fdf4;border-color:#bbf7d0;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:8px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid #cbd5e1;}
+  .toc{columns:2;font-size:14px;}
+  .toc a{color:var(--accent);text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  ol.steps{margin:6px 0 0;padding-left:20px;}
+  ol.steps li{margin:4px 0;font-size:14px;}
+  .arrow{text-align:center;color:var(--accent2);font-size:22px;margin:4px 0;}
+  .whatsnew{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:0 0 8px;}
+  .whatsnew h3{margin-top:0;color:#92400e;}
+  .whatsnew ul{margin:6px 0 0;padding-left:20px;font-size:13.8px;}
+  footer{color:var(--muted);font-size:12.5px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>PostCap_SplitPayment — Step-by-Step Data Workbook <span class="v">v2 — corrected</span></h1>
+  <p>Stored procedure: <code>dbo.PostCap_SplitPayment</code> &nbsp;•&nbsp; Database: <code>CA_Extensions</code> &nbsp;•&nbsp; Runs immediately after the Capitation run</p>
+</header>
+
+<div class="wrap">
+
+  <!-- WHAT'S NEW -->
+  <div class="card whatsnew">
+    <h3>What changed from v1</h3>
+    <ul>
+      <li><b>Realistic CapVoucher granularity:</b> CapVoucher is <b>per member (enrollid) per fund</b>, so a PaymentID has <b>many</b> rows — not 6. v1 wrongly showed one row per fund.</li>
+      <li><b>Real production FundIDs</b> from <code>PostCap_PreFundAllocate</code>: weekly <code>MSCDMQ…</code> and withhold <code>WITHLD…</code>.</li>
+      <li><b>"6" clarified:</b> it is the <b>maximum number of distinct funds</b> (3 weekly + 3 withhold), reached only <i>after</i> the <code>SUM(CAPAmount) GROUP BY FundID</code> collapse — and only if all 6 funds are present.</li>
+      <li><b>Qualifying rule made explicit:</b> a payment is split only if it has at least one weekly fund <u>and</u> at least one withhold fund.</li>
+    </ul>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="card">
+    <h2>What this procedure does (plain English)</h2>
+    <p class="desc">
+      After the Capitation run, a provider gets <b>one</b> Payment record whose amount is the lump sum of
+      <b>many</b> per-member CapVoucher lines spread across several <b>Funds</b>. Some funds are meant to be
+      <b>paid out across weeks</b> (weekly funds) and some are <b>withheld</b>. This procedure sums those lines
+      per fund and <b>splits the single payment into one Payment record per fund</b>, so each week / withhold
+      amount can be tracked and released separately.
+    </p>
+    <ol class="steps">
+      <li><b>Read configuration</b> — the 6 Funds, the Method, and each fund's week label.</li>
+      <li><b>Find the payments to split</b> — CAP payments that are <code>OPEN</code>, on the configured Method, that contain <b>both</b> weekly funds (Fund1‑3) <b>and</b> withhold funds (Fund4‑6).</li>
+      <li><b>For each payment, SUM the many CapVoucher lines per fund</b> → this is where the row count collapses to (up to) 6.</li>
+      <li><b>Keep the first fund on the original PaymentID</b> (just correct its amount).</li>
+      <li><b>For every other fund, mint a new PaymentID</b> and move that fund's CapVoucher / PayCheck / CapAdjustment rows to it. Funds 1‑3 → <code>OPEN</code>, Funds 4‑6 → <code>WITHHOLD</code>.</li>
+    </ol>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--before)"></span> Value BEFORE the step</span>
+      <span><span class="sw" style="background:#fef9c3"></span> Value changed by the step</span>
+      <span><span class="sw" style="background:#dcfce7"></span> Newly inserted row / value</span>
+      <span><span class="sw" style="background:#f8fafc"></span> Second member's rows (shading only)</span>
+    </div>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div class="card">
+    <h3 style="margin-top:0">Contents</h3>
+    <div class="toc">
+      <a href="#s0">0. The example data before we start (realistic)</a><br>
+      <a href="#s1">1. Read the configuration variables</a><br>
+      <a href="#s2">2. Isolate the PaymentIDs to split (#PaymentIDsTBL)</a><br>
+      <a href="#s3">3. Outer loop: SUM per fund → #PaymentTBL</a><br>
+      <a href="#s4">4. Inner loop #1 — keep original PaymentID</a><br>
+      <a href="#s5">5. Inner loop #2..N — create new PaymentIDs</a><br>
+      <a href="#s6">6. Final result (all tables)</a><br>
+      <a href="#s7">7. Notes: row counts, RECON / ADJUSTMENT &amp; errors</a>
+    </div>
+  </div>
+
+  <!-- STEP 0 -->
+  <div class="card" id="s0">
+    <h2><span class="num">0</span>Starting point — realistic data after the Capitation run</h2>
+    <p class="desc">
+      In this example the Capitation run produced <b>one</b> payment, <span class="pill">P0001</span>, for provider
+      <span class="pill">PRV01</span>. Two members are capitated to this provider —
+      <span class="pill">M001</span> and <span class="pill">M002</span> — each contributing
+      <b>$500 per fund across 6 funds</b>. That means <b>2 members × 6 funds = 12 CapVoucher lines</b>,
+      totalling <b>$6,000</b>. The single <code>Payment</code> row holds the $6,000 lump sum.
+    </p>
+
+    <div class="tbl-title"><span class="tag before">Before</span> plandata_parallel.dbo.Payment</div>
+    <table>
+      <tr><th>PaymentID</th><th>ProvID</th><th>ProgramID</th><th>AmountPaid</th><th>Payee</th><th>PayType</th><th>Status</th><th>CheckPrintBy</th><th>CheckAmt</th></tr>
+      <tr><td>P0001</td><td>PRV01</td><td>PRG01</td><td>6000.00</td><td>Dr Smith</td><td>CAP</td><td>OPEN</td><td>(null)</td><td>6000.00</td></tr>
+    </table>
+
+    <div class="tbl-title"><span class="tag before">Before</span> plandata_parallel.dbo.CapVoucher &nbsp;— 12 lines (per member × per fund)</div>
+    <table>
+      <tr><th>PaymentID</th><th>EnrollID</th><th>FundID</th><th>Fund role</th><th>CapType</th><th>Method</th><th>CAPAmount</th><th>AffiliationID</th></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wk">MSCDMQ000000002</td><td>Weekly 1</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wk">MSCDMQ000000003</td><td>Weekly 2</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wk">MSCDMQ000000004</td><td>Weekly 3</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wh">WITHLD000000002</td><td>Withhold 1</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wh">WITHLD000000003</td><td>Withhold 2</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr><td>P0001</td><td>M001</td><td class="wh">WITHLD000000004</td><td>Withhold 3</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wk">MSCDMQ000000002</td><td>Weekly 1</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wk">MSCDMQ000000003</td><td>Weekly 2</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wk">MSCDMQ000000004</td><td>Weekly 3</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wh">WITHLD000000002</td><td>Withhold 1</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wh">WITHLD000000003</td><td>Withhold 2</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+      <tr class="m2"><td>P0001</td><td>M002</td><td class="wh">WITHLD000000004</td><td>Withhold 3</td><td>MONTHLY</td><td>CAPFactors</td><td>500.00</td><td>AF01</td></tr>
+    </table>
+
+    <div class="tbl-title"><span class="tag before">Before</span> plandata_parallel.dbo.PayCheck &nbsp;— fund-level detail</div>
+    <table>
+      <tr><th>PaymentID</th><th>FundID</th><th>Amount</th></tr>
+      <tr><td>P0001</td><td class="wk">MSCDMQ000000002</td><td>1000.00</td></tr>
+      <tr><td>P0001</td><td class="wk">MSCDMQ000000003</td><td>1000.00</td></tr>
+      <tr><td>P0001</td><td class="wk">MSCDMQ000000004</td><td>1000.00</td></tr>
+      <tr><td>P0001</td><td class="wh">WITHLD000000002</td><td>1000.00</td></tr>
+      <tr><td>P0001</td><td class="wh">WITHLD000000003</td><td>1000.00</td></tr>
+      <tr><td>P0001</td><td class="wh">WITHLD000000004</td><td>1000.00</td></tr>
+    </table>
+
+    <div class="callout warn">
+      <b>Row counts are not fixed.</b> CapVoucher has one line per member per fund, so a real PaymentID often has
+      <b>dozens or hundreds</b> of lines. The number of <b>distinct funds</b> is at most 6 (3 weekly + 3 withhold),
+      and may be fewer depending on each member's rate-cell / cap-factor allocation.
+    </div>
+    <div class="callout good">
+      <b>Goal:</b> collapse the many lines to one amount per fund, then turn the <b>1</b> payment into up to
+      <b>6</b> payments — so each week can be released on its own schedule and withhold funds can be held back.
+    </div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="card" id="s1">
+    <h2><span class="num">1</span>Read the configuration variables</h2>
+    <p class="desc">
+      The procedure reads a single delimited string from <code>CLM_SP_VariableValues</code> for its own name,
+      then splits it on the <code>^</code> delimiter via <code>dbo.SplitDelimitedString</code>. Each of the 13
+      pieces is looped over and assigned to a variable.
+    </p>
+
+    <div class="tbl-title"><span class="tag before">Before</span> dbo.CLM_SP_VariableValues (input row)</div>
+    <table>
+      <tr><th>SpName</th><th>Active</th><th>VariableString</th></tr>
+      <tr><td>PostCap_SplitPayment</td><td>Y</td><td class="mono">MSCDMQ000000002^MSCDMQ000000003^MSCDMQ000000004^WITHLD000000002^WITHLD000000003^WITHLD000000004^CAPFactors^Week1^Week2^Week3^Week4^Week5^Week6</td></tr>
+    </table>
+
+    <div class="arrow">▼ split on “^” &amp; assign ▼</div>
+
+    <div class="tbl-title"><span class="tag after">After</span> variables populated</div>
+    <table>
+      <tr><th>ID</th><th>Variable</th><th>Value</th><th>Role</th></tr>
+      <tr><td>1</td><td>@Fund1</td><td class="new">MSCDMQ000000002</td><td>Weekly fund → stays OPEN</td></tr>
+      <tr><td>2</td><td>@Fund2</td><td class="new">MSCDMQ000000003</td><td>Weekly fund → stays OPEN</td></tr>
+      <tr><td>3</td><td>@Fund3</td><td class="new">MSCDMQ000000004</td><td>Weekly fund → stays OPEN</td></tr>
+      <tr><td>4</td><td>@Fund4</td><td class="new">WITHLD000000002</td><td>Withhold fund → WITHHOLD</td></tr>
+      <tr><td>5</td><td>@Fund5</td><td class="new">WITHLD000000003</td><td>Withhold fund → WITHHOLD</td></tr>
+      <tr><td>6</td><td>@Fund6</td><td class="new">WITHLD000000004</td><td>Withhold fund → WITHHOLD</td></tr>
+      <tr><td>7</td><td>@Method</td><td class="new">CAPFactors</td><td>Which CapVoucher method to target</td></tr>
+      <tr><td>8‑13</td><td>@Wk1Desc … @Wk6Desc</td><td class="new">Week1 … Week6</td><td>Label written to Description / CheckPrintBy per fund</td></tr>
+    </table>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="card" id="s2">
+    <h2><span class="num">2</span>Isolate the PaymentIDs to split → <code>#PaymentIDsTBL</code></h2>
+    <p class="desc">
+      Only qualifying payments are collected: <code>PayType='CAP'</code>, <code>Status='OPEN'</code>,
+      <code>Method=@Method</code>, having a CapVoucher in <b>Fund1‑3</b> <u>and</u> also (via <code>EXISTS</code>)
+      a CapVoucher in <b>Fund4‑6</b> for the same PaymentID. So a payment is split only when it contains
+      <b>both</b> weekly funds and withhold funds. <code>DISTINCT</code> means each PaymentID appears once here,
+      no matter how many CapVoucher lines it has.
+    </p>
+    <pre><span class="cm">-- qualifying filter (simplified)</span>
+<span class="kw">SELECT DISTINCT</span> p.PaymentID
+<span class="kw">FROM</span> Payment p <span class="kw">JOIN</span> CapVoucher cv <span class="kw">ON</span> cv.paymentid = p.paymentid
+<span class="kw">WHERE</span> p.PayType = <span class="st">'CAP'</span> <span class="kw">AND</span> p.Status = <span class="st">'OPEN'</span>
+  <span class="kw">AND</span> cv.Method = @Method
+  <span class="kw">AND</span> cv.FundID <span class="kw">IN</span> (@Fund1, @Fund2, @Fund3)              <span class="cm">-- has a weekly fund</span>
+  <span class="kw">AND EXISTS</span> (<span class="kw">SELECT</span> * <span class="kw">FROM</span> capvoucher cv2
+              <span class="kw">WHERE</span> cv2.FundID <span class="kw">IN</span> (@Fund4,@Fund5,@Fund6)   <span class="cm">-- and a withhold fund</span>
+                <span class="kw">AND</span> cv.paymentid = cv2.paymentid)</pre>
+
+    <div class="tbl-title"><span class="tag after">After</span> #PaymentIDsTBL</div>
+    <table>
+      <tr><th>ID (identity)</th><th>PaymentID</th></tr>
+      <tr class="new"><td>1</td><td>P0001</td></tr>
+    </table>
+    <p class="desc">Our example has one qualifying payment, so the <b>outer loop</b> runs once.</p>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="card" id="s3">
+    <h2><span class="num">3</span>Outer loop — SUM the lines per fund → <code>#PaymentTBL</code></h2>
+    <p class="desc">
+      This is the key collapse. For the current PaymentID (<span class="pill">P0001</span>), the <b>12 CapVoucher
+      lines</b> are aggregated with <code>SUM(CAPAmount)</code> grouped by fund (the query does not group by
+      EnrollID). The two members' $500 lines per fund merge into <b>$1,000 per fund</b>, giving <b>6 rows</b> —
+      one per distinct fund. Each fund gets its week <code>Description</code> / <code>CheckPrintBy</code> label,
+      and rows are ordered by Description, which sets the inner-loop order.
+    </p>
+
+    <div class="arrow">12 CapVoucher lines &nbsp;▼ SUM(CAPAmount) GROUP BY FundID ▼&nbsp; 6 rows</div>
+
+    <div class="tbl-title"><span class="tag after">After</span> #PaymentTBL</div>
+    <table>
+      <tr><th>ID</th><th>PaymentID</th><th>FundID</th><th>AmountPaid (SUM of 2 members)</th><th>Description</th><th>CheckPrintBy</th><th>NewPaymentID</th></tr>
+      <tr class="new"><td>1</td><td>P0001</td><td class="wk">MSCDMQ000000002</td><td>1000.00</td><td>Week1</td><td>Week1</td><td>(empty)</td></tr>
+      <tr class="new"><td>2</td><td>P0001</td><td class="wk">MSCDMQ000000003</td><td>1000.00</td><td>Week2</td><td>Week2</td><td>(empty)</td></tr>
+      <tr class="new"><td>3</td><td>P0001</td><td class="wk">MSCDMQ000000004</td><td>1000.00</td><td>Week3</td><td>Week3</td><td>(empty)</td></tr>
+      <tr class="new"><td>4</td><td>P0001</td><td class="wh">WITHLD000000002</td><td>1000.00</td><td>Week4</td><td>Week4</td><td>(empty)</td></tr>
+      <tr class="new"><td>5</td><td>P0001</td><td class="wh">WITHLD000000003</td><td>1000.00</td><td>Week5</td><td>Week5</td><td>(empty)</td></tr>
+      <tr class="new"><td>6</td><td>P0001</td><td class="wh">WITHLD000000004</td><td>1000.00</td><td>Week6</td><td>Week6</td><td>(empty)</td></tr>
+    </table>
+    <div class="callout">
+      <code>@InnerLoopMax = 6</code> (the number of distinct funds). The inner loop runs once per row.
+      If a payment only had, say, 4 distinct funds, <code>#PaymentTBL</code> would have 4 rows and the loop would run 4 times.
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="card" id="s4">
+    <h2><span class="num">4</span>Inner loop #1 (first fund) — keep the original PaymentID</h2>
+    <p class="desc">
+      The <b>first</b> fund row keeps <span class="pill">P0001</span>. The procedure corrects the original
+      Payment's amount from the $6,000 lump sum down to this fund's $1,000, stamps <code>CheckPrintBy</code>, and
+      clears <code>CheckAmt</code>. No new PaymentID is created here.
+    </p>
+    <pre><span class="kw">UPDATE</span> p <span class="kw">SET</span> amountpaid = @TotalPaid,        <span class="cm">-- 1000.00</span>
+              checkprintby = tmpPay.CheckPrintBy, <span class="cm">-- 'Week1'</span>
+              checkamt = <span class="st">''</span>
+<span class="kw">WHERE</span> p.amountpaid != @TotalPaid;           <span class="cm">-- 6000 != 1000 -> row updated</span></pre>
+
+    <div class="grid2">
+      <div>
+        <div class="tbl-title"><span class="tag before">Before</span> Payment (P0001)</div>
+        <table>
+          <tr><th>PaymentID</th><th>AmountPaid</th><th>Status</th><th>CheckPrintBy</th><th>CheckAmt</th></tr>
+          <tr><td>P0001</td><td>6000.00</td><td>OPEN</td><td>(null)</td><td>6000.00</td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="tbl-title"><span class="tag after">After</span> Payment (P0001)</div>
+        <table>
+          <tr><th>PaymentID</th><th>AmountPaid</th><th>Status</th><th>CheckPrintBy</th><th>CheckAmt</th></tr>
+          <tr><td>P0001</td><td class="chg">1000.00</td><td>OPEN</td><td class="chg">Week1</td><td class="chg">'' (empty)</td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="desc">
+      CapVoucher / PayCheck rows for the first fund (both members' lines) are <b>untouched</b> — they already point
+      at P0001, which now correctly represents just that fund's summed amount.
+    </p>
+    <div class="callout">
+      If the original amount had <b>already</b> equalled $1,000 (<code>@@ROWCOUNT = 0</code>), the procedure runs a
+      second update that only sets <code>CheckPrintBy</code> and clears <code>CheckAmt</code>.
+    </div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="card" id="s5">
+    <h2><span class="num">5</span>Inner loops #2‑#6 — mint a new PaymentID per fund</h2>
+    <p class="desc">
+      For every fund after the first, a new PaymentID is generated from <code>QCSIDB.dbo.IDSequence</code>
+      (idtype 4) via <code>spQ_IDSeq</code>. A new <code>Payment</code> row is inserted, then <b>all</b> of that
+      fund's <code>CapVoucher</code> lines (both members), its <code>PayCheck</code> row (and
+      <code>CapAdjustment</code> when applicable) are re-pointed from <span class="pill">P0001</span> to the new
+      PaymentID. <b>Status</b> = <code>OPEN</code> for weekly funds, <code>WITHHOLD</code> for withhold funds.
+    </p>
+    <pre><span class="kw">INSERT INTO</span> Payment (PaymentID, ..., Status, CheckPrintBy)
+<span class="kw">SELECT</span> @NewPaymentID, ...,
+   <span class="kw">CASE WHEN</span> @FundID <span class="kw">IN</span>(@Fund1,@Fund2,@Fund3) <span class="kw">THEN</span> <span class="st">'OPEN'</span>
+        <span class="kw">WHEN</span> @FundID <span class="kw">IN</span>(@Fund4,@Fund5,@Fund6) <span class="kw">THEN</span> <span class="st">'WITHHOLD'</span> <span class="kw">END</span>, ...
+
+<span class="kw">UPDATE</span> CapVoucher <span class="kw">SET</span> paymentid=@NewPaymentID <span class="kw">WHERE</span> PaymentID=@CurrentPaymentID <span class="kw">AND</span> FundID=@FundID;
+<span class="kw">UPDATE</span> PayCheck   <span class="kw">SET</span> paymentid=@NewPaymentID <span class="kw">WHERE</span> PaymentID=@CurrentPaymentID <span class="kw">AND</span> FundID=@FundID;</pre>
+
+    <h3>Loop #2 — Weekly fund 2 (MSCDMQ000000003) → new PaymentID P0002 (OPEN)</h3>
+    <p class="desc">Both members' lines for that fund move together, because the <code>UPDATE</code> keys on FundID (not EnrollID).</p>
+    <div class="grid2">
+      <div>
+        <div class="tbl-title"><span class="tag before">Before</span> CapVoucher (fund MSCDMQ…003)</div>
+        <table>
+          <tr><th>PaymentID</th><th>EnrollID</th><th>FundID</th></tr>
+          <tr><td>P0001</td><td>M001</td><td class="wk">MSCDMQ000000003</td></tr>
+          <tr class="m2"><td>P0001</td><td>M002</td><td class="wk">MSCDMQ000000003</td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="tbl-title"><span class="tag after">After</span> CapVoucher (fund MSCDMQ…003)</div>
+        <table>
+          <tr><th>PaymentID</th><th>EnrollID</th><th>FundID</th></tr>
+          <tr><td class="chg">P0002</td><td>M001</td><td class="wk">MSCDMQ000000003</td></tr>
+          <tr class="m2"><td class="chg">P0002</td><td>M002</td><td class="wk">MSCDMQ000000003</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="tbl-title"><span class="tag after">After</span> new Payment row inserted</div>
+    <table>
+      <tr><th>PaymentID</th><th>AmountPaid</th><th>Status</th><th>CheckPrintBy</th></tr>
+      <tr class="new"><td class="new">P0002</td><td>1000.00</td><td class="new">OPEN</td><td>Week2</td></tr>
+    </table>
+
+    <h3>The same pattern repeats for loops #3‑#6</h3>
+    <table>
+      <tr><th>Inner Loop</th><th>FundID</th><th>New PaymentID</th><th>Amount</th><th>Status assigned</th><th>Week label</th><th>CapVoucher lines moved</th></tr>
+      <tr><td>1</td><td class="wk">MSCDMQ000000002</td><td>P0001 (kept)</td><td>1000.00</td><td>OPEN</td><td>Week1</td><td>2 (stay on P0001)</td></tr>
+      <tr class="new"><td>2</td><td class="wk">MSCDMQ000000003</td><td>P0002</td><td>1000.00</td><td>OPEN</td><td>Week2</td><td>2</td></tr>
+      <tr class="new"><td>3</td><td class="wk">MSCDMQ000000004</td><td>P0003</td><td>1000.00</td><td>OPEN</td><td>Week3</td><td>2</td></tr>
+      <tr class="new"><td>4</td><td class="wh">WITHLD000000002</td><td>P0004</td><td>1000.00</td><td>WITHHOLD</td><td>Week4</td><td>2</td></tr>
+      <tr class="new"><td>5</td><td class="wh">WITHLD000000003</td><td>P0005</td><td>1000.00</td><td>WITHHOLD</td><td>Week5</td><td>2</td></tr>
+      <tr class="new"><td>6</td><td class="wh">WITHLD000000004</td><td>P0006</td><td>1000.00</td><td>WITHHOLD</td><td>Week6</td><td>2</td></tr>
+    </table>
+  </div>
+
+  <!-- STEP 6 -->
+  <div class="card" id="s6">
+    <h2><span class="num">6</span>Final result — all tables after the procedure</h2>
+    <p class="desc">The single $6,000 payment (12 CapVoucher lines) is now <b>6 separate payments</b>, each tied to its own fund, week label, and status. The 12 CapVoucher lines are unchanged in count — they are just re-pointed across 6 PaymentIDs (2 lines each).</p>
+
+    <div class="tbl-title"><span class="tag after">After</span> plandata_parallel.dbo.Payment</div>
+    <table>
+      <tr><th>PaymentID</th><th>ProvID</th><th>AmountPaid</th><th>Status</th><th>CheckPrintBy</th><th>CheckAmt</th></tr>
+      <tr><td>P0001</td><td>PRV01</td><td class="chg">1000.00</td><td>OPEN</td><td>Week1</td><td>'' </td></tr>
+      <tr class="new"><td>P0002</td><td>PRV01</td><td>1000.00</td><td>OPEN</td><td>Week2</td><td></td></tr>
+      <tr class="new"><td>P0003</td><td>PRV01</td><td>1000.00</td><td>OPEN</td><td>Week3</td><td></td></tr>
+      <tr class="new"><td>P0004</td><td>PRV01</td><td>1000.00</td><td>WITHHOLD</td><td>Week4</td><td></td></tr>
+      <tr class="new"><td>P0005</td><td>PRV01</td><td>1000.00</td><td>WITHHOLD</td><td>Week5</td><td></td></tr>
+      <tr class="new"><td>P0006</td><td>PRV01</td><td>1000.00</td><td>WITHHOLD</td><td>Week6</td><td></td></tr>
+    </table>
+
+    <div class="grid2">
+      <div>
+        <div class="tbl-title"><span class="tag after">After</span> CapVoucher (12 lines, re-pointed)</div>
+        <table>
+          <tr><th>PaymentID</th><th>EnrollID</th><th>FundID</th></tr>
+          <tr><td>P0001</td><td>M001</td><td class="wk">MSCDMQ…002</td></tr>
+          <tr class="m2"><td>P0001</td><td>M002</td><td class="wk">MSCDMQ…002</td></tr>
+          <tr><td class="chg">P0002</td><td>M001</td><td class="wk">MSCDMQ…003</td></tr>
+          <tr class="m2"><td class="chg">P0002</td><td>M002</td><td class="wk">MSCDMQ…003</td></tr>
+          <tr><td class="chg">P0003</td><td>M001</td><td class="wk">MSCDMQ…004</td></tr>
+          <tr class="m2"><td class="chg">P0003</td><td>M002</td><td class="wk">MSCDMQ…004</td></tr>
+          <tr><td class="chg">P0004</td><td>M001</td><td class="wh">WITHLD…002</td></tr>
+          <tr class="m2"><td class="chg">P0004</td><td>M002</td><td class="wh">WITHLD…002</td></tr>
+          <tr><td class="chg">P0005</td><td>M001</td><td class="wh">WITHLD…003</td></tr>
+          <tr class="m2"><td class="chg">P0005</td><td>M002</td><td class="wh">WITHLD…003</td></tr>
+          <tr><td class="chg">P0006</td><td>M001</td><td class="wh">WITHLD…004</td></tr>
+          <tr class="m2"><td class="chg">P0006</td><td>M002</td><td class="wh">WITHLD…004</td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="tbl-title"><span class="tag after">After</span> PayCheck</div>
+        <table>
+          <tr><th>PaymentID</th><th>FundID</th><th>Amount</th></tr>
+          <tr><td>P0001</td><td class="wk">MSCDMQ…002</td><td>1000.00</td></tr>
+          <tr><td class="chg">P0002</td><td class="wk">MSCDMQ…003</td><td>1000.00</td></tr>
+          <tr><td class="chg">P0003</td><td class="wk">MSCDMQ…004</td><td>1000.00</td></tr>
+          <tr><td class="chg">P0004</td><td class="wh">WITHLD…002</td><td>1000.00</td></tr>
+          <tr><td class="chg">P0005</td><td class="wh">WITHLD…003</td><td>1000.00</td></tr>
+          <tr><td class="chg">P0006</td><td class="wh">WITHLD…004</td><td>1000.00</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="callout good">
+      <b>Reconciliation check:</b> $1,000 × 6 = $6,000 — the total is preserved, just distributed across 6 PaymentIDs.
+      Weekly funds are <code>OPEN</code> (payable per week); withhold funds are <code>WITHHOLD</code> (held back).
+    </div>
+  </div>
+
+  <!-- STEP 7 -->
+  <div class="card" id="s7">
+    <h2><span class="num">7</span>Notes — row counts, RECON / ADJUSTMENT &amp; errors</h2>
+
+    <h3>How many rows does a PaymentID really have?</h3>
+    <table>
+      <tr><th>Table</th><th>Granularity</th><th>Rows per PaymentID before split</th></tr>
+      <tr><td>Payment</td><td>1 per PaymentID</td><td>Exactly 1</td></tr>
+      <tr><td>CapVoucher</td><td>per member (EnrollID) per fund per cap factor</td><td><b>Many</b> — (# members) × (# funds); not 6</td></tr>
+      <tr><td>PayCheck</td><td>fund-level within the PaymentID</td><td>Up to # distinct funds (≤ 6)</td></tr>
+      <tr><td>#PaymentTBL (after SUM)</td><td>1 per distinct fund</td><td>= # distinct funds (≤ 6)</td></tr>
+    </table>
+    <p class="desc">
+      So the "6" only ever appears as the count of <b>distinct funds</b> after the group-by, and only when all
+      3 weekly + 3 withhold funds are present. Fewer funds → fewer resulting PaymentIDs.
+    </p>
+
+    <h3>RECON / ADJUSTMENT payments</h3>
+    <p class="desc">
+      The procedure runs for both <b>MONTHLY</b> and <b>RECON</b> cap types. When a PaymentID contains a
+      CapVoucher with <code>CapType = 'ADJUSTMENT'</code> (a negative RECON amount), the procedure looks up the
+      provider's <b>ACTIVE, DIRECT</b> affiliation into <code>@NewPayToAffillID</code>, uses it as the PayToAffilID
+      for the adjustment rows so the negative amount can be <b>absorbed</b>, and re-points
+      <code>CapAdjustment</code> rows to the new PaymentID along with CapVoucher/PayCheck.
+    </p>
+    <div class="callout warn">
+      Business rule: a negative RECON amount can <b>never</b> stand alone on its own PaymentID — it always stays
+      attached to its associated FundID's PaymentID.
+    </div>
+
+    <h3>Error handling</h3>
+    <p class="desc">
+      The whole body is wrapped in <code>TRY…CATCH</code>; any failure is logged to
+      <code>dbo.SQLDEV_CAP_ERRORS</code> (CAPType = <code>'Split Payment'</code>) with the error number,
+      procedure, line and message — the run does not crash silently.
+    </p>
+    <pre><span class="kw">INSERT INTO</span> dbo.SQLDEV_CAP_ERRORS
+  (CAPType, ErrorNumber, ErrorProcedure, ErrorLine, ErrorMessage)
+<span class="kw">VALUES</span> (<span class="st">'Split Payment'</span>, Error_Number(), Error_Procedure(), Error_Line(), Error_Message());</pre>
+
+    <h3>Timing</h3>
+    <p class="desc">
+      Must run <b>immediately after the Capitation run</b>. The create-date filter was intentionally removed (per
+      the 01/06/2023 change) because a CAP run can take up to 24 hours — so the procedure keys only off
+      <code>Status = 'OPEN'</code>.
+    </p>
+  </div>
+
+  <footer>
+    Workbook v2 for <code>dbo.PostCap_SplitPayment</code> — illustrative sample data.
+    PaymentIDs (P0001…P0006), members (M001/M002) and amounts are examples to demonstrate the transformation;
+    FundIDs match the production configuration in <code>PostCap_PreFundAllocate</code>.
+  </footer>
+</div>
+</body>
+</html>
