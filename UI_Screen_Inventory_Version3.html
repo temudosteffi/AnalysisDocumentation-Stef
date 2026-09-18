@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI Screen Inventory - Version 3</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11px; color: #1a1a1a; line-height: 1.4; }
+  h1 { font-size: 20px; border-bottom: 3px solid #2b579a; padding-bottom: 6px; color: #2b579a; }
+  h2 { font-size: 15px; color: #2b579a; margin-top: 22px; border-bottom: 1px solid #ccc; padding-bottom: 3px; page-break-after: avoid; }
+  h3 { font-size: 12px; margin-top: 14px; color: #444; page-break-after: avoid; }
+  p.meta { color: #666; font-size: 10px; margin: 2px 0 10px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; page-break-inside: auto; }
+  th, td { border: 1px solid #bbb; padding: 5px 7px; text-align: left; vertical-align: top; }
+  th { background: #2b579a; color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: #f3f6fb; }
+  tr { page-break-inside: avoid; }
+  code { font-family: Consolas, "Courier New", monospace; background: #eef; padding: 0 3px; border-radius: 3px; }
+  .note { font-size: 10px; color: #555; font-style: italic; }
+  .none { color: #a00; }
+  .new { background: #fff6d6 !important; }
+  .newbadge { display: inline-block; background: #d9822b; color: #fff; border-radius: 3px; padding: 0 5px; font-size: 9px; font-weight: 600; }
+  .tag { display: inline-block; background: #eef; border: 1px solid #ccd; border-radius: 3px; padding: 0 4px; font-family: Consolas, monospace; font-size: 10px; }
+</style>
+</head>
+<body>
+<h1>UI Screen Inventory &mdash; Version 3 (All 17 CEF Repositories)</h1>
+<p class="meta">Generated 2026-09-18 &bull; Full-workspace scan (excludes bin/obj/packages/node_modules/.git). <span class="newbadge">NEW in V3</span> Adds service endpoints (<code>.svc</code> WCF, <code>.asmx</code> legacy SOAP) and previously-missing UI extensions: <code>.master</code> (ASP.NET master-page layouts), <code>.asp</code> (classic ASP pages), <code>.htc</code> (DHTML behavior components). Interactive UI = .aspx/.ascx (WebForms), .cshtml/.vbhtml (Razor/MVC), .master (layouts), .asp (classic ASP), .frm (VB6), .xaml (WPF), .htc (DHTML behaviors). SSRS reports (.rdl) and help/static pages (.htm/.html) are shown separately. Counts are total files found; some repos keep multiple branch copies, so distinct screen/service names may be fewer.</p>
+
+<h2>What changed since Version 2</h2>
+<table>
+  <thead><tr><th>Extension</th><th>Kind</th><th>Why it was missing in V2</th><th>Repos affected</th></tr></thead>
+  <tbody>
+    <tr class="new"><td><code>.svc</code></td><td>WCF service endpoint</td><td>Treated as backend only; not listed at all</td><td>8 repos, 135 files</td></tr>
+    <tr class="new"><td><code>.asmx</code></td><td>Legacy ASP.NET SOAP web service</td><td>Not scanned</td><td>3 repos, 199 files</td></tr>
+    <tr class="new"><td><code>.master</code></td><td>ASP.NET master-page layout (UI)</td><td>Not scanned</td><td>4 repos, 37 files</td></tr>
+    <tr class="new"><td><code>.asp</code></td><td>Classic ASP page (UI)</td><td>Not scanned</td><td>3 repos, 13 files</td></tr>
+    <tr class="new"><td><code>.htc</code></td><td>DHTML behavior / HTML component (UI)</td><td>Not scanned</td><td>1 repo, 12 files</td></tr>
+  </tbody>
+</table>
+<p class="note">Also present but excluded as generated service-reference metadata (not UI, not endpoints): <code>.svcmap</code>, <code>.svcinfo</code>, <code>.disco</code>, <code>.wsdl</code> (client proxy/metadata artifacts under Service References). See final section for counts.</p>
+
+<h2>Master summary &mdash; extension &amp; file count per repo</h2>
+<table>
+  <thead><tr><th>#</th><th>Repo</th><th>Interactive UI screens (ext = count)</th><th>Service endpoints</th><th>Reports / static</th><th>Purpose of the UI</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>mms-cms-cef</td><td>.aspx=4003, .ascx=67, .cshtml=13, .frm=7, .xaml=66, <span class="newbadge">.master=2</span>, <span class="newbadge">.htc=12</span></td><td><span class="newbadge">.asmx=192</span>, <span class="newbadge">.svc=5</span></td><td>.rdl=547, .htm=12511, .html=37</td><td>QNXT/HealthPAS core admin web app (claims, members, providers, contracts, UM, finance)</td></tr>
+    <tr><td>2</td><td>act-OH-FIWebSvc-main</td><td class="none">none</td><td><span class="newbadge">.svc=20</span></td><td>&mdash;</td><td>Backend WCF/SOAP service layer (HPO IVR, financial, claims, eligibility, hospice)</td></tr>
+    <tr><td>3</td><td>act-oh-OHDDI-main</td><td class="none">none</td><td>&mdash;</td><td>.html=2</td><td>SQL/ETL data-integration repo (only 2 doc HTML files)</td></tr>
+    <tr><td>4</td><td>Baseline.ETLGateway.2016.ETL</td><td class="none">none</td><td>&mdash;</td><td>&mdash;</td><td>SSIS/ETL packages; no UI</td></tr>
+    <tr><td>5</td><td>etl-framework-main</td><td class="none">none</td><td>&mdash;</td><td>.rdl=16</td><td>ETL framework; SSRS monitoring reports only</td></tr>
+    <tr><td>6</td><td>finance-corticon-businessrules-main</td><td class="none">none</td><td>&mdash;</td><td>&mdash;</td><td>Corticon rules assets; no UI</td></tr>
+    <tr><td>7</td><td>LetterManager-main</td><td>.xaml=4</td><td>&mdash;</td><td>.htm=6</td><td>WPF letter/document layout templates</td></tr>
+    <tr><td>8</td><td>mms-bolton-distmgr-work</td><td>.aspx=12 (5 distinct), <span class="newbadge">.asp=4</span></td><td>&mdash;</td><td>.html=43, .htm=4</td><td>Distribution Manager web pages + classic-ASP framing pages</td></tr>
+    <tr><td>9</td><td>mms-bolton-fin-hist-ohio-main</td><td class="none">none</td><td><span class="newbadge">.svc=66</span>, <span class="newbadge">.asmx=3</span></td><td>&mdash;</td><td>Finance-history service layer (FinancialService / FinancialDataService), many branch copies</td></tr>
+    <tr><td>10</td><td>mms-bolton-fin-ohio-main</td><td class="none">none</td><td>&mdash;</td><td>&mdash;</td><td>Finance data/config; no UI</td></tr>
+    <tr><td>11</td><td>mms-cms-v360-main</td><td>.cshtml=741</td><td><span class="newbadge">.svc=5</span></td><td>.rdl=74</td><td>VUE360 ASP.NET MVC web app + VUE360 WCF services</td></tr>
+    <tr><td>12</td><td>OH_FI_Reporting-main</td><td class="none">none</td><td>&mdash;</td><td>.rdl=303</td><td>SSRS Ohio FI reporting only</td></tr>
+    <tr><td>13</td><td>Ohio.ETL</td><td class="none">none</td><td>&mdash;</td><td>&mdash;</td><td>ETL/DTSX packages; no UI</td></tr>
+    <tr><td>14</td><td>ProcessManager-Common-main</td><td>.aspx=12 (5 distinct), .xaml=3, <span class="newbadge">.asp=5</span></td><td><span class="newbadge">.svc=9</span>, <span class="newbadge">.asmx=4</span></td><td>.html=31, .htm=7</td><td>Process Manager common web pages, WPF host + document/image WCF services</td></tr>
+    <tr><td>15</td><td>ProcessManager-PMCustom-main</td><td>.aspx=53, .ascx=12, .frm=46, <span class="newbadge">.master=14</span>, <span class="newbadge">.asp=4</span></td><td><span class="newbadge">.svc=2</span></td><td>.htm=78, .html=30</td><td>PM custom doc/workflow pages, VB6 workflow-server client + WFE service</td></tr>
+    <tr><td>16</td><td>ProcessManager-ProcessManager5.0-&hellip;-Development2022-main</td><td>.aspx=161, .ascx=240, <span class="newbadge">.master=8</span></td><td><span class="newbadge">.svc=3</span></td><td>.htm=128, .html=1</td><td>Full Process Manager 5.0 web application + PEAPM/PRIMS services</td></tr>
+    <tr><td>17</td><td>sis-inx-edigw-main</td><td>.aspx=415, .ascx=39, .xaml=2, <span class="newbadge">.master=13</span></td><td><span class="newbadge">.svc=25</span></td><td>.htm=22, .html=62</td><td>EDI Gateway (QNXT/Molina) web app + full WCF service suite</td></tr>
+  </tbody>
+</table>
+<p class="note">Repos with neither interactive UI nor service endpoints (6): act-oh-OHDDI-main, Baseline.ETLGateway.2016.ETL, finance-corticon-businessrules-main, mms-bolton-fin-ohio-main, Ohio.ETL, plus etl-framework-main and OH_FI_Reporting-main which contain only .rdl reports. act-OH-FIWebSvc-main and mms-bolton-fin-hist-ohio-main have no interactive UI but DO expose service endpoints.</p>
+
+<h2 class="new">Service endpoints &mdash; <code>.svc</code> (WCF) &bull; NEW in V3</h2>
+<p class="note">WCF service host files. Total 135 files across 8 repos (branch copies inflate counts; distinct services listed).</p>
+<table>
+  <thead><tr><th>Repo</th><th>Files</th><th>Distinct services</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>act-OH-FIWebSvc-main</td><td>20</td><td>ClaimSearch, Dental, EDIGWTPAProxyService, Eligibility, Financial, Hospice, HospiceEnrollment, Institutional, InternalIVR, IVRService, PriorAuth, Professional, QService, Service1</td><td>HPO SOAP/IVR service layer &mdash; claim search, dental/professional/institutional claims, eligibility, financial, hospice enrollment, prior auth, IVR</td></tr>
+    <tr><td>sis-inx-edigw-main</td><td>25</td><td>AuthenticationService, DataService, DDEService, DocumentManagerService, EDIGWStubService, MemberService, MIMEService, ProviderService, SecureMessageService, Service1, Service277U, SOAPService, TradingPartnerRealTimeService(+4), TradingPartnerService, UtilityService</td><td>EDI Gateway service suite &mdash; authentication, member/provider data, document manager, 277U status, trading-partner real-time, secure messaging</td></tr>
+    <tr><td>ProcessManager-Common-main</td><td>9</td><td>CommitWCFService, DMPSDataService, MMSDocumentWCF_P8, MMSDocumentWcfP8_WebInvoke(+2), MMSDocUpdateP8, MMSImageWCFService, PackagerAddData, RequestOnlineDMDocPackage</td><td>Document/image (FileNet P8) commit, update, packaging &amp; online-package request services</td></tr>
+    <tr><td>mms-bolton-fin-hist-ohio-main</td><td>66</td><td>FinancialService, FinancialDataService</td><td>Finance-history financial &amp; financial-data services (many branch/deploy copies)</td></tr>
+    <tr><td>mms-cms-v360-main</td><td>5</td><td>SecurityFrameWork, VUE360QWCFHIPAAService, VUE360QWCFService, VUE360Services</td><td>VUE360 security framework, HIPAA QWCF, core QWCF and app services</td></tr>
+    <tr><td>mms-cms-cef</td><td>5</td><td>(QNXT/HealthPAS WCF hosts)</td><td>WCF endpoints embedded in the QNXT/HealthPAS web app</td></tr>
+    <tr><td>ProcessManager-ProcessManager5.0-&hellip;-Development2022-main</td><td>3</td><td>PEAPMService, PRIMSService</td><td>Process Manager 5.0 engine (PEAPM) &amp; PRIMS services</td></tr>
+    <tr><td>ProcessManager-PMCustom-main</td><td>2</td><td>WFEService</td><td>Workflow-engine (WFE) custom service</td></tr>
+  </tbody>
+</table>
+
+<h2 class="new">Service endpoints &mdash; <code>.asmx</code> (legacy ASP.NET SOAP) &bull; NEW in V3</h2>
+<table>
+  <thead><tr><th>Repo</th><th>Files</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>mms-cms-cef</td><td>192 (180 distinct)</td><td>QNXT/HealthPAS SOAP web-service tier &mdash; one <code>*QNXT.asmx</code> / <code>*QQNXT.asmx</code> / <code>*QFrame.asmx</code> per business module (Claim, Member, Provider, Contract, Benefit, Carrier, Configuration, Credentialing, EDI, CallTracking, AccountsReceivable, Authorization, AutoAdjust, etc.)</td></tr>
+    <tr><td>ProcessManager-Common-main</td><td>4</td><td>MMSDocumentServiceP8, MMSDocumentServiceP8_WebService, MMSDocumentWcfP8_WebInvoke, MMSImageWebService &mdash; FileNet P8 document/image SOAP services</td></tr>
+    <tr><td>mms-bolton-fin-hist-ohio-main</td><td>3</td><td>Finance-history legacy SOAP endpoints</td></tr>
+  </tbody>
+</table>
+
+<h2 class="new">UI layouts &mdash; <code>.master</code> (ASP.NET master pages) &bull; NEW in V3</h2>
+<table>
+  <thead><tr><th>Repo</th><th>Files</th><th>Master pages</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>ProcessManager-PMCustom-main</td><td>14</td><td>Site.Master, Site.Mobile.Master, MasterPage.Master, ext.master</td><td>Site shell + mobile + custom document/workflow page layouts</td></tr>
+    <tr><td>sis-inx-edigw-main</td><td>13</td><td>Site.master, Site.Mobile.master</td><td>EDI Gateway site &amp; mobile page layout templates</td></tr>
+    <tr><td>ProcessManager-ProcessManager5.0-&hellip;-Development2022-main</td><td>8</td><td>Site, Web, Wizard, PopUp, GlobalConfig, ControlWizardMaster, ExportPage, Actionserver</td><td>PM 5.0 shell + wizard/popup/global-config/action-server layout masters</td></tr>
+    <tr><td>mms-cms-cef</td><td>2</td><td>(HealthPAS site masters)</td><td>QNXT/HealthPAS page layout masters</td></tr>
+  </tbody>
+</table>
+
+<h2 class="new">UI pages &mdash; <code>.asp</code> (classic ASP) &bull; NEW in V3</h2>
+<table>
+  <thead><tr><th>Repo</th><th>Files</th><th>Pages</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>ProcessManager-Common-main</td><td>5</td><td>Client_launch_frame.asp, Imaging_viewer_frame.asp, Inbox_viewer_frame.asp, query_doc_frame.asp, Reject_Letter_Worksheet.asp</td><td>Legacy client-launch / imaging-viewer / inbox framing pages &amp; reject-letter worksheet</td></tr>
+    <tr><td>mms-bolton-distmgr-work</td><td>4</td><td>(distribution-manager framing/viewer pages)</td><td>Classic-ASP framing/viewer pages accompanying the .aspx UI</td></tr>
+    <tr><td>ProcessManager-PMCustom-main</td><td>4</td><td>Default.asp, TextFile.asp, WFActionGUI.asp, WFIndexForm.asp</td><td>Workflow action-GUI / index-form and default legacy pages</td></tr>
+  </tbody>
+</table>
+
+<h2 class="new">UI components &mdash; <code>.htc</code> (DHTML behaviors) &bull; NEW in V3</h2>
+<table>
+  <thead><tr><th>Repo</th><th>Files</th><th>Components</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>mms-cms-cef</td><td>12 (6 distinct)</td><td>MultiPage.htc, TabStrip.htc, toolbar.htc, treeview.htc, webservice.htc, webserviced.htc</td><td>Client-side DHTML behavior components (tabs, toolbar, tree view, multi-page, web-service call helper) used by the QNXT/HealthPAS UI</td></tr>
+  </tbody>
+</table>
+
+<h2>1. mms-cms-cef &mdash; .aspx 4003 (+ .ascx 67, .cshtml 13, .frm 7, .xaml 66, .master 2, .htc 12)</h2>
+<p class="note">QNXT / HealthPAS (HPA) core administration web app. Screens under <code>components/QNXT/UI/Webapp/HPAALL/HPA</code>, organized by business module. .htm=12,511 are QNXT online-help pages; .rdl=547 are embedded SSRS reports. Service tier: .asmx=192 SOAP services + .svc=5 WCF hosts. Client behaviors: .htc=12.</p>
+<table>
+  <thead><tr><th>Module (folder)</th><th>~aspx</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>QContract</td><td>138</td><td>Provider/payer contract setup and maintenance</td></tr>
+    <tr><td>QMember</td><td>134</td><td>Member enrollment, demographics, eligibility screens</td></tr>
+    <tr><td>QClaimFinanceCodes</td><td>123</td><td>Claim finance/adjustment code configuration</td></tr>
+    <tr><td>QClaim</td><td>105</td><td>Claim entry, adjudication, detail/review screens</td></tr>
+    <tr><td>QSponsor</td><td>103</td><td>Sponsor/group account maintenance</td></tr>
+    <tr><td>QUtilizationManagement</td><td>95</td><td>UM authorizations, referrals, reviews</td></tr>
+    <tr><td>QConfiguration</td><td>93</td><td>System/application configuration screens</td></tr>
+    <tr><td>QEDI</td><td>83</td><td>EDI transaction setup and monitoring</td></tr>
+    <tr><td>QCarrier</td><td>74</td><td>Carrier/payer maintenance</td></tr>
+    <tr><td>QPolicy</td><td>71</td><td>Policy setup</td></tr>
+    <tr><td>QProvider</td><td>71</td><td>Provider records and maintenance</td></tr>
+    <tr><td>QPaymentManager</td><td>64</td><td>Payment processing/management screens</td></tr>
+    <tr><td>QBenefit</td><td>50</td><td>Benefit plan configuration</td></tr>
+    <tr><td>QSearch</td><td>50</td><td>Cross-module search screens</td></tr>
+    <tr><td>QUserSec</td><td>41</td><td>User security / access administration</td></tr>
+    <tr><td>QCallTracking</td><td>38</td><td>Call/CRM tracking</td></tr>
+    <tr><td>QPartnerInterfaces</td><td>36</td><td>Partner/interface configuration</td></tr>
+    <tr><td>QREPORTADMIN</td><td>34</td><td>Report administration</td></tr>
+    <tr><td>QMedicalCodes / QMedicalpolicy</td><td>27 / 27</td><td>Medical code and medical-policy maintenance</td></tr>
+    <tr><td>QCredentialing</td><td>27</td><td>Provider credentialing</td></tr>
+    <tr><td>QAutoAdjust / QClaimEstimate</td><td>25 / 25</td><td>Auto-adjustment and claim estimation</td></tr>
+    <tr><td>QFeeTables / QPreDetermination</td><td>24 / 24</td><td>Fee schedule tables and pre-determination</td></tr>
+    <tr><td>QClaimWorkFlow</td><td>19</td><td>Claim workflow screens</td></tr>
+    <tr><td>Others (QProviderTS, QLogBrowser, QMassAdjudication, QScheduler, QPremiumBilling, QPCPAssignment, etc.)</td><td>&lt;20 each</td><td>Provider transactions, log browser, mass adjudication, scheduler, premium billing, PCP assignment, etc.</td></tr>
+  </tbody>
+</table>
+<p class="note">Also present: .ascx shared controls, a few .cshtml Razor views, .frm legacy forms, .xaml WPF utilities, 2 .master layouts, and 6 distinct .htc client behaviors. Service tier is 180 distinct .asmx SOAP services (one set per business module). A parallel copy exists under <code>HPAALL_Website</code> with the same module breakdown.</p>
+
+<h2>11. mms-cms-v360-main &mdash; .cshtml 741 (+ .svc 5)</h2>
+<p class="note">VUE360 ASP.NET MVC web application. Views grouped by feature area. .rdl=74 are the app's SSRS reports. Service tier: SecurityFrameWork, VUE360QWCFHIPAAService, VUE360QWCFService, VUE360Services (WCF).</p>
+<table>
+  <thead><tr><th>Area (view folder)</th><th>~views</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Shared</td><td>77</td><td>Layouts, partials, shared UI components</td></tr>
+    <tr><td>Lookup</td><td>57</td><td>Reference/lookup pickers</td></tr>
+    <tr><td>Authorization / AuthorizationAuthorization</td><td>52 / 13</td><td>UM authorization entry &amp; management</td></tr>
+    <tr><td>TPL / TradingPartner / TradingPartnerEdiTransactions</td><td>24 / 14 / 8</td><td>Third-party liability and EDI trading-partner screens</td></tr>
+    <tr><td>OperationsVueMgmt / OperationsClaimsDDE / OperationsCallsMessages</td><td>21 / 14 / 6</td><td>Operations management, claims DDE, calls/messages</td></tr>
+    <tr><td>FinanceWorkQueue / FinanceAccountsReceivable / FinanceAccountsPayable / Finance / MemberFinancials</td><td>19 / 11 / 8 / 6 / 7</td><td>Finance work queues, AR/AP, member financials</td></tr>
+    <tr><td>CaseCarePlan / Case / CaseAdminCarePlan / CaseContacts</td><td>18 / 9 / 7 / 5</td><td>Case management and care plans</td></tr>
+    <tr><td>ClaimsClaim / ClaimsEdits / ClaimsPay / ClaimsClaimHistory / ClaimsCOB / Claims</td><td>17 / 15 / 10 / 10 / 5 / 7</td><td>Claim entry, edits, payment, history, COB</td></tr>
+    <tr><td>MemberTBQ / MemberEHR / MemberSummary / Member / MemberBenefits / MemberMemberManagement</td><td>16 / 16 / 16 / 10 / 8 / 5</td><td>Member management, EHR, summaries, benefits</td></tr>
+    <tr><td>ProviderScreening / ProviderEnrollment / ProviderSummary</td><td>14 / 14 / 13</td><td>Provider screening, enrollment, summary</td></tr>
+    <tr><td>ConfigurationReferenceCodes / FeeSchedules / Pricing / MedicalPolicy / Benefits / Configuration</td><td>12 / 10 / 9 / 8 / 6 / 7</td><td>System/reference/fee/pricing/policy configuration</td></tr>
+    <tr><td>Home / WorkCenter / Administrator / Candidates / Benefit</td><td>14 / 10 / 9 / 5 / 7</td><td>Home, work center, admin, candidate &amp; benefit screens</td></tr>
+  </tbody>
+</table>
+
+<h2>7. LetterManager-main &mdash; .xaml (4)</h2>
+<table>
+  <thead><tr><th>Screen</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>DefaultTemplate.xaml</td><td>Default letter/document layout template</td></tr>
+    <tr><td>LabDefaultTemplate.xaml / LabDefaultTemplate.11.xaml</td><td>Lab-specific letter layout templates</td></tr>
+    <tr><td>UpgradeTemplate.xaml</td><td>Template used during template/version upgrade</td></tr>
+  </tbody>
+</table>
+
+<h2>8. mms-bolton-distmgr-work &mdash; .aspx (5 distinct) + .asp (4)</h2>
+<table>
+  <thead><tr><th>Screen</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Home.aspx / Home - Up.aspx / Home - Down.aspx</td><td>Distribution Manager landing page (up/down state variants)</td></tr>
+    <tr><td>AdvancedQuery.aspx</td><td>Ad-hoc/advanced data query screen</td></tr>
+    <tr><td>CustomAction.aspx</td><td>Trigger custom distribution actions</td></tr>
+    <tr class="new"><td>4 &times; .asp framing/viewer pages</td><td>Classic-ASP framing / viewer pages supporting the .aspx UI</td></tr>
+  </tbody>
+</table>
+
+<h2>14. ProcessManager-Common-main &mdash; .aspx (5 distinct) + .xaml (3) + .asp (5) + .svc (9) + .asmx (4)</h2>
+<table>
+  <thead><tr><th>Screen / service</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Home.aspx</td><td>Common Process Manager home page</td></tr>
+    <tr><td>AdvancedQuery.aspx</td><td>Advanced query interface</td></tr>
+    <tr><td>CustomAction.aspx</td><td>Custom action launcher</td></tr>
+    <tr><td>InsertData.aspx</td><td>Data insert/entry utility page</td></tr>
+    <tr><td>Test.aspx</td><td>Developer test harness page</td></tr>
+    <tr><td>App.xaml / MainWindow.xaml</td><td>WPF host application shell &amp; main window</td></tr>
+    <tr><td>FnIsKeyValuePairs.xaml</td><td>Key/value-pair configuration control</td></tr>
+    <tr class="new"><td>Client_launch_frame.asp, Imaging_viewer_frame.asp, Inbox_viewer_frame.asp, query_doc_frame.asp, Reject_Letter_Worksheet.asp</td><td>Classic-ASP framing/viewer pages + reject-letter worksheet</td></tr>
+    <tr class="new"><td>CommitWCFService, DMPSDataService, MMSDocumentWCF_P8, MMSDocUpdateP8, MMSImageWCFService, PackagerAddData, RequestOnlineDMDocPackage (.svc) + MMSDocumentServiceP8, MMSImageWebService (.asmx)</td><td>FileNet P8 document/image commit, update, packaging &amp; online-package services (WCF + legacy SOAP)</td></tr>
+  </tbody>
+</table>
+
+<h2>15. ProcessManager-PMCustom-main &mdash; .aspx (53), .ascx (12), .frm (46), .master (14), .asp (4), .svc (2)</h2>
+<h3>Web pages / controls (document &amp; workflow custom UI)</h3>
+<table>
+  <thead><tr><th>Screen(s)</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Default.aspx, About.aspx, Contact.aspx, Calendar.aspx</td><td>Standard site shell pages</td></tr>
+    <tr><td>DisplayDoc.aspx, docview.aspx, ViewDocument2.aspx, dislayImage.aspx, ViewImage.aspx/.ascx, ViewClaimImage.aspx, TiffToPDF.aspx</td><td>Document / image / claim-image viewers and TIFF&rarr;PDF conversion</td></tr>
+    <tr><td>COBSearch.ascx, COBHeader.ascx</td><td>Coordination-of-Benefits search + header</td></tr>
+    <tr><td>ExclusionSearch.aspx, SearchPage.aspx, GridView.aspx</td><td>Search and result-grid screens</td></tr>
+    <tr><td>eCOIApprovalUI.aspx</td><td>eCOI approval interface</td></tr>
+    <tr><td>EnrollStatusPage.aspx, HPAddProv.aspx</td><td>Enrollment status / add-provider screens</td></tr>
+    <tr><td>CComGenerateLetterFromXML.aspx, FnDocContent.aspx, annocontent.aspx, annosecinfo.aspx</td><td>Letter generation &amp; document/annotation content</td></tr>
+    <tr><td>WFClaimExtraction.aspx, WorkObjectList.aspx</td><td>Workflow claim extraction &amp; work-object list</td></tr>
+    <tr><td>ErrorPage.aspx, FNErrorPage.aspx, GenericErr.aspx, NoAccess.aspx</td><td>Error / access-denied pages</td></tr>
+    <tr><td>PopUpContainer.aspx, IntermediaryPage.aspx, ViewSwitcher.ascx, Tabs.ascx, Header.ascx</td><td>Layout / navigation helper controls</td></tr>
+    <tr><td>FnOpenClient.aspx, fnjavaview.aspx, meex*.aspx</td><td>FileNet client launch / viewer bridges</td></tr>
+    <tr class="new"><td>Site.Master, Site.Mobile.Master, MasterPage.Master, ext.master (14 files)</td><td>Site shell + mobile + custom page layout masters</td></tr>
+    <tr class="new"><td>Default.asp, TextFile.asp, WFActionGUI.asp, WFIndexForm.asp (.asp)</td><td>Classic-ASP workflow action-GUI / index-form legacy pages</td></tr>
+    <tr class="new"><td>WFEService.svc</td><td>Workflow-engine (WFE) custom WCF service</td></tr>
+  </tbody>
+</table>
+<h3>VB6 desktop forms (.frm) &mdash; Workflow Server admin/monitoring client</h3>
+<table>
+  <thead><tr><th>Screen(s)</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>frmMain, frmMDI, frmWFSvrMain, frmStartApp, frmSplash</td><td>Main workflow-server application shell/splash</td></tr>
+    <tr><td>frmConfig, frmPref, frmSMTP, frmPrefetchQConfig, frmRoute</td><td>Configuration (general, email, prefetch queue, routing)</td></tr>
+    <tr><td>frmAuditLog, frmErrorLog, frmLogView, frmStatus, frmLockMontior</td><td>Audit/error/log viewers and lock monitor</td></tr>
+    <tr><td>frmAddToWorkflowWizard, frmDisplayWorkflow, frmSuspend, frmPushMode</td><td>Workflow wizard / display / suspend / push-mode</td></tr>
+    <tr><td>frmKeyGen, frmLicenseServer, frmCredits, frmAbout, frmHelp</td><td>Licensing, key generation, about/help</td></tr>
+    <tr><td>frmFileBrowser, frmSelectFile, frmSelectDirectory</td><td>File/directory pickers</td></tr>
+    <tr><td>frmNTService, frmLostConn, frmViewProfile</td><td>Service control, lost-connection, profile viewer</td></tr>
+  </tbody>
+</table>
+
+<h2>16. ProcessManager-ProcessManager5.0-&hellip;-Development2022-main &mdash; .aspx (161), .ascx (240), .master (8), .svc (3)</h2>
+<p class="note">Full Process Manager 5.0 web application. Screens grouped by functional area. Layout masters: Site, Web, Wizard, PopUp, GlobalConfig, ControlWizardMaster, ExportPage, Actionserver. Services: PEAPMService, PRIMSService.</p>
+<table>
+  <thead><tr><th>Area</th><th>Representative screens</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>Authentication / session</td><td>Login, Register, ChangePassword(+Success), Timeout/TimeoutWarning, SessionExpiry, SessionTimeout</td><td>User login, registration, password change, session/timeout handling</td></tr>
+    <tr><td>Home / shell</td><td>Home, Frameset, Welcome, Toolbar, HomeViewAllLink</td><td>Application shell, framesets, toolbars, landing</td></tr>
+    <tr><td>Admin &amp; global config</td><td>AdminModule, GlobalConfig(+DataSource/Repository/WebServer/PMServer/Wizards), GrantUserAccess, SysCheck</td><td>System administration &amp; global configuration</td></tr>
+    <tr><td>User wizard</td><td>UserWizard*, CreateNewUser, CreateUserGroup, Edit/RemoveUserGroup, permission &amp; group-membership steps</td><td>Create/edit users &amp; groups and assign permissions</td></tr>
+    <tr><td>Queue management</td><td>QueueWizard(Add/Edit/Main), QueueDetail*, BrowseQueue(s), AllQueues, ParentQueueUC</td><td>Define, browse and manage work queues</td></tr>
+    <tr><td>Work classes</td><td>WorkClass*, Workclasses, SpecifyWorkclassIndex*, WorkClassSelectorUC</td><td>Work-class definition and indexing wizards</td></tr>
+    <tr><td>Doc classes</td><td>DocClass*, DocClassWizard*, DocClassIndex*, InheritProperties</td><td>Document-class configuration wizards</td></tr>
+    <tr><td>Document explorer / viewer</td><td>DocumentExplorer(+Search variants), DocumentViewer, DocumentPdfViewer, ProfessionalViewer, OpenNativeFile</td><td>Search, browse, and view documents</td></tr>
+    <tr><td>Control / form-builder wizard</td><td>ControlWizard*, Add/Update controls (TextBox/DropDown/ListBox/CheckBoxGroup/RadioButtonGroup/Button), SpecifyControlType</td><td>Wizard to build custom index controls/forms</td></tr>
+    <tr><td>Search applications</td><td>SearchApp*, SearchAppView*, SearchToolbar</td><td>Configure and run search applications</td></tr>
+    <tr><td>Workflow</td><td>WorkFlowWizard, WFManageRoute, WFRoute*, WorkFlowWorker(+Actions/ViewDetails), WorkFlowInitiator, WFExplorer*</td><td>Build routes, initiate and process workflow work objects</td></tr>
+    <tr><td>Rendezvous</td><td>Rendezvous* (Process/Query/Queue/Workflow controls)</td><td>Rendezvous (join/sync) query &amp; process configuration</td></tr>
+    <tr><td>Content publisher</td><td>WFContentPublisher*, WFContentPub*</td><td>Publish/search workflow content and supporting docs</td></tr>
+    <tr><td>Populate wizard</td><td>PopulateWizard*, Populate</td><td>Data-population wizard</td></tr>
+    <tr><td>Action server</td><td>ActionServer*, Actiontype* (Assign/Bridge/Delay/Email/Launch/Rendezvous), ActionQueuePopUp</td><td>Configure action-server jobs and action types</td></tr>
+    <tr><td>Export</td><td>ExportXML, ExportMainComparor, ExportSelectionReport, UCWorkFlowExportSelection, ExportDestinationDBSelector</td><td>Export configuration/data to XML/DB</td></tr>
+    <tr><td>Browse-queue actions</td><td>BQ* (AssignToUser, Route, Suspend, Expire, Lock/Unlock, ViewHistory, WorkList)</td><td>Per-work-object queue actions</td></tr>
+    <tr><td>Help</td><td>Help*.aspx (many), WebHelp, HotFixNotes</td><td>Context help topics</td></tr>
+    <tr><td>Errors / not-implemented</td><td>NotImplemented*, PMNotImplementedPage, UnAuthorisedUser, ErrorSummaryUC</td><td>Error / placeholder / unauthorized pages</td></tr>
+  </tbody>
+</table>
+
+<h2>17. sis-inx-edigw-main &mdash; .aspx (415), .ascx (39), .xaml (2), .master (13), .svc (25)</h2>
+<p class="note">EDI Gateway application (QNXT/Molina-oriented). Grouped by area. Layout masters: Site.master, Site.Mobile.master. Full WCF service suite (25 files, 16 distinct) &mdash; see .svc section.</p>
+<table>
+  <thead><tr><th>Area</th><th>Representative screens</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>App shell / auth</td><td>Default, Home, MainHomePage, Login, Logoff, ChangePassword(+Success), Register, QMain</td><td>Landing, login/logout, password, main menu</td></tr>
+    <tr><td>Navigation / layout</td><td>MainMenu.ascx, NavDispatcher, ReRouter, ErrorRouter, IntermediatePage, PopUpContainer, ModalPopUpContainer, ViewSwitcher.ascx, ProgressScreen</td><td>Routing, dispatch, popups, progress indicator</td></tr>
+    <tr><td>Claims processing</td><td>ClaimScannerCriteriaToUse, ClaimScannerResult, ClaimSQL(+SelectSave), ClaimTypeSelection, ReverseImportedClaims, PostConnectClaimAdjustWiz1/2</td><td>Claim scanning, SQL selection, adjustment wizards</td></tr>
+    <tr><td>277 / 835 EDI</td><td>Process277UByClaim, Process277UByProvider, NonClaim835Result</td><td>EDI 277U status and 835 remittance processing</td></tr>
+    <tr><td>Search / selection</td><td>Additional*Search (CPT/HCPCS, Diagnosis, Member), AdditionalSearchSelection, AttributeSelector, ContractSelection, OrgPolicySelection, ProgramSelection, EditsSelection, ClaimTypeSelection, SelectMore</td><td>Data lookups and selection pickers</td></tr>
+    <tr><td>UM (utilization management)</td><td>UMTree, UMUpdateSelection, AuthTemplateSelection</td><td>UM tree navigation &amp; authorization templates</td></tr>
+    <tr><td>Scheduler</td><td>SchedulerMain, SchedulerJobs, SchedulerInfo, Schedules, SchedulerXMLViewer, SchedXMLPage</td><td>Job scheduler management &amp; XML views</td></tr>
+    <tr><td>Document / image</td><td>ViewImage.ascx, HasDiag.ascx, XMLViewer, XMLPage, XSLListViewer, DownloadFile, Copy</td><td>Image/XML viewing and file download</td></tr>
+    <tr><td>Auto-adjust</td><td>AutoAdjustMain, AutoAdjustBackGround, AutoAdjustIFrame</td><td>Automated claim-adjustment frames</td></tr>
+    <tr><td>QNXT headers / config</td><td>QNXTHeader.ascx, PopQNXTHeader.ascx, uxCommonConfig.ascx, MolinaCustomBackGround</td><td>QNXT header controls &amp; client-specific config</td></tr>
+    <tr><td>Misc / utility</td><td>Calendar, Dialog, Activity, History, LockReasonSelector, Channel</td><td>Calendars, dialogs, activity/history, lock handling</td></tr>
+    <tr><td>Errors</td><td>ErrorPage.aspx</td><td>Error display</td></tr>
+    <tr><td>WPF host</td><td>App.xaml, MainWindow.xaml</td><td>Desktop host shell (utility)</td></tr>
+  </tbody>
+</table>
+
+<h2>2. act-OH-FIWebSvc-main &mdash; .svc (20) &bull; backend service repo</h2>
+<p class="note">No interactive UI; this repo is the HPO SOAP/WCF and IVR service layer. 14 distinct services across multiple hosts.</p>
+<table>
+  <thead><tr><th>Service(s)</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>ClaimSearch.svc, Institutional.svc, Professional.svc, Dental.svc</td><td>Claim search and institutional / professional / dental claim services</td></tr>
+    <tr><td>Eligibility.svc, PriorAuth.svc, Financial.svc</td><td>Eligibility, prior-authorization and financial services</td></tr>
+    <tr><td>Hospice.svc, HospiceEnrollment.svc</td><td>Hospice and hospice-enrollment services</td></tr>
+    <tr><td>IVRService.svc, InternalIVR.svc, Service1.svc</td><td>IVR (external / internal) telephony services</td></tr>
+    <tr><td>QService.svc, EDIGWTPAProxyService.svc</td><td>QNXT service host and EDI-Gateway TPA proxy service</td></tr>
+  </tbody>
+</table>
+
+<h2>9. mms-bolton-fin-hist-ohio-main &mdash; .svc (66) + .asmx (3) &bull; backend service repo</h2>
+<p class="note">No interactive UI. Two distinct WCF services (FinancialService, FinancialDataService) with 66 host files across many branch/deployment copies, plus 3 legacy .asmx endpoints.</p>
+
+<h2>Report layouts (.rdl) &mdash; not interactive UI</h2>
+<table>
+  <thead><tr><th>Repo</th><th>Extension</th><th>Count</th><th>Purpose</th></tr></thead>
+  <tbody>
+    <tr><td>mms-cms-cef</td><td>.rdl</td><td>547</td><td>Embedded QNXT/HealthPAS SSRS reports</td></tr>
+    <tr><td>OH_FI_Reporting-main</td><td>.rdl</td><td>303</td><td>SSRS Ohio FI reporting (claims, care mgmt, CMS reporting, comms tracking, etc.)</td></tr>
+    <tr><td>mms-cms-v360-main</td><td>.rdl</td><td>74</td><td>VUE360 SSRS reports</td></tr>
+    <tr><td>etl-framework-main</td><td>.rdl</td><td>16</td><td>SSRS reports for ETL framework monitoring/stats</td></tr>
+  </tbody>
+</table>
+
+<h2>Service-reference metadata &mdash; generated, not UI or endpoints</h2>
+<p class="note">These are auto-generated client proxy/metadata artifacts (under "Service References"). Listed for completeness; they are neither screens nor hosted endpoints.</p>
+<table>
+  <thead><tr><th>Repo</th><th>.wsdl</th><th>.disco</th><th>.svcmap</th></tr></thead>
+  <tbody>
+    <tr><td>act-OH-FIWebSvc-main</td><td>35</td><td>13</td><td>22</td></tr>
+    <tr><td>ProcessManager-PMCustom-main</td><td>38</td><td>28</td><td>28</td></tr>
+    <tr><td>ProcessManager-Common-main</td><td>29</td><td>21</td><td>23</td></tr>
+    <tr><td>sis-inx-edigw-main</td><td>25</td><td>17</td><td>17</td></tr>
+    <tr><td>mms-bolton-fin-hist-ohio-main</td><td>15</td><td>15</td><td>3</td></tr>
+    <tr><td>ProcessManager-ProcessManager5.0-&hellip;-Development2022-main</td><td>10</td><td>10</td><td>9</td></tr>
+    <tr><td>mms-cms-cef</td><td>10</td><td>7</td><td>&mdash;</td></tr>
+    <tr><td>LetterManager-main</td><td>9</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>mms-bolton-distmgr-work</td><td>2</td><td>2</td><td>2</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>
