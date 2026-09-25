@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capitation UI Files - mms-cms-v360-main</title>
+    <style>
+        :root {
+            --primary: #00558c;
+            --accent: #0078d4;
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --border: #d9dee3;
+            --text: #22303c;
+            --muted: #5a6b78;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.55;
+        }
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: #fff;
+            padding: 28px 40px;
+        }
+        header h1 { margin: 0 0 6px; font-size: 1.6rem; }
+        header p { margin: 0; opacity: 0.9; font-size: 0.95rem; }
+        main { max-width: 1100px; margin: 0 auto; padding: 32px 24px 56px; }
+        .intro {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            border-radius: 6px;
+            padding: 18px 22px;
+            margin-bottom: 28px;
+        }
+        h2 {
+            color: var(--primary);
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 6px;
+            margin-top: 36px;
+            font-size: 1.25rem;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin: 14px 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .card h3 { margin: 0 0 6px; font-size: 1rem; color: var(--accent); }
+        .path {
+            font-family: "Cascadia Code", Consolas, monospace;
+            font-size: 0.82rem;
+            color: var(--muted);
+            word-break: break-all;
+            display: block;
+            margin-bottom: 8px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 4px;
+            background: var(--card);
+            font-size: 0.9rem;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 9px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: var(--primary); color: #fff; font-weight: 600; }
+        tbody tr:nth-child(even) { background: #f0f4f8; }
+        .tag {
+            display: inline-block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #e3f0fb;
+            color: var(--primary);
+            margin-left: 6px;
+        }
+        .summary {
+            background: #eef7ee;
+            border: 1px solid #cfe6cf;
+            border-left: 4px solid #2e8b57;
+            border-radius: 6px;
+            padding: 16px 22px;
+            margin-top: 30px;
+        }
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.8rem;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Capitation UI Files</h1>
+        <p>Repository: mms-cms-v360-main &nbsp;|&nbsp; UX layer: components/ux/Molina.VUE360.Web</p>
+    </header>
+
+    <main>
+        <div class="intro">
+            <strong>What "Capitation" means here:</strong> Capitation is a payment model where providers
+            are paid a fixed per-member amount (per member per month) rather than per service. VUE360 has
+            two capitation areas: <em>Provider Capitation Adjustments</em> (adjusting payments for a provider)
+            and <em>Contract Capitation Configuration</em> (defining the capitation rate structure on a contract).
+        </div>
+
+        <h2>Views (the actual screens)</h2>
+
+        <div class="card">
+            <h3>_CapitationPV.cshtml <span class="tag">Provider</span></h3>
+            <span class="path">Views/ProviderSummary/_CapitationPV.cshtml</span>
+            The Provider &rarr; Summary &rarr; <strong>Capitation Adjustments search screen</strong>. Lets users
+            search a provider's capitation adjustments by program, reason, adjustment type, processing date range,
+            and member ID. Enforces roles (<em>Provider_View_Capitation_Adjustments</em> to view,
+            <em>Provider_Modify_Capitation_Adjustments</em> to add/edit/delete) and renders a grid with Edit/Delete
+            row commands.
+        </div>
+
+        <div class="card">
+            <h3>_AddEditCapitationAdjustmentPV.cshtml <span class="tag">Provider</span></h3>
+            <span class="path">Views/ProviderSummary/_AddEditCapitationAdjustmentPV.cshtml</span>
+            The <strong>Add/Edit Capitation Adjustment form</strong>. Used to create or modify a single adjustment &mdash;
+            selecting Fund, Program, Reason, and Adjustment Type (e.g., MONETARY vs. non-monetary). The form title and
+            save button switch between "Add/SAVE" and "Edit/UPDATE" based on mode.
+        </div>
+
+        <div class="card">
+            <h3>_CapitationPV.cshtml <span class="tag">Contract</span></h3>
+            <span class="path">Views/ConfigurationPricing/_CapitationPV.cshtml</span>
+            The <strong>Contract capitation configuration (read-only display) screen</strong>. Shows how capitation
+            is set up on a contract: Capitation Table, Type, Payment Fund, Provider Membership Only flag, Effective
+            date, and Management Capitation indicator. This is the rate-structure definition side, backed by cap
+            factors/terms/pools.
+        </div>
+
+        <h2>Client-side scripts</h2>
+
+        <div class="card">
+            <h3>CapitationAdjustment.js <span class="tag">Provider</span></h3>
+            <span class="path">wwwroot/js/CapitationAdjustment.js</span>
+            Front-end logic for the provider adjustment screens &mdash; driving the search grid, add/edit/delete
+            actions, dropdown filtering, and validation for <em>_CapitationPV</em> and the Add/Edit form.
+        </div>
+
+        <div class="card">
+            <h3>_CapitationPV.js <span class="tag">Contract</span></h3>
+            <span class="path">wwwroot/js/ConfigurationPricing/_CapitationPV.js</span>
+            Front-end logic for the contract capitation configuration view &mdash; loading and displaying capitation
+            factors and terms.
+        </div>
+
+        <h2>Controllers (server actions behind the screens)</h2>
+
+        <div class="card">
+            <h3>ProviderSummaryController.cs <span class="tag">Provider</span></h3>
+            <span class="path">Controllers/ProviderSummaryController.cs</span>
+            Serves the provider adjustment UI: <em>_CapitationPV</em> (renders the screen),
+            <em>GetProviderCapitationAdjustmentDetails</em> (search with filtering by program/reason/type/date/member),
+            and <em>GetCapitationDropDownData</em> (populates the search dropdowns). Uses caching keyed per provider.
+        </div>
+
+        <div class="card">
+            <h3>ConfigurationPricingController.cs <span class="tag">Contract</span></h3>
+            <span class="path">Controllers/ConfigurationPricingController.cs</span>
+            Serves the contract capitation config UI: <em>_CapitationPV</em> (contract capitation details),
+            <em>CapitationFactors_Read</em> (cap factor grid), and <em>CapitationTerms_Read</em> (cap terms, including
+            member tier/coverage code enrichment).
+        </div>
+
+        <div class="card">
+            <h3>LookupController.cs <span class="tag">Shared</span></h3>
+            <span class="path">Controllers/LookupController.cs</span>
+            Provides <em>GetProvAffiliationsForCapAdjustment</em> &mdash; a lookup of provider affiliations used when
+            creating a capitation adjustment.
+        </div>
+
+        <h2>Backing models (data shapes bound to the UI)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:32%">Model</th>
+                    <th>Purpose</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>ProviderCapitationAdjustmentModel.cs</td>
+                    <td>One capitation adjustment row: adjustment type/status/reason, amount, provider, member, fund,
+                        program, capitation rate, member months, recon data, etc. Drives the search grid and add/edit form.</td>
+                </tr>
+                <tr>
+                    <td>ProviderPaymentCapDetailModel.cs</td>
+                    <td>Provider payment capitation detail line items.</td>
+                </tr>
+                <tr>
+                    <td>ContractCapitationModel.cs</td>
+                    <td>Contract-level capitation header: cap type, description, payment fund, effective/terminate
+                        dates, PCP-only and management-cap flags. Drives the config display screen.</td>
+                </tr>
+                <tr>
+                    <td>ContractCapitationFactorsModel.cs</td>
+                    <td>Capitation factors (rate multipliers/adjustments) for a contract.</td>
+                </tr>
+                <tr>
+                    <td>ContractCapTermsModel.cs</td>
+                    <td>Capitation terms, including member tier and coverage code.</td>
+                </tr>
+                <tr>
+                    <td>ContractCapTermPoolsModel.cs</td>
+                    <td>Term pools grouping capitation terms.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <strong>In short</strong>
+            <ul>
+                <li><strong>Provider side:</strong> search, add, edit, and delete per-provider <em>capitation payment
+                    adjustments</em> (_CapitationPV, _AddEditCapitationAdjustmentPV, CapitationAdjustment.js,
+                    ProviderSummaryController, ProviderCapitationAdjustmentModel).</li>
+                <li><strong>Contract side:</strong> view how <em>capitation rates are configured</em> on a contract
+                    &mdash; factors, terms, and pools (ConfigurationPricing/_CapitationPV, its .js,
+                    ConfigurationPricingController, and the ContractCap* models).</li>
+            </ul>
+        </div>
+    </main>
+
+    <footer>
+        Generated for repository mms-cms-v360-main &mdash; Capitation UI overview
+    </footer>
+</body>
+</html>
