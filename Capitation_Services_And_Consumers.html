@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capitation Services &amp; Consumers - act-OH-FIWebSvc-main</title>
+    <style>
+        :root {
+            --primary: #1b5e5a;
+            --accent: #2a9d8f;
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --border: #d7dee0;
+            --text: #21313c;
+            --muted: #5a6b78;
+            --warn: #e0a800;
+            --danger: #c0392b;
+            --ok: #2e8b57;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            margin: 0; background: var(--bg); color: var(--text); line-height: 1.55;
+        }
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            color: #fff; padding: 28px 40px;
+        }
+        header h1 { margin: 0 0 6px; font-size: 1.6rem; }
+        header p { margin: 0; opacity: 0.92; font-size: 0.95rem; }
+        main { max-width: 1160px; margin: 0 auto; padding: 32px 24px 56px; }
+        .intro {
+            background: var(--card); border: 1px solid var(--border);
+            border-left: 4px solid var(--accent); border-radius: 6px;
+            padding: 18px 22px; margin-bottom: 28px;
+        }
+        h2 {
+            color: var(--primary); border-bottom: 2px solid var(--border);
+            padding-bottom: 6px; margin-top: 40px; font-size: 1.3rem;
+        }
+        h3 { color: var(--accent); margin: 22px 0 6px; font-size: 1.05rem; }
+        .card {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 6px; padding: 16px 20px; margin: 14px 0;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .card h3 { margin: 0 0 6px; }
+        .path {
+            font-family: "Cascadia Code", Consolas, monospace; font-size: 0.78rem;
+            color: var(--muted); word-break: break-all; display: block; margin: 2px 0;
+        }
+        table {
+            width: 100%; border-collapse: collapse; margin: 12px 0 4px;
+            background: var(--card); font-size: 0.86rem;
+        }
+        th, td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; vertical-align: top; }
+        th { background: var(--primary); color: #fff; font-weight: 600; }
+        tbody tr:nth-child(even) { background: #eef4f3; }
+        code {
+            font-family: "Cascadia Code", Consolas, monospace; background: #eef2f4;
+            padding: 1px 5px; border-radius: 3px; font-size: 0.85em;
+        }
+        .tag {
+            display: inline-block; font-size: 0.72rem; font-weight: 600;
+            padding: 2px 8px; border-radius: 10px; background: #ddf0ec;
+            color: var(--primary); margin-left: 6px;
+        }
+        .badge { font-weight: 700; }
+        .badge.ok { color: var(--ok); }
+        .badge.warn { color: var(--warn); }
+        .badge.no { color: var(--danger); }
+        .note {
+            background: #fff8e6; border: 1px solid #f0e0b0; border-left: 4px solid var(--warn);
+            border-radius: 6px; padding: 12px 18px; margin: 16px 0; font-size: 0.9rem;
+        }
+        .flow {
+            background: #0f2c2a; color: #d7f2ec; border-radius: 8px;
+            padding: 20px 24px; margin: 16px 0; overflow-x: auto;
+        }
+        .flow ol { margin: 0; padding-left: 20px; }
+        .flow li { margin: 10px 0; }
+        .flow .hop { color: #7fe0cf; font-weight: 600; }
+        .flow .file { color: #9fb6b2; font-size: 0.8rem; font-family: "Cascadia Code", Consolas, monospace; }
+        .summary {
+            background: #eef7ee; border: 1px solid #cfe6cf; border-left: 4px solid var(--ok);
+            border-radius: 6px; padding: 16px 22px; margin-top: 30px;
+        }
+        footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 20px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Capitation Services &amp; Where They Are Consumed</h1>
+        <p>Repository: act-OH-FIWebSvc-main &nbsp;|&nbsp; Ohio FI (Fiscal Intermediary) Web Services</p>
+    </header>
+
+    <main>
+        <div class="intro">
+            <strong>Answer: Yes.</strong> Capitation is handled in this repo through the
+            <strong>CapVoucher</strong> (capitation payment voucher) that flows out of the
+            <code>PaymentInquiry</code> / <code>GetPaymentDetails</code> SOAP operations. Capitation is a
+            payment model where a provider is paid a fixed periodic amount per member. Below are the
+            capitation-bearing services, the end-to-end data flow, and every project/process that consumes them.
+            There are also generated VUE360 capitation client operations that are <em>declared but not called</em>.
+        </div>
+
+        <h2>1. Services / APIs that produce capitation data</h2>
+
+        <div class="card">
+            <h3>Gainwell.FI.SOAPService &mdash; primary capitation output <span class="tag">Live</span></h3>
+            <span class="path">src/Gainwell.FI.SOAPService/.../ModularServices/IFinanceServiceController.cs &rarr; GetPaymentDetails(PaymentInquiryQuery)</span>
+            <span class="path">src/Gainwell.FI.SOAPService/.../ModularServices/FinanceServiceController.cs</span>
+            <span class="path">src/Gainwell.FI.SOAPService/.../Applications/QueryHandlers/PaymentInquiryHandler.cs (MediatR)</span>
+            Returns <code>PaymentInquiryResponse</code>, which contains <code>List&lt;CapVoucher&gt;</code>.
+            This is the primary place capitation vouchers are produced and returned to callers.
+        </div>
+
+        <div class="card">
+            <h3>Gainwell.HPO.SOAPService (SOAPIVRService) &mdash; IVR-facing endpoint <span class="tag">Live</span></h3>
+            <span class="path">src/Gainwell.HPO.SOAPService/Gainwell.HPO.SOAPIVRService/IHPOSOAPIVRService.cs</span>
+            <span class="path">src/Gainwell.HPO.SOAPService/Gainwell.HPO.SOAPIVRService/HPOSOAPIVRService.cs</span>
+            <code>[ServiceContract]</code> exposing <code>[OperationContract] PaymentInquiry(PaymentInquiryRequest)</code>.
+            The implementation calls <code>IPaymentInquiryService.PaymentInquiry()</code> and maps results via
+            <code>PaymentDataMapper.ConvertStructure()</code>, returning capitation payment inquiry data to the IVR/telephony channel.
+        </div>
+
+        <div class="card">
+            <h3>MyHealthPAS.SOAP.Proxy &mdash; back-end proxy <span class="tag">Proxy</span></h3>
+            <span class="path">src/MyHealthPAS.SOAP.Proxy/MyHealthPAS.SOAP.Proxy/IProxyService.cs &rarr; PaymentInquiry(PaymentInquiryRequest)</span>
+            <span class="path">src/MyHealthPAS.SOAP.Proxy/.../ProxyService.cs &rarr; delegates to FinanceServiceController.GetPaymentDetails()</span>
+            Bridges to the MyHealthPAS (MHP) back-end that actually produces the capitation voucher data.
+        </div>
+
+        <h2>2. CapVoucher data flow (end to end)</h2>
+        <div class="flow">
+            <ol>
+                <li><span class="hop">Caller</span> (IVR / EDI Gateway / internal) sends a PaymentInquiry (PaymentID, EnvironmentID).</li>
+                <li><span class="hop">PaymentInquiryQuery</span> (MediatR query object)
+                    <span class="file">Applications/Queries/PaymentInquiryQuery.cs</span></li>
+                <li><span class="hop">PaymentInquiryHandler.Handle()</span> enriches the query and delegates
+                    <span class="file">Applications/QueryHandlers/PaymentInquiryHandler.cs</span></li>
+                <li><span class="hop">FinanceServiceController.GetPaymentDetails()</span> calls
+                    <code>mHPServicesClient.GetPaymentDetailsAsync(PaymentID, envID)</code>
+                    <span class="file">ModularServices/FinanceServiceController.cs</span></li>
+                <li><span class="hop">MHPServicesClient</span> (WCF proxy to MyHealthPAS back-end) returns
+                    <code>MHPServices.PaymentDetails</code> containing <code>CapVoucher[]</code>
+                    <span class="file">ServiceRepository/Connected Services/MHPServices/Reference.cs (auto-generated)</span></li>
+                <li><span class="hop">AutoMapper &mdash; PaymentInquiryProfile</span> maps
+                    <code>MHPServices.CapVoucher &rarr; Entities.CapVoucher</code>
+                    <span class="file">Applications/AutoMappingConfig/PaymentInquiryProfile.cs</span></li>
+                <li><span class="hop">PaymentInquiryResponse.CapVoucher</span> returned to the caller
+                    <span class="file">Applications/ClientResponses/PaymentInquiryResponse.cs</span></li>
+            </ol>
+        </div>
+        <p><strong>CapVoucher fields:</strong> <code>FullName</code>, <code>CapType</code>,
+            <code>DayCount</code>, <code>CapDate</code>, <code>CapAmt</code>. Defined identically in three layers:
+            FI SOAP service (Applications/Entities), HPO SOAP service (Applications/FIModel), and MyHealthPAS proxy (Applications/Entities).</p>
+
+        <h2>3. Where capitation services are consumed (projects / processes)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:22%">Project / Process</th>
+                    <th style="width:20%">Contract</th>
+                    <th style="width:22%">Operation</th>
+                    <th style="width:16%">Consumes CapVoucher</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Gainwell.FI.SOAPService</td>
+                    <td>IFinanceServiceController</td>
+                    <td>GetPaymentDetails()</td>
+                    <td><span class="badge ok">Yes &mdash; live (from MHP)</span></td>
+                    <td>Primary producer; calls MyHealthPAS back-end and maps CapVoucher into the response.</td>
+                </tr>
+                <tr>
+                    <td>Gainwell.HPO.SOAPService (SOAPIVRService)</td>
+                    <td>IHPOSOAPIVRService</td>
+                    <td>PaymentInquiry()</td>
+                    <td><span class="badge ok">Yes &mdash; live</span></td>
+                    <td>IVR-facing endpoint; consumes IPaymentInquiryService and returns mapped capitation data.</td>
+                </tr>
+                <tr>
+                    <td>MyHealthPAS.SOAP.Proxy</td>
+                    <td>IProxyService</td>
+                    <td>PaymentInquiry()</td>
+                    <td><span class="badge ok">Yes &mdash; delegated</span></td>
+                    <td>Delegates to FI FinanceServiceController; bridge to MHP back-end.</td>
+                </tr>
+                <tr>
+                    <td>Gainwell.IVR.WCFServices</td>
+                    <td>IIVRService</td>
+                    <td>ProvidePaymentInquiryData()</td>
+                    <td><span class="badge warn">Mock data only</span></td>
+                    <td>Standalone WCF IVR service; uses hard-coded test payment data, no live back-end.</td>
+                </tr>
+                <tr>
+                    <td>HPO.IVR.WCFService (WCFServices/HPO.SOAP.WCFService)</td>
+                    <td>IIVRService</td>
+                    <td>ProvidePaymentInquiryData()</td>
+                    <td><span class="badge warn">Commented / disabled</span></td>
+                    <td>WCF wrapper; prior code called <code>ivrClient.PaymentInquiry()</code> on the HPO SOAP API, now largely commented out.</td>
+                </tr>
+                <tr>
+                    <td>Gainwell.InternalIVR</td>
+                    <td>(internal) IVRService</td>
+                    <td>ProvidePaymentInquiryData()</td>
+                    <td><span class="badge warn">Commented / disabled</span></td>
+                    <td>Mirrors HPO.IVR.WCFService; integration points largely commented out.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>4. VUE360 capitation client operations &mdash; declared but NOT consumed</h2>
+        <div class="note">
+            <strong>Important finding:</strong> The following VUE360 capitation operations exist ONLY in the
+            auto-generated WCF proxy (<code>ServiceRepository/Connected Services/VUE360Services/Reference.cs</code>
+            in both <code>Gainwell.FI.SOAPService</code> and <code>MyHealthPAS.SOAP.Proxy</code>).
+            <strong>No hand-written code in this repository calls them.</strong>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:46%">Declared VUE360 Operation</th>
+                    <th>Purpose</th>
+                    <th style="width:14%">Called?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td><code>GetContractCapitation(contractId)</code></td><td>Contract capitation header.</td><td><span class="badge no">No</span></td></tr>
+                <tr><td><code>GetContractCapitationFactor(capId)</code></td><td>Capitation rate factors.</td><td><span class="badge no">No</span></td></tr>
+                <tr><td><code>GetContractCapTerms(capId)</code></td><td>Capitation terms (tier / coverage).</td><td><span class="badge no">No</span></td></tr>
+                <tr><td><code>GetContractCapTermPools(capId, captermid)</code></td><td>Capitation term pools.</td><td><span class="badge no">No</span></td></tr>
+                <tr><td><code>GetProviderPaymentCapDetails(...)</code></td><td>Provider capitation payment details.</td><td><span class="badge no">No</span></td></tr>
+            </tbody>
+        </table>
+
+        <div class="summary">
+            <strong>Summary</strong>
+            <ul>
+                <li><strong>Active capitation service:</strong> the <code>PaymentInquiry</code> /
+                    <code>GetPaymentDetails</code> operation returns capitation vouchers
+                    (<code>PaymentInquiryResponse.CapVoucher</code>), sourced from the MyHealthPAS back-end.</li>
+                <li><strong>Live consumers:</strong> Gainwell.FI.SOAPService (producer), Gainwell.HPO.SOAPService
+                    (IVR-facing), and MyHealthPAS.SOAP.Proxy (delegating bridge).</li>
+                <li><strong>Inactive consumers:</strong> Gainwell.IVR.WCFServices uses mock data;
+                    HPO.IVR.WCFService and Gainwell.InternalIVR have their integration commented out/disabled.</li>
+                <li><strong>Declared-but-unused:</strong> the five VUE360 capitation client operations exist only
+                    in generated proxy code and are not invoked anywhere in this repo.</li>
+                <li><strong>No capitation UI</strong> lives here — the capitation screens are in the
+                    <code>mms-cms-v360-main</code> (VUE360) repository.</li>
+            </ul>
+        </div>
+    </main>
+
+    <footer>
+        Generated for repository act-OH-FIWebSvc-main &mdash; Capitation services &amp; consumers overview
+    </footer>
+</body>
+</html>
