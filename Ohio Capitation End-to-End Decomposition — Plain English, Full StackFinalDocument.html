@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<!-- saved from url=(0092)file:///Users/junaidbmir/Documents/TODAY/Capitation_EndToEnd_PlainEnglish_Decomposition.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohio Capitation End-to-End Decomposition — Plain English, Full Stack</title>
+<style>
+:root{--h1:#1a237e;--h2:#283593;--h3:#3949ab;--confirmed:#2e7d32;--inferred:#1565c0;--unknown:#e65100;--external:#455a64;--plain-bg:#eef1fb;--plain-border:#3949ab;--body-font:'Segoe UI',system-ui,sans-serif;--mono:'Cascadia Code','Fira Code',Consolas,monospace}
+*{box-sizing:border-box}
+body{font-family:var(--body-font);line-height:1.7;color:#212121;max-width:1100px;margin:0 auto;padding:2rem 1.5rem;background:#fafbff}
+h1{color:var(--h1);border-bottom:3px solid var(--h1);padding-bottom:.5rem;margin-top:2.5rem}
+h2{color:var(--h2);border-bottom:1px solid #c5cae9;padding-bottom:.3rem;margin-top:2rem}
+h3{color:var(--h3);margin-top:1.5rem}
+h4{color:#455a64;margin-top:1.2rem}
+
+.tag{display:inline-block;padding:1px 8px;border-radius:3px;font-size:.75rem;font-weight:700;color:#fff;margin:0 2px;vertical-align:middle}
+.tag-c{background:var(--confirmed)}.tag-i{background:var(--inferred)}.tag-u{background:var(--unknown)}.tag-e{background:var(--external)}
+
+.plain{background:var(--plain-bg);border-left:4px solid var(--plain-border);padding:1rem 1.2rem;margin:1rem 0;border-radius:0 6px 6px 0;font-size:.97rem}
+.plain strong{color:var(--h3)}
+
+table{border-collapse:collapse;width:100%;margin:1rem 0;font-size:.88rem}
+th,td{border:1px solid #c5cae9;padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#e8eaf6;color:var(--h2);font-weight:600}
+tr:nth-child(even){background:#f5f6ff}
+
+code{font-family:var(--mono);background:#e8eaf6;padding:1px 5px;border-radius:3px;font-size:.85em}
+pre{background:#263238;color:#eeffff;padding:1rem;border-radius:6px;overflow-x:auto;font-size:.82rem;line-height:1.5}
+pre code{background:none;padding:0;color:inherit}
+
+.evidence{font-size:.82rem;color:#546e7f;margin-top:.3rem}
+.risk{background:#fff3e0;border-left:4px solid #e65100;padding:.8rem 1rem;margin:1rem 0;border-radius:0 6px 6px 0}
+.finding{background:#e8f5e9;border-left:4px solid var(--confirmed);padding:.8rem 1rem;margin:1rem 0;border-radius:0 6px 6px 0}
+
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;margin:1rem 0;padding:.8rem;background:#f5f5f5;border-radius:6px}
+.legend-item{display:flex;align-items:center;gap:4px;font-size:.85rem}
+
+svg text{font-family:var(--body-font);font-size:11px}
+.svg-container{overflow-x:auto;margin:2rem 0}
+
+footer{margin-top:3rem;padding-top:1rem;border-top:2px solid #c5cae9;font-size:.85rem;color:#78909c;text-align:center}
+</style>
+</head>
+<body>
+
+<h1>Ohio Capitation End-to-End Decomposition</h1>
+<p><strong>Engagement:</strong> Gainwell Ohio CEF IV&amp;V (MSS) — Contract 0A1286 / SOW 31066<br>
+<strong>Mode:</strong> Definitive plain-English decomposition, full stack, evidence-backed<br>
+<strong>Audience:</strong> Architects, executive sponsors — assumes healthcare-IT literacy but no QNXT expertise</p>
+
+<div class="legend">
+<div class="legend-item"><span class="tag tag-c">C</span> CONFIRMED — Ohio code/schema, file:line cited</div>
+<div class="legend-item"><span class="tag tag-i">I</span> INFERRED — Reasoned from naming/structure</div>
+<div class="legend-item"><span class="tag tag-u">!</span> UNKNOWN — Needs onshore read / compiled assembly</div>
+<div class="legend-item"><span class="tag tag-e">E</span> EXTERNAL — Product capability, not Ohio-confirmed</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>What Is Capitation? (Three Sentences)</h2>
+
+<div class="plain">
+<strong>Capitation</strong> is a fixed per-member-per-month (PMPM) payment that Ohio Medicaid makes to Managed Care Plans (MCPs) — Aetna, Buckeye, CareSource, Molina, Paramount, United Health — regardless of what services those plans actually deliver. Think of it as a "monthly payroll run for health plans": every month, the system decides which members are enrolled in which plans, looks up the rate each member's demographics command, and writes a check to each plan for the sum of its members' rates. The Ohio capitation system processes approximately 71 concurrent (program × period) runs per monthly cycle, touching 6+ databases and producing vouchers that flow through a general-ledger posting pipeline before the state releases funds.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 0 — Run Invocation (How a Capitation Run Starts)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The trigger mechanism — how the system receives the instruction "calculate capitation for program X, period Y." Like pressing "Run Payroll" in a payroll system, except it fans out into dozens of parallel sub-runs.<br>
+<strong>What does it do?</strong> Accepts a run request (programs, cap date, recon date, retro months), fans it out into per-program messages, then per-provider messages, feeding the calculation pipeline.<br>
+<strong>What does it read/write?</strong> Reads dispatch config from <code>PlanIntegration</code>; writes run-state to <code>processlogheader</code>/<code>processlogdetail</code>.
+</div>
+
+<h3>Run Trigger</h3>
+<p>A capitation run is initiated either by a <strong>QNXT Administrator UI action</strong> ("Create Advanced Capitation Payments" wizard) or by a <strong>scheduled QFrame job-queue row</strong>. The wizard presents four operational modes <span class="tag tag-e">E</span>:</p>
+<ul>
+<li><strong>Create Months</strong> — calculate capitation for new period(s)</li>
+<li><strong>Reconcile Months</strong> — re-calculate for prior periods where retroactive changes occurred</li>
+<li><strong>Multiple Retroactive Months</strong> — reconcile up to 12 months of lookback in one pass</li>
+<li><strong>Reconcile Providers</strong> — re-run for specific provider(s) only</li>
+</ul>
+<p>These modes generate the ~71 (program × period) runs clustered monthly. Each MCP (6–7 plans) × each retro month within the lookback window = dozens of runs. <span class="tag tag-i">I</span></p>
+
+<h3>Dispatch Architecture</h3>
+<p>Run submission enters via <code>CapSubmitAgent.ProcessMessage()</code> <span class="tag tag-c">C</span> <span class="evidence">CapSubmitAgent.cs:33</span>. This agent receives a <code>CapSubmitMessage</code> XML payload containing:</p>
+<ul>
+<li>Selected programs (list)</li>
+<li>Capitation date (the month being calculated)</li>
+<li>Review date / Reconciliation date</li>
+<li>Affiliation list</li>
+</ul>
+
+<p>The agent applies <strong>XSLT fan-out</strong> (<code>XSLTCAPSubmit.xslt</code>) to split the single request into <strong>one message per program</strong>. <span class="tag tag-c">C</span> <span class="evidence">CapSubmitAgent.cs:60 — xslt.Load("../XSLTCAPSubmit.xslt")</span></p>
+
+<p>Routing uses <code>OneWayProxy</code> (fire-and-forget dispatch) <span class="tag tag-c">C</span> <span class="evidence">CapitationBatchProcessProxy.cs:21</span> which can post to:</p>
+<ul>
+<li>QEnterprise Distribution Hub (HTTP POST)</li>
+<li>SQL Server Service Broker queue (<code>data.EnqueueMessage</code>)</li>
+<li>Direct bypass to <code>MessageProcessorEngine</code> (config-driven)</li>
+</ul>
+
+<h3>Process Configuration (PlanIntegration DB)</h3>
+
+<table>
+<tbody><tr><th>Chain</th><th>Step</th><th>Agent</th><th>Assembly</th><th>Active</th></tr>
+<tr><td><code>ADV_CAP_PROC</code></td><td>0</td><td>CapProgramAgent</td><td><code>ClaimAD.QCSI.ASC.CapitationSetup v5.0.31.00</code></td><td>Yes</td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>0</td><td>CapitationBatchProcessAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>1</td><td>PostCapSplitPayment</td><td><code>QCSI ASC PostCapitationBatchAgent v5.1001.0.0</code></td><td><strong>No</strong> (inactive)</td></tr>
+<tr><td><code>ADV_CAP_BATCH</code></td><td>2</td><td>PostCapFundAllocation</td><td><code>QCSI ASC PostCapitationBatchAgent v5.1001.0.0</code></td><td><strong>No</strong> (inactive)</td></tr>
+<tr><td><code>CapProvProc</code></td><td>0</td><td>CapitationCreateAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td></tr>
+<tr><td><code>CapReStartProc</code></td><td>0</td><td>CapitationRestartAgent</td><td><code>ClaimAD.QCSI.ASC.Capitation v5.0.31.00</code></td><td>Yes</td></tr>
+</tbody></table>
+<p class="evidence"><span class="tag tag-c">C</span> Source: Capitation_ProcessStep_Config_LiveRead — PlanIntegration.dbo.processstep + agent tables</p>
+
+<h3>Parameters That Scope a Run</h3>
+<p>Each run is scoped by: <strong>programid</strong> (which MCP), <strong>capdate</strong> (which month), <strong>recondate</strong> (reconciliation reference), <strong>retro months</strong> (lookback window), and <strong>provider list</strong> (optional filter). <span class="tag tag-c">C</span> <span class="evidence">IAdvCap.vb:296, CapSubmitMessage XML schema</span></p>
+
+<h3>DB: PlanIntegration</h3>
+<table>
+<tbody><tr><th>Table</th><th>R/W</th><th>Purpose</th></tr>
+<tr><td><code>process</code></td><td>READ</td><td>Process chain catalog (192 entries, keyed by <code>logtype</code>)</td></tr>
+<tr><td><code>processstep</code></td><td>READ</td><td>Step order + active flag per chain</td></tr>
+<tr><td><code>agent</code></td><td>READ</td><td>Agent → assembly + class mapping (214 entries)</td></tr>
+<tr><td><code>processlogheader</code></td><td>WRITE</td><td>Run audit log (871K rows — every run start/stop)</td></tr>
+<tr><td><code>processlogdetail</code></td><td>WRITE</td><td>Per-step detail within a run</td></tr>
+<tr><td><code>processstate</code></td><td>WRITE</td><td>Live run-state + error capture (2B rows)</td></tr>
+</tbody></table>
+
+<p><strong>Hand-off →</strong> Per-program messages flow to <code>CapData</code> agent (enriches with program cap configuration), then to <code>CAPGlobal</code>/<code>CapPcp</code> (build provider lists and fan out per-provider via XSLT), entering Stage 1a.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 1a — Membership (Who Is Eligible for Capitation This Period)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The enrollment query — like asking "who's on the company health plan this month?" For each provider, the system finds every member enrolled in that provider's program during the capitation period.<br>
+<strong>What does it do?</strong> Queries valid enrollments per provider/program combination for the cap month, building the roster of members whose capitation needs calculating.<br>
+<strong>What does it read/write?</strong> Reads enrollment, member, benefitplan, contract, policyplans from <code>Plandata_Parallel</code>. Writes the initial <code>payment</code> record (pre-allocating the paymentid).
+</div>
+
+<h3>The Enrollment Build</h3>
+<p>Component: <code>cBuildCapEnrolls</code> <span class="tag tag-c">C</span> <span class="evidence">cBuildCapEnrolls.vb — delegated from CapitationActivity.vb:46</span></p>
+<p>This step opens an ADODB connection (<code>CommandTimeout=0</code> — no timeout) <span class="tag tag-c">C</span> <span class="evidence">IBuildCapEnrolls.vb:85</span> and executes queries that join:</p>
+
+<table>
+<tbody><tr><th>Table</th><th>Purpose in Enrollment Build</th></tr>
+<tr><td><code>enrollkeys</code></td><td>Enrollment records (member → program → dates)</td></tr>
+<tr><td><code>benefitplan</code></td><td>Plan attributes for enrolled members</td></tr>
+<tr><td><code>contract</code></td><td>Provider contracts covering the enrollment</td></tr>
+<tr><td><code>contractinfo</code></td><td>Contract metadata (provider linkage)</td></tr>
+<tr><td><code>capitation</code></td><td>Capitation configuration per contract</td></tr>
+<tr><td><code>memberpcp</code></td><td>Member-to-PCP assignment for PCP capitation</td></tr>
+<tr><td><code>policyplans</code></td><td>Policy/plan attributes</td></tr>
+<tr><td><code>orgpolicy</code></td><td>Organization-level policy settings</td></tr>
+<tr><td><code>provider</code></td><td>Provider demographics</td></tr>
+<tr><td><code>memo</code> / <code>provmemo</code></td><td>Notes (LEFT JOIN — optional)</td></tr>
+<tr><td><code>affiliation</code></td><td>Provider affiliations (which entity gets paid)</td></tr>
+<tr><td><code>program</code></td><td>Program definitions (Medicaid MCP, PACE, FFS)</td></tr>
+<tr><td><code>programcap</code></td><td>Program-level capitation configuration</td></tr>
+</tbody></table>
+
+<h3>Payment Pre-Allocation (Critical)</h3>
+<p>At this step — <strong>before any vouchers are written</strong> — the system pre-allocates a <code>paymentid</code>: <span class="tag tag-c">C</span></p>
+<pre><code>m_paymentid = CreatePayment(...)      ' cBuildCapEnrolls.vb:784
+m_XMLMessage.paymentid = m_paymentid   ' cBuildCapEnrolls.vb:786</code></pre>
+<p>The <code>paymentid</code> is generated via <code>CNextId.GetStringID(QCS_ID_PAYABLE)</code> which calls the centralized <code>IDSequence</code> service in QCSIDB (<code>QCS_ID_PAYABLE = 4</code>). <span class="tag tag-c">C</span> <span class="evidence">CNextId.vb:14-35, QcsIDGenerator.cs:14</span></p>
+<p><strong>One paymentid per (provider, run)</strong> — ALL subsequent vouchers for this provider share this single paymentid. This is architecturally critical: it means the paymentid is a <strong>shared identifier</strong> across N voucher rows, not unique per voucher.</p>
+
+<h3>Enrollment Source — Accenture E&amp;E via MSMQ</h3>
+<p>The enrollment data that <code>cBuildCapEnrolls</code> queries originates from <strong>Accenture's Eligibility &amp; Enrollment (E&amp;E) system</strong>, delivered via <strong>MSMQ</strong> (not X12 834 EDI). <span class="tag tag-c">C</span> <span class="evidence">MQTrigger.cs:22 — TRIGGER_SVC = "MSMQTriggers"; CEF_Inbound_Outbound_Data_Interface_Catalog confirms MSMQ XML format to QCHipaaPostProcessor endpoint</span></p>
+
+<p><strong>Hand-off →</strong> Enrollment list message passed to Stage 1b (affiliation/assignment resolution).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 1b — MCO-Assignment Resolution (Temporal-Conflict Surface)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> For each enrolled member, this step answers: "Which MCO is responsible for this member during the cap period, and which provider entity (affiliate) should receive the payment?" Like determining which department a payroll check should be charged to — except the answer can change retroactively.<br>
+<strong>What does it do?</strong> Resolves the chain: member → MCO assignment → provider contract → pay-to affiliate. Builds a month-by-month schedule of cap months to process.<br>
+<strong>What does it read/write?</strong> Reads affiliation, contract, contractinfo, contcapcat, memberpcp, enrollcoverage, enrollrestriction from <code>Plandata_Parallel</code>.
+</div>
+
+<h3>The Affiliation Build</h3>
+<p>Component: <code>cBuildCapAffils</code> <span class="tag tag-c">C</span> <span class="evidence">cBuildCapAffils.vb — delegated from CapitationActivity.vb:57</span></p>
+
+<p>For each enrollment, this step:</p>
+<ol>
+<li>Determines <strong>which affiliations need capitation calculated</strong> (PCP vs. global)</li>
+<li>Builds a <strong>month-by-month schedule</strong> of cap months within the run period</li>
+<li>Identifies the <strong>contract terms</strong> (which cap table, which rates apply)</li>
+<li>Resolves the <strong>pay-to affiliate</strong> (which entity receives the check)</li>
+</ol>
+
+<h3>Key Tables</h3>
+<table>
+<tbody><tr><th>Table</th><th>Purpose</th><th>Evidence</th></tr>
+<tr><td><code>affiliation</code></td><td>Provider affiliations — who gets paid</td><td>cBuildCapAffils.vb:L1041, L1076-1086</td></tr>
+<tr><td><code>memberpcp</code></td><td>Member-to-PCP assignment (date-bounded)</td><td>cBuildCapAffils.vb:L935-936, L953</td></tr>
+<tr><td><code>contract</code> / <code>contractinfo</code></td><td>Provider contracts + metadata</td><td>cBuildCapAffils.vb:L447-448</td></tr>
+<tr><td><code>contcapcat</code></td><td>Contract capitation category (carve-out logic)</td><td>cBuildCapAffils.vb:L448-449</td></tr>
+<tr><td><code>enrollcoverage</code></td><td>Coverage codes per enrollment</td><td>cBuildCapAffils.vb:L48, L1494</td></tr>
+<tr><td><code>enrollrestriction</code> / <code>restrictiontype</code></td><td>Enrollment restrictions (lock-in rules)</td><td>cBuildCapAffils.vb:L914-915</td></tr>
+<tr><td><code>capterm</code></td><td>Service ZIP lookup for rate selection</td><td>cBuildCapAffils.vb:L1366-1371</td></tr>
+<tr><td><code>policycopay</code> / <code>policycopaygroup</code> / <code>copaygroupdetail</code></td><td>Copay group resolution for rate-cell matching</td><td>cBuildCapAffils.vb:L1620-1627</td></tr>
+</tbody></table>
+
+<h3>The Assignment Linkage Chain</h3>
+<p>The canonical chain <span class="tag tag-e">E</span> confirmed structurally in Ohio code <span class="tag tag-c">C</span>:</p>
+<pre><code>Member → MCO Assignment (memberpcp / enrollment)
+       → Provider Contract (contract + contractinfo)
+       → Capitation Table (capitation.capid)
+       → Rate (capterm rows under that capid)</code></pre>
+<p>Rates are NOT reached directly from the MCO. The <strong>provider contract is the indirection point</strong> — a change at any link in this chain re-prices the member without the member themselves changing.</p>
+
+<h3 style="color:var(--unknown)">⚠ The Temporal-Conflict Surface</h3>
+<div class="risk">
+<strong>The correctness question:</strong> If a member's MCO assignment <strong>changed during the cap period</strong> (mid-month switch or retroactive correction), how does the run resolve the assignment?<br><br>
+<strong>Finding <span class="tag tag-u">!</span>:</strong> The assignment resolution logic lives within compiled <code>cBuildCapAffils</code> methods (<code>cRetrievePCPAffiliationsByEnrollid</code>, <code>cRetrieveMemberPCPByEnrollidDate</code>). The date predicate used is <strong>not fully visible</strong> in workspace source (the query XML references date parameters but the binding/segmentation logic is in compiled VB.NET). Whether assignment is resolved as full-period, point-in-time, or segmented <strong>cannot be confirmed from available source</strong>.<br><br>
+<strong>Risk:</strong> Two overlapping-period runs (a current monthly and a retro/reconcile run) MAY resolve the same member for the same period to <strong>different affiliates/payments</strong> — this would be a data-level source of the (program × period) run conflict, distinct from the paymentid scheduling collision (Stage 7).
+</div>
+
+<p><strong>Hand-off →</strong> Enriched message (enrollment + affiliation + month schedule + contract terms) passed to Stage 2 (rate loading) and Stage 3 (amount calculation).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 2 — Rate Sweep (Loading Capitation Rates)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> Before the system can calculate how much to pay, it needs to load the rate tables — like loading a tax bracket table before computing withholding. The "rate sweep" is a batch ETL job that stages rate-cell data from reference files into the operational database.<br>
+<strong>What does it do?</strong> The <code>MEMSW00013</code> SSIS package family loads rate-cell assignments into <code>MemberCondition</code>, mapping each member to a rate-cell code based on demographics (age, gender, region, coverage).<br>
+<strong>What does it read/write?</strong> Reads from <code>ETLStageDB</code> staging tables and <code>HealthPAS_Common</code> crosswalks; writes to <code>MemberCondition</code> in <code>Plandata_Parallel</code>.
+</div>
+
+<h3>Why "Sweep"</h3>
+<p>The term "sweep" means the ETL <strong>scans all enrolled members</strong> and assigns each to a rate cell based on their current demographics — a point-in-time staging of who-gets-what-rate. This is a <strong>pre-computation</strong>: it runs on its own schedule, separate from the cap engine, and deposits results into a shared table that the engine later reads. <span class="tag tag-c">C</span></p>
+
+<h3>MEMSW00013 Package Family (7 Packages)</h3>
+<table>
+<tbody><tr><th>#</th><th>Package</th><th>Purpose</th><th>Target</th></tr>
+<tr><td>1</td><td><code>MEMSW00013_CapFactor_Stage.dtsx</code></td><td>Stage enrollment changes (age-outs, entity, special conditions)</td><td><code>ETLStageDB.MEMSW00013_CapFactor_*</code></td></tr>
+<tr><td>2</td><td><code>MEMSW00013_CapFactor_Edits.dtsx</code></td><td>Apply staged changes to MemberCondition (INSERT/DELETE/UPDATE)</td><td><code>Plandata_Parallel.MemberCondition</code></td></tr>
+<tr><td>3</td><td><code>MEMSW00013_Special_Stage.dtsx</code></td><td>Stage special-condition factors (EC, NF, OOO, WVR, MC)</td><td><code>ETLStageDB.MEMSW00013_stg_Special*</code></td></tr>
+<tr><td>4</td><td><code>MEMSW00013_Special_Edits.dtsx</code></td><td>Apply special-condition changes</td><td><code>Plandata_Parallel.MemberCondition</code></td></tr>
+<tr><td>5</td><td><code>MEMSW00013_Retroactives.dtsx</code></td><td>Adjust for voided enrollments/coverage changes</td><td><code>Plandata_Parallel.MemberCondition</code></td></tr>
+<tr><td>6</td><td><code>MEMSW00013_Standard_Stage_Receipt.dtsx</code></td><td>TRUNCATE and reload Standard_Stage</td><td><code>ETLStageDB.Standard_Stage</code></td></tr>
+<tr><td>7</td><td>(Standard_Stage processing)</td><td>Map members to rate cells via crosswalk</td><td><code>ETLStageDB → Plandata_Parallel</code></td></tr>
+</tbody></table>
+<p class="evidence"><span class="tag tag-c">C</span> Ohio.ETL/MEMSW00013/ package set</p>
+
+<h3>Rate-Cell Dimensions (Ohio's Actual Configuration)</h3>
+<p>The rate-cell crosswalk maps members using these dimensions <span class="tag tag-c">C</span>:</p>
+<table>
+<tbody><tr><th>Dimension</th><th>Source</th><th>Evidence</th></tr>
+<tr><td>MC_Group (program/MCP)</td><td>Member enrollment</td><td>MEMIM00065_RateCellCode_GAP.MC_Group</td></tr>
+<tr><td>Min_Age / Max_Age</td><td>Member DOB → age <strong>in months</strong></td><td>1320 sentinel = 110 years × 12 months</td></tr>
+<tr><td>Member_Gender</td><td>Member demographics</td><td>Standard_Stage.Member_Gender</td></tr>
+<tr><td>MC_Region</td><td>Provider/member geography</td><td>MEMIM00065_RateCellCode_GAP.MC_Region</td></tr>
+<tr><td>Coverage Code</td><td>Enrollment coverage (ABP, MCAID, QMB, SLMB)</td><td>Standard_Stage.Active_MC_CoverageCode</td></tr>
+<tr><td>Rate Code</td><td>Rate category</td><td>Standard_Stage.Active_MC_RateCode</td></tr>
+<tr><td>Payer (Benefit Plan)</td><td>MCP identity</td><td>MEMSW00013_Conditionid_RateCell_Xwalk.Payer</td></tr>
+</tbody></table>
+
+<h3>Crosswalk Tables</h3>
+<ul>
+<li><code>HealthPAS_Common.dbo.MEMIM00065_RateCellCode_GAP</code> — maps (MC_Group, Min_Age/Max_Age, Gender, MC_Region) → Rate_Cell_Number</li>
+<li><code>HealthPAS_Common.dbo.MEMIM00065_RateCell_GAP</code> — maps Rate_Cell_Number → Rate_Cell_Code</li>
+<li><code>ETLStageDB.dbo.MEMSW00013_Conditionid_RateCell_Xwalk</code> — maps Rate_Cell_Number + Payer → ConditionId (the key into MemberCondition)</li>
+</ul>
+
+<h3 style="color:var(--unknown)">⚠ Known Rate-Load Defect</h3>
+<div class="risk">
+<strong>Three confirmed defects in the rate sweep (blocks 24-month capitation):</strong> <span class="tag tag-c">C</span>
+<ol>
+<li><strong>TRUNCATE Destroys History (H1):</strong> <code>MEMSW00013_Standard_Stage_Receipt.dtsx</code> executes <code>TRUNCATE TABLE dbo.MEMSW00013_Standard_Stage</code> before reload. The staging table DDL has <strong>NO <code>effdate</code>/<code>termdate</code> columns</strong> — only a point-in-time snapshot. <span class="evidence">Line ~5235</span></li>
+<li><strong>Age-at-Load Collapses Effective-Dating (H2):</strong> The crosswalk join uses <code>stg.Member_Age BETWEEN gap.Min_Age AND gap.Max_Age</code> — this evaluates age <strong>at load time</strong>, not at each historical cap month. A member who ages from 24→26 over a 24-month lookback gets ALL months mapped to the age-26 rate cell.</li>
+<li><strong>No TransactionOption:</strong> Zero packages have transaction wrapping — DELETEs/UPDATEs are non-atomic.</li>
+</ol>
+<strong>Impact:</strong> For single-period (monthly) runs the defect is invisible (current age = correct cell). For multi-month retroactive runs, members crossing age-bracket boundaries get the wrong rate for historical months.
+</div>
+
+<h3>FFS-Comparison Rates</h3>
+<p><span class="tag tag-e">E</span> Product capability: rate tables can hold FFS-comparison "shadow rates" alongside payment rates (for cost comparison reporting). <span class="tag tag-u">!</span> Whether Ohio's rate tables carry FFS-comparison rates and how they are distinguished from payment rates is <strong>not determinable from available source</strong>. The rate-table schema does not show an explicit "rate-type" flag.</p>
+
+<p><strong>Hand-off →</strong> Rate-cell assignments sit in <code>MemberCondition</code> awaiting the cap engine's scoring query (Stage 6).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 3 — Member Conditions (Eligibility Conditions That Affect Payment)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> Some members have conditions that adjust their capitation — like a payroll deduction or bonus based on employee status. Conditions can add to or modify the base rate (e.g., a diabetes-management condition factor, an Ohio Rise behavioral-health condition).<br>
+<strong>What does it do?</strong> The system reads <code>MemberCondition</code> rows for each member and uses the associated <code>conditionid</code> to look up cap factors and special adjustments.<br>
+<strong>What does it read/write?</strong> Reads <code>membercondition</code>, <code>condition</code> from <code>Plandata_Parallel</code>; reads <code>ELGIP00005_SUPP_GAP</code> from <code>HealthPAS_Common</code>.
+</div>
+
+<h3>Where Conditions Are Evaluated</h3>
+<table>
+<tbody><tr><th>Component</th><th>What It Does With Conditions</th><th>Evidence</th></tr>
+<tr><td><code>cCapFundAdjustment</code></td><td>Retrieves member conditions by memid/date/conditionid; applies condition-based cap factors</td><td>cCapFundAdjustment.vb:L34, L459-464, L479, L574</td></tr>
+<tr><td><code>PostCap_PreFundAllocate</code></td><td>JOINs membercondition + condition for fund allocation attributes</td><td>PostCap_PreFundAllocate.sql:L130, L132, L155, L162</td></tr>
+<tr><td><code>PostCap_PreFundAllocateAdj</code></td><td>Same condition lookups for adjustment runs</td><td>PostCap_PreFundAllocateAdjustments.sql:L175, L177</td></tr>
+</tbody></table>
+
+<h3>Ohio-Specific Condition Categories</h3>
+<ul>
+<li><strong>MyCare Special Conditions</strong> (EC, NF, OOO, WVR, MC) — loaded by <code>MEMSW00013_Special_Stage.dtsx</code> <span class="tag tag-c">C</span></li>
+<li><strong>Ohio Rise Behavioral Health</strong> — coverage code <code>MCOHR</code> with age-24 term-date cap <span class="tag tag-c">C</span></li>
+<li><strong>Rate-Cell Conditions</strong> — the standard age/gender/region rate-cell assignment (per Stage 2) <span class="tag tag-c">C</span></li>
+</ul>
+
+<p><strong>Hand-off →</strong> Condition data feeds into Stage 4 (factor/term configuration) and Stage 6 (rate-cell scoring).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 3b — Reconciliation Triggers (The Retro Catalog)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The definitive catalog of <em>why</em> the same scope gets re-processed and re-vouchered. Like a payroll correction run — if someone's status changed retroactively, you recalculate past periods and issue a positive or negative adjustment. Each trigger type is a distinct reason for a retro run.<br>
+<strong>What does it do?</strong> Detects retroactive changes and generates positive or negative reconciliation amounts for any affected period within the lookback window.<br>
+<strong>What does it read/write?</strong> Reads change-detection from enrollment, assignment, rate, contract, and cap-table tables; writes delta vouchers (positive/negative adjustments).
+</div>
+
+<h3>The Six Reconciliation Triggers <span class="tag tag-e">E</span></h3>
+
+<table>
+<tbody><tr><th>#</th><th>Trigger</th><th>What Changed</th><th>Ohio Code Path</th><th>Status</th></tr>
+<tr><td>1</td><td><strong>Retroactive Enrollment</strong></td><td>Member's enrollment changed for a past period (added/removed/date-shifted)</td><td><code>cBuildCapEnrolls</code> — enrollment query returns different members for a past period on re-run</td><td><span class="tag tag-c">C</span> Exercised — <code>MEMSW00013_Retroactives.dtsx</code> processes voided enrollments</td></tr>
+<tr><td>2</td><td><strong>MCO Assignment Change</strong></td><td>Member moved between MCOs retroactively</td><td><code>cBuildCapAffils</code> — memberpcp date-bounded lookup</td><td><span class="tag tag-i">I</span> Structurally exercised (memberpcp is date-bounded)</td></tr>
+<tr><td>3</td><td><strong>Enrollment Restriction Change</strong></td><td>Restriction/lock-in changed affecting eligibility</td><td><code>cBuildCapAffils.vb:L914-915</code> — reads <code>enrollrestriction</code> + <code>restrictiontype</code></td><td><span class="tag tag-c">C</span> Read path confirmed; whether Ohio actively uses restriction changes is <span class="tag tag-u">!</span></td></tr>
+<tr><td>4</td><td><strong>Cap Term Rate Change</strong></td><td>A rate on a cap term changed for a past period</td><td><code>cCapFundAllocation</code> — reads <code>capterm</code> by capid + effdate/termdate</td><td><span class="tag tag-i">I</span> Effective-dated cap terms allow retro rate changes</td></tr>
+<tr><td>5</td><td><strong>Contract Affiliation Change</strong></td><td>The pay-to affiliate/contract linkage changed</td><td><code>cBuildCapAffils</code> — contract/affiliation join</td><td><span class="tag tag-i">I</span> Structural (affiliation is date-bounded per contract)</td></tr>
+<tr><td>6</td><td><strong>Cap Table Change</strong></td><td>The rate table itself was edited retroactively</td><td><code>cCapFundAllocation</code> — reads current <code>capterm</code> rows (no point-in-time versioning)</td><td><span class="tag tag-i">I</span> No versioning = reads latest = retro change auto-reflected on re-run</td></tr>
+</tbody></table>
+
+<div class="finding">
+<strong>This catalog is the answer to "why are there ~71 runs and why does the same scope get re-touched."</strong> Each MCP (6-7 plans) × multiple retro months within lookback window × trigger types that fire = dozens of runs per monthly cycle. Each trigger that fires retroactively is a path by which the <strong>same member/scope is re-vouchered</strong> — connecting to the Stage 7 <code>paymentid</code> collision surface and the Stage 1b temporal-conflict surface.
+</div>
+
+<p><strong>Hand-off →</strong> Reconciliation pass produces delta vouchers with +/- amounts that follow the same write path as initial vouchers (Stage 7).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 4 — Cap Factor &amp; Cap Term Configuration</h2>
+
+<div class="plain">
+<strong>What is this?</strong> A "cap factor" is an adjustment to the base rate — like a tax credit or surcharge applied per-member based on their characteristics. A "cap term" is the time-bounded configuration that says "this rate applies from date X to date Y." Together, they steer the final payment amount.<br>
+<strong>What does it do?</strong> Loads factor values (age/gender, benefit plan, condition, rate code) and cap terms; applies them to the base rate to compute the adjusted capitation amount.<br>
+<strong>What does it read/write?</strong> Reads <code>capfactors</code>, <code>factorvalues</code>, <code>capterm</code> from <code>Plandata_Parallel</code>; writes <code>funddetail</code>, <code>funddetailadj</code>.
+</div>
+
+<h3>Factor Types <span class="tag tag-e">E</span></h3>
+<p>Product documentation describes two arithmetic modes:</p>
+<ul>
+<li><strong>Additive:</strong> a dollar amount added to the base (e.g., diabetes-condition factor adds $X)</li>
+<li><strong>Multiplicative:</strong> a rate multiplier on the base (e.g., 0.90 factor for single males 20–24 = 90% of base)</li>
+</ul>
+<p>Factor value types: <strong>age/gender</strong>, <strong>benefit plan</strong>, <strong>benefit</strong>, <strong>condition</strong>, <strong>rate code</strong>. <span class="tag tag-e">E</span></p>
+
+<h3>Factor Composition in Ohio Code</h3>
+<p><span class="tag tag-u">!</span> The exact composition formula (order of additive vs. multiplicative, interleaving rules) lives within compiled <code>cCapFundAdjustment</code> VB.NET logic. From the available source:</p>
+<ul>
+<li><code>cCapFundAdjustment.vb:L33</code> — calls <code>Queries.cRetrieveCapFactorsByCapidDate</code> <span class="tag tag-c">C</span></li>
+<li><code>cCapFundAdjustment.vb:L305-318</code> — reads <code>capfactors</code> JOIN <code>factorvalues</code> <span class="tag tag-c">C</span></li>
+<li><code>cCapFundAdjustment.vb:L996-1009</code> — UPDATE <code>funddetail</code> with adjusted amounts <span class="tag tag-c">C</span></li>
+</ul>
+<p>The system supports three cap methods: <strong>S</strong> (Summary/Standard PMPM), <strong>D</strong> (Detail/Days-based), <strong>F</strong> (Flat Fee). <span class="tag tag-c">C</span> <span class="evidence">ProgramCapMessageType fields: Capmethod(S/D/F)</span></p>
+
+<h3>Cap Terms</h3>
+<p>A cap term row in the <code>capterm</code> table defines: effective date, termination date, service ZIP, rate code, coverage code, tier, gender, age min/max, plan ID, copay group/id/amount, and the <strong><code>capamount</code></strong> (the actual dollar rate). <span class="tag tag-c">C</span> <span class="evidence">Query 10794 — SELECT capterm.* ... WHERE capterm.effdate &lt;= &lt;capdate&gt; AND capterm.termdate &gt;= &lt;capdate&gt;</span></p>
+
+<h3>Configuration Level</h3>
+<p>Factors and terms are set at the <strong>contract/program level</strong> — stored in <code>programcap</code> (program-level) and <code>capitation</code> (contract-level). <span class="tag tag-c">C</span> <span class="evidence">cBuildCapEnrolls.vb:L996, L1029-1030</span></p>
+
+<p><strong>Hand-off →</strong> Factor-adjusted amounts flow into fund allocation (Stage 6, substep AllocateCapFunds/AdjustCapFunds).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 4b — Rate-Calculation Methodologies (Six Methods)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> Capitation is NOT a single PMPM calculation — it is a <strong>family of six configurable methodologies</strong>. This is a direct FI contractual requirement (req 812 / FI2SS.085: "Provide multiple capitation rate calculation methodologies"). Each methodology uses a different basis for computing the payment.<br>
+<strong>What does it do?</strong> The system selects and executes the appropriate methodology per contract configuration.<br>
+<strong>What does it read/write?</strong> Same infrastructure as Stages 4/6, but different calculation paths.
+</div>
+
+<h3>The Six Methodologies</h3>
+
+<table>
+<tbody><tr><th>#</th><th>Method</th><th>What Makes It Different</th><th>Ohio Status</th></tr>
+<tr><td>1</td><td><strong>Full &amp; Partial Risk (PMPM)</strong></td><td>Standard per-member-per-month; rates vary by rate-cell dimensions (the "default" path)</td><td><span class="tag tag-c">C</span> Active — primary Ohio path</td></tr>
+<tr><td>2</td><td><strong>Risk Adjustment Case Factor</strong></td><td>Additive/multiplicative factor adjustments on the base (Stage 4 factors)</td><td><span class="tag tag-c">C</span> Active — <code>cCapFundAdjustment</code>, MyCare conditions</td></tr>
+<tr><td>3</td><td><strong>Carve-Outs</strong></td><td><strong>Cap↔Claims coupling:</strong> per-service, claim-level in/out-of-cap decision. If a cap contract does NOT include a service, it's priced under a different (FFS) contract.</td><td><span class="tag tag-c">C</span> <code>contcapcat</code> read in <code>cBuildCapAffils.vb:L448-449</code> — carve-out category lookup confirmed</td></tr>
+<tr><td>4</td><td><strong>Specialty Care Capitation</strong></td><td>Cap tables assigned to specific specialties (dental, behavioral). Different assignment granularity.</td><td><span class="tag tag-i">I</span> Ohio's MyCare special conditions suggest specialty-scoped cap</td></tr>
+<tr><td>5</td><td><strong>Per-Diem Rate Methods</strong></td><td><strong>Non-PMPM basis:</strong> per-day or flat-rate pricing. NOT "members × monthly rate."</td><td><span class="tag tag-c">C</span> Capmethod = 'D' (Days) and 'F' (Flat Fee) confirmed in config</td></tr>
+<tr><td>6</td><td><strong>Primary &amp; Specialty Cap Rate Payment</strong></td><td>One member can have multiple cap arrangements (primary + specialty) with different tables → multiple voucher lines</td><td><span class="tag tag-i">I</span> Global vs PCP split (CAPGlobal/CapPcp agents) is structural evidence</td></tr>
+</tbody></table>
+
+<div class="risk">
+<strong>Carve-Out Coupling (Method 3):</strong> The carve-out mechanism means capitation is NOT a cleanly-isolated bounded context — the cap engine decides, per service, what is inside vs. outside the cap arrangement, which entangles it with claims pricing. This is a reason the cap service cannot be extracted as a clean microservice without also addressing the claims-pricing interface. <span class="tag tag-c">C</span>
+</div>
+
+<p><strong>Requirement traceability:</strong> FI RFP req <strong>FI2SS.085</strong> (req 812) — "Provide multiple capitation rate calculation methodologies." <span class="tag tag-e">E</span></p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 5 — Affiliations (Provider Relationships + MCO → Contract → Rate Chain)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The "affiliation" is the mapping that says "this member's capitation payment goes to THIS provider entity." Like the routing number on a payroll check — it determines where the money goes. Provider ZIP enters here as a rate dimension.<br>
+<strong>What does it do?</strong> Resolves the full join path: MCO → provider contract → capitation table → rate. Determines the pay-to affiliate.<br>
+<strong>What does it read/write?</strong> Reads affiliation, contract, capitation, capterm from <code>Plandata_Parallel</code>.
+</div>
+
+<h3>The Canonical Linkage Chain</h3>
+<p><span class="tag tag-c">C</span> Rates are NOT reached directly from the MCO. The chain is:</p>
+<pre><code>MCO → (linked to) → Provider Contract → (through contract) → Capitation Table → Rate Cell</code></pre>
+<p>Each MCO is linked to a provider contract, and it is <em>through that contract</em> — not directly — that the MCO reaches its capitation rates. The <strong>provider contract is the indirection point</strong>.</p>
+
+<h3>Why This Indirection Matters</h3>
+<p>Because the rate is resolved via MCO → contract → cap table, two reconciliation triggers (Stage 3b #5 and #6) operate on the <em>middle of the chain</em>, re-pricing a member <strong>without the member or MCO changing at all</strong>:</p>
+<ul>
+<li><strong>Contract affiliation change</strong> (trigger #5) — the MCO→contract link changes → different rates</li>
+<li><strong>Capitation table change</strong> (trigger #6) — the cap table attached to the contract changes → different rates</li>
+</ul>
+
+<h3>Key Tables</h3>
+<table>
+<tbody><tr><th>Table</th><th>Role</th><th>Evidence</th></tr>
+<tr><td><code>affiliation</code></td><td>Provider affiliations (pay-to entity)</td><td>cBuildCapEnrolls.vb:L551-564, cBuildCapAffils.vb:L1041</td></tr>
+<tr><td><code>contract</code> / <code>contractinfo</code></td><td>Provider contracts (the middle of the chain)</td><td>cBuildCapEnrolls.vb:L557, cBuildCapAffils.vb:L447</td></tr>
+<tr><td><code>capitation</code></td><td>Capitation table definitions (capid)</td><td>cBuildCapEnrolls.vb:L559</td></tr>
+<tr><td><code>contcapcat</code></td><td>Contract capitation category (carve-out)</td><td>cBuildCapAffils.vb:L448-449</td></tr>
+</tbody></table>
+
+<h3>Panel Size</h3>
+<p><span class="tag tag-u">!</span> Whether MCO panel size feeds capitation (e.g., capacity-based assignment) is <strong>not determinable from source</strong>. No reference to a panel-size column found in the capitation code paths. Likely inert for cap calculation.</p>
+
+<h3>Requirement Traceability</h3>
+<p>MCO contract ingestion maps to RFP requirement <strong>MC2.2</strong> — "Receive MCO contract information from contract data store (e.g., address, covered services, rates)" (req #666). <span class="tag tag-e">E</span></p>
+
+<p><strong>Hand-off →</strong> Affiliation resolution provides <code>affiliationid</code> and <code>paytoaffilid</code> to the calculation engine (Stage 6).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 6 — QFrame (The Calculation Engine)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> QFrame is the master/worker compute grid that runs the actual capitation calculation. Think of it as a distributed calculator: a central hub dispatches work to application servers, which fan out to execution units, which each process batches of members. The "winner selection" step is like a lookup in a complex tax table — multiple rate cells might partially match a member, and the system must pick the single best match.<br>
+<strong>What does it do?</strong> Executes the 7-step inner pipeline for each member: build enrollment → build affiliations → calculate amount → allocate to funds → apply adjustments → store voucher → finalize payment.<br>
+<strong>What does it read/write?</strong> Reads config/enrollment/rates from <code>Plandata_Parallel</code>; computes in-memory; writes results in Stage 7.
+</div>
+
+<h3>QFrame Grid Topology</h3>
+<p><span class="tag tag-i">I</span> QFrame distributes work across a grid: Distribution Hub → Application Servers → Execution Units. The confirmed connection targets (Dev/UAT environment):</p>
+<ul>
+<li><code>OHDBD01.OHAWS.COM\OHDEVENV01,55178</code> — Plandata_Parallel / QCSIDB</li>
+<li><code>OHDBD01.OHAWS.COM\OHDEVENV01</code> — ETLStageDB, Flexi</li>
+<li><code>OHDBD01.OHAWS.COM\OHDEVENVRX</code> — HealthPAS_Common</li>
+</ul>
+<p>Production topology (2 → 4 → 66 hosts) referenced in prior assessments but <strong>not directly confirmable from source code</strong>. <span class="tag tag-u">!</span></p>
+
+<h3>The Inner 7-Step Chain (Hardcoded in VB.NET)</h3>
+<p>This pipeline is <strong>NOT configurable via the process-step table</strong> — it is hardcoded within <code>CapProgramAgent</code> and <code>CapitationActivity</code>: <span class="tag tag-c">C</span></p>
+
+<table>
+<tbody><tr><th>#</th><th>Step Class</th><th>Delegated From</th><th>Purpose</th></tr>
+<tr><td>1</td><td><code>cBuildCapEnrolls</code></td><td>CapitationActivity.vb:46</td><td>Build valid enrollment list</td></tr>
+<tr><td>2</td><td><code>cBuildCapAffils</code></td><td>CapitationActivity.vb:57</td><td>Determine affiliations + month schedule</td></tr>
+<tr><td>3</td><td><code>cBuildCapAmount</code></td><td>CapitationActivity.vb:68</td><td>Calculate base capitation amount</td></tr>
+<tr><td>4</td><td><code>cCapFundAllocation</code></td><td>CapitationActivity.vb:79</td><td>Allocate amount across funds (winner selection)</td></tr>
+<tr><td>5</td><td><code>cCapFundAdjustment</code></td><td>CapitationActivity.vb:108</td><td>Apply cap factors + adjustments</td></tr>
+<tr><td>6</td><td><code>cStoreCapVoucher</code></td><td>CapitationActivity.vb:121</td><td>Persist voucher records + reconcile</td></tr>
+<tr><td>7</td><td><code>cCapPayment</code></td><td>(via FinalizeCapPayment agent)</td><td>Finalize payment, create paycheck</td></tr>
+</tbody></table>
+
+<h3>Winner Selection — Rate-Cell Scoring (Query 10794)</h3>
+<p>When multiple rate cells (capterm rows) match a member, <code>cCapFundAllocation</code> picks the best one using a <strong>10-dimension scoring SQL</strong> <span class="tag tag-c">C</span> <span class="evidence">mms-cms-cef-main/components/QFrame/Queries/QCSI Payment Query Group/10794.xml</span>:</p>
+
+<h4>The 10 Dimensions</h4>
+<table>
+<tbody><tr><th>#</th><th>Dimension</th><th>Column</th><th>Scores 1 when…</th></tr>
+<tr><td>1</td><td>Service ZIP</td><td><code>capterm.zip</code></td><td>Cell defines ZIP AND matches member's PCP service ZIP</td></tr>
+<tr><td>2</td><td>Rate Code</td><td><code>capterm.ratecode</code></td><td>Cell defines ratecode AND IN member's list</td></tr>
+<tr><td>3</td><td>Coverage Code</td><td><code>capterm.coveragecodeid</code></td><td>Cell defines coveragecodeid AND IN member's list</td></tr>
+<tr><td>4</td><td>Tier ID</td><td><code>capterm.tierid</code></td><td>Cell defines tierid AND IN member's tier list</td></tr>
+<tr><td>5</td><td>Gender</td><td><code>capterm.sex</code></td><td>Cell's sex = 'B' (both) OR = member's gender</td></tr>
+<tr><td>6</td><td>Age Minimum</td><td><code>capterm.agemin</code></td><td>Cell's agemin ≤ member's currentage</td></tr>
+<tr><td>7</td><td>Age Maximum</td><td><code>capterm.agemax</code></td><td>Cell's agemax ≥ member's currentage</td></tr>
+<tr><td>8</td><td>Plan ID</td><td><code>capterm.planid</code></td><td>Cell defines planid AND matches member's plan</td></tr>
+<tr><td>9</td><td>Copay Group</td><td><code>capterm.copaygroupid</code></td><td>Cell defines copay group AND matches member's</td></tr>
+<tr><td>10</td><td>Copay ID + Amount (paired)</td><td><code>capterm.copayid</code> + <code>copayamt</code></td><td>Both match (bitwise AND)</td></tr>
+</tbody></table>
+
+<h4>The matched = possible Rule</h4>
+<p>A rate cell is valid <strong>if and only if <code>matched = possible</code></strong> (the member satisfies EVERY criterion the cell defines). A cell requiring ZIP + gender + age where the member matches only ZIP + age → <code>matched=3, possible=4</code> → <strong>invalid</strong>. Only perfect matches are accepted. <span class="tag tag-c">C</span> <span class="evidence">cCapFundAllocation.vb ~L382</span></p>
+
+<h4>Tie-Break Sort Order (EXACT — Critical for Reimplementation)</h4>
+<pre><code>DataView.Sort = "possible DESC, matched DESC, agemax ASC, agemin ASC, capamount DESC"</code></pre>
+<p><span class="tag tag-c">C</span> <span class="evidence">cCapFundAllocation.vb — DataView.Sort property assignment</span></p>
+<p><strong>Critical detail:</strong> <code>agemax ASC, agemin ASC</code> are <strong>TWO separate columns</strong>, NOT range-width (<code>agemax-agemin</code>). A reimplementation MUST replicate this two-column sort exactly or it can select a different cell and pay a different amount. The legacy version (<code>ICapFundAllocation.vb</code>) used range-width (<code>agemax-agemin ASC</code>) — these are NOT equivalent.</p>
+
+<h4>Age Encoding — MONTHS, Not Years</h4>
+<div class="finding">
+<strong>CONFIRMED:</strong> Age is encoded in <strong>months</strong>. <span class="tag tag-c">C</span><br>
+Evidence: The scoring SQL contains <code>CASE WHEN 1 &lt;&gt; 1320 THEN 1 ELSE 0 END</code> (a tautology constant for the <code>possible</code> clause). <strong>1320 = 110 years × 12 months</strong> — the maximum representable age sentinel. Sample values: Max Age = 1331 (≈110.9 years), Min Age = 252 (= 21 years). The member's <code>&lt;currentage&gt;</code> parameter must be computed in months from DOB before comparison. A reimplementation that assumes "age in years" will sort wrong AND compare in the wrong unit, selecting the wrong cell.
+</div>
+
+<p><strong>Hand-off →</strong> Computed amounts flow to Stage 7 (voucher write).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 7 — Plandata_Parallel (Where Results Are Written)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The business-data database where capitation OUTPUT lands — the vouchers (individual member cap lines) and payment records (aggregated per-affiliate checks). This is the "answer" of the run — the system's record of who got paid, how much, for which members.<br>
+<strong>What does it do?</strong> Writes one <code>capvoucher</code> row per member-cap-line; aggregates all vouchers for one affiliate into a single <code>payment</code> record (fan-in). Sets payment status to OPEN.<br>
+<strong>What does it read/write?</strong> Writes <code>capvoucher</code>, <code>payment</code>, <code>paycheck</code>, <code>funddetail</code>, <code>funddetailadj</code>, <code>pooltrans</code> in <code>Plandata_Parallel</code>.
+</div>
+
+<h3>Aggregation / Fan-In</h3>
+<p><span class="tag tag-e">E</span> confirmed structurally <span class="tag tag-c">C</span>: "The actual pay-to affiliate receives <strong>one monthly capitation check for all MCO assignments for all different rates</strong>." MANY member-level cap lines (different members, rates, assignments) roll UP into <strong>one payment per pay-to affiliate</strong>. This is the inverse of the QFrame fan-out.</p>
+<p>Mechanism: All voucher rows share the affiliate's pre-allocated <code>paymentid</code> (from Stage 1a). The 13-column PK on <code>capvoucher</code> keeps them distinct WITHIN the payment.</p>
+
+<h3>The capvoucher Write</h3>
+<p>Component: <code>cStoreCapVoucher.InsertCapVoucher()</code> <span class="tag tag-c">C</span> <span class="evidence">cStoreCapVoucher.vb:540, 583-586 — Queries.cCreatecapvoucherRecord.ExecuteQuery()</span></p>
+<p>The refactored version uses parameterized queries (SQL injection fixed vs. legacy string-concatenation). <strong>However: still no explicit transaction wrapping, still no duplicate guard.</strong> <span class="tag tag-c">C</span></p>
+
+<h3>The 13-Column Primary Key (PKcapvoucher)</h3>
+<pre><code>CONSTRAINT [PKcapvoucher] PRIMARY KEY CLUSTERED (
+    [paymentid] ASC,      -- Shared across all vouchers for this affiliate
+    [captype] ASC,        -- MONTHLY or RECON
+    [caprateid] ASC,      -- Which rate table
+    [captermid] ASC,      -- Which rate term
+    [capmonth] ASC,       -- Which month
+    [affiliationid] ASC,  -- Which affiliation
+    [enrollid] ASC,       -- Which enrollment
+    [fundid] ASC,         -- Which fund
+    [paytoaffilid] ASC,   -- Which pay-to affiliate
+    [networkid] ASC,      -- Which network
+    [recondate] ASC,      -- Reconciliation date
+    [factorvalueid] ASC,  -- Which factor
+    [capadjustmentid] ASC -- Which adjustment
+) WITH (IGNORE_DUP_KEY = OFF)</code></pre>
+<p class="evidence"><span class="tag tag-c">C</span> db_schema/Plandata/Table/dbo.capvoucher.sql:30-44</p>
+
+<h3>Payment Finalization</h3>
+<p><code>cCapPayment.CreateCapPayment()</code> <span class="tag tag-c">C</span> <span class="evidence">cCapPayment.vb:348, 516-517</span> sets <code>payment.status='OPEN'</code>, deletes $0 vouchers, creates <code>paycheck</code> record. <code>paymentid</code> type is <code>varchar</code> (caller-assigned from IDSequence), NOT an auto-increment identity. <span class="tag tag-c">C</span></p>
+
+<h3 style="color:var(--unknown)">⚠ The Write Collision (paymentid Reuse on Restart)</h3>
+<div class="risk">
+<strong>Root Cause of PK Collision:</strong> <span class="tag tag-c">C</span><br>
+<table>
+<tbody><tr><th>Scenario</th><th>Collides?</th><th>Why</th></tr>
+<tr><td>Two fresh concurrent runs</td><td><strong>No</strong></td><td>Each gets unique ID from IDSequence</td></tr>
+<tr><td><strong>Restart/replay</strong> (<code>restarting="Y"</code>)</td><td><strong>Yes</strong></td><td>Reuses original paymentid from <code>payment.capmessage</code> XML (cBuildCapEnrolls.vb:144)</td></tr>
+<tr><td>Message re-delivery (QEnterprise/Service Broker)</td><td><strong>Yes</strong></td><td>Batch message carries paymentid from caller (XMLAdvCap.vb:179)</td></tr>
+<tr><td>Intra-run enrollment duplication</td><td><strong>Yes</strong></td><td>Same enrollment processed twice within one run</td></tr>
+<tr><td>Retro/RECON</td><td><strong>No</strong></td><td>RECON writes under NEW paymentid (IStoreCapVoucher.vb:308)</td></tr>
+</tbody></table>
+<p><strong>153,071 errors / 0 vouchers / 99.2% PK collisions per RECON run</strong> prove runs are not serialized. The PK constraint correctly REJECTS duplicates (errors, not silent dupes) — but the write path does not cooperate with the PK under concurrency (bare INSERT, no upsert/merge/retry).</p>
+<p><strong><code>recondate</code> is NOT an escape hatch:</strong> <code>IStoreCapVoucher.vb:307-308</code> — <code>recondate = l_tmpCapDate</code> (deterministic first-of-month). Two runs for same scope produce the SAME recondate → does NOT differentiate concurrent runs.</p>
+</div>
+
+<h3>Serialization Guards — Absent</h3>
+<table>
+<tbody><tr><th>Locus</th><th>Finding</th><th>Status</th></tr>
+<tr><td>L1 — Write Operation</td><td>Bare INSERT — no MERGE, no IF NOT EXISTS, no try/catch-retry</td><td><span style="color:red">NON-COOPERATIVE</span></td></tr>
+<tr><td>L2 — Pre-Write Scope Clear</td><td>No scope-clear DELETE before insert</td><td><span style="color:red">ABSENT</span></td></tr>
+<tr><td>L3 — Dispatch-Time Run Guard</td><td>No "already running" check in CapSubmitAgent/CapProgramAgent/OneWayProxy</td><td><span style="color:red">ABSENT in source</span></td></tr>
+<tr><td>L4 — Database-Level</td><td>PK constraint PRESENT and FIRING (IGNORE_DUP_KEY=OFF)</td><td><span style="color:green">PRESENT</span> (but error, not resolution)</td></tr>
+<tr><td>L5 — Configuration</td><td>OneWayProxy = fire-and-forget; no synchronization primitive</td><td><span style="color:orange">INCONCLUSIVE</span></td></tr>
+</tbody></table>
+
+<p><strong>Hand-off →</strong> Vouchers and OPEN payments flow to PostCap batch (fund allocation, split payment) and then to the finance pipeline (Stage 11/12).</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 8 — PlanIntegration (Dispatch + Run-State + Run-Log)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The "control tower" database. It holds the catalog of every process the system can run, the agents that execute them, and a complete timestamped log of every run (start/stop, batch counts, failures). Think of it as the air-traffic-control system for all batch processing — it knows what ran, when, and what happened.<br>
+<strong>What does it do?</strong> Provides process configuration for dispatch; receives run-state writes during execution; stores audit logs post-execution.<br>
+<strong>What does it read/write?</strong> Read: <code>process</code>, <code>processstep</code>, <code>agent</code>. Write: <code>processstate</code>, <code>processlogheader</code>, <code>processlogdetail</code>.
+</div>
+
+<h3>Key Tables</h3>
+<table>
+<tbody><tr><th>Table</th><th>Row Count</th><th>Purpose</th></tr>
+<tr><td><code>process</code></td><td>192</td><td>Process chains catalog (keyed by <code>logtype</code>)</td></tr>
+<tr><td><code>agent</code></td><td>214</td><td>Agent → assembly + creatable class</td></tr>
+<tr><td><code>processstep</code></td><td>~300</td><td>Step order + active flag per process chain</td></tr>
+<tr><td><code>processstate</code></td><td><strong>2 billion</strong></td><td>Live run-state + error messages (includes PK violation logs)</td></tr>
+<tr><td><code>processlogheader</code></td><td>871K</td><td>Run start/stop audit trail</td></tr>
+<tr><td><code>processlogdetail</code></td><td>Millions</td><td>Per-step execution detail</td></tr>
+</tbody></table>
+
+<div class="finding">
+<strong>Important distinction:</strong> <code>processstate</code> is a <strong>logging/auditing table</strong>, NOT a serialization lock. It records what happened but does NOT prevent concurrent execution. No <code>processstate</code> read is found at dispatch time as a guard. <span class="tag tag-c">C</span>
+</div>
+
+<p><strong>Hand-off →</strong> PlanIntegration provides the agent chain configuration that QFrame reads to know which agents to invoke and in what order.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 9 — QCSIDB (Engine Self-Coordination / Run-State)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> QNXT's own infrastructure database — the engine's internal bookkeeping system. It generates unique IDs (like a ticket dispenser) and stores system configuration that all engine components share.<br>
+<strong>What does it do?</strong> Provides the centralized ID generation service (<code>IDSequence</code> / <code>spQ_IDSeq</code>) that produces unique paymentids, and stores QFrame system configuration.<br>
+<strong>What does it read/write?</strong> Read/Write: <code>IDSequence</code> (via <code>spQ_IDSeq</code> stored procedure).
+</div>
+
+<h3>Distinction from PlanIntegration</h3>
+<table>
+<tbody><tr><th>Aspect</th><th>PlanIntegration</th><th>QCSIDB</th></tr>
+<tr><td>Purpose</td><td>Process dispatch + audit logging</td><td>Engine infrastructure + ID generation</td></tr>
+<tr><td>Ownership</td><td>Operational configuration (Ohio-managed process chains)</td><td>COTS engine internals (vendor-managed)</td></tr>
+<tr><td>Cap-specific usage</td><td>Agent chain definition, error logging</td><td><code>spQ_IDSeq</code> generates <code>paymentid</code></td></tr>
+<tr><td>Row volume</td><td>2B (processstate)</td><td>Small (config tables)</td></tr>
+</tbody></table>
+
+<p class="evidence"><span class="tag tag-c">C</span> PostCap_SplitPayment.sql:L266-272 — FROM IDSequence; EXEC spQ_IDSeq</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 10 — HealthPAS_Common (Shared Reference Data)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The shared library of reference data and Ohio-custom financial staging tables. Think of it as the shared lookup tables that many systems reference — member demographics, rate-cell crosswalks, and the financial staging area where capitation results are prepared for GL posting.<br>
+<strong>What does it do?</strong> Provides rate-cell crosswalk lookups (MEMIM00065 tables), eligibility supplemental data (ELGIP00005), and financial staging (hpfin_FAAttributesCAP).<br>
+<strong>What does it read/write?</strong> Cap engine READS crosswalks/reference; PostCap procs WRITE financial attributes.
+</div>
+
+<h3>Cap-Relevant Tables</h3>
+<table>
+<tbody><tr><th>Table</th><th>R/W by Cap</th><th>Purpose</th></tr>
+<tr><td><code>MEMIM00065_RateCellCode_GAP</code></td><td>READ</td><td>Rate-cell crosswalk (demographics → rate cell number)</td></tr>
+<tr><td><code>MEMIM00065_RateCell_GAP</code></td><td>READ</td><td>Rate cell number → rate cell code</td></tr>
+<tr><td><code>ELGIP00005_SUPP_GAP</code></td><td>READ</td><td>Eligibility supplemental data (PostCap fund allocation)</td></tr>
+<tr><td><code>hpfin_FAAttributesCAP</code></td><td>WRITE</td><td>Fund allocation attributes (staging for Flexi GL)</td></tr>
+<tr><td><code>hpfin_FAAttributesCAP_Archive</code></td><td>WRITE</td><td>Archived fund allocation records</td></tr>
+<tr><td><code>hpfin_CFAColumnMapping</code></td><td>READ</td><td>Column mapping for claim fund allocation</td></tr>
+<tr><td><code>hpfin_CorticonMatrix</code></td><td>READ</td><td>Corticon business-rules matrix</td></tr>
+<tr><td><code>hpfin_PRMPymtResolutionStg</code></td><td>WRITE</td><td>Payment resolution staging</td></tr>
+</tbody></table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 11 — Financial SSIS (Extracts / Posting to Finance)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The batch ETL pipeline that moves capitation results toward financial settlement. After the cap engine writes vouchers and sets payment.status='OPEN', these SSIS packages pick up the results and stage them for GL posting. Like the accounting department processing approved invoices for payment.<br>
+<strong>What does it do?</strong> Three SSIS packages: (1) allocate funds per accounting rules, (2) create AP invoices and load into Flexi GL, (3) resolve payments after Flexi confirms posting.<br>
+<strong>What does it read/write?</strong> Reads from <code>Plandata_Parallel</code> (capvoucher, payment); writes to <code>HealthPAS_Common</code> (hpfin staging) and <code>Flexi</code> (GL tables).
+</div>
+
+<h3>Three Financial SSIS Packages</h3>
+<table>
+<tbody><tr><th>Package</th><th>Key Stored Procs</th><th>What It Does</th></tr>
+<tr><td><code>hpfin_ClaimFundAllocation.dtsx</code></td><td><code>up_hpfin_CFACapAdjFundAlloc</code>, <code>up_hpfin_CFALoadDistrLines</code>, <code>up_hpfin_CFAValidateClaimImport</code>, <code>up_hpfin_CFACreateAPBatchNo</code></td><td>Applies accounting-rule fund allocation (reads capvoucher + hpfin_FAAttributesCAP → creates distribution lines)</td></tr>
+<tr><td><code>hpfin_APInvoiceUpdate.dtsx</code></td><td><code>up_hpfin_APILoadTIVH</code> → Flexi..TIVH, <code>up_hpfin_APILoadTIVD</code> → Flexi..TIVD, <code>up_hpfin_APILoadAPBH</code> → Flexi..APBH, <code>up_hpfin_APICreatePIPQRecords</code> → Flexi..PIPQ, <code>up_hpfin_APISetINFLEXIPaymentStatus</code> (OPEN→INFLEXI)</td><td>Creates GL invoice records and loads into Flexi; sets payment status to INFLEXI</td></tr>
+<tr><td><code>Hpfin_ClaimResolution.dtsx</code></td><td><code>up_hpfin_PRMCapLoadCheckHist</code>, <code>up_hpfin_PRMCapUpdatePaycheck</code>, <code>up_hpfin_PRMCapUpdatePayment</code> (→PAIDREMIT), <code>up_hpfin_PRMCap835LoadPayCheck</code></td><td>After Flexi confirms posting, resolves payments (INFLEXI→PAIDREMIT), creates check history</td></tr>
+</tbody></table>
+<p class="evidence"><span class="tag tag-c">C</span> mms-bolton-fin-ohio-main SSIS packages</p>
+
+<h3>Payment Status Transitions</h3>
+<pre><code>OPEN → INFLEXI → PAIDREMIT
+ ↑         ↑           ↑
+ Cap     AP Invoice   Claim
+ Engine   Update     Resolution</code></pre>
+
+<p><strong>Hand-off →</strong> Invoices loaded into Flexi GL (Stage 12) for settlement.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 12 — Flexi (General Ledger / Financial Settlement) + ODM Release &amp; OAKS Funds</h2>
+
+<div class="plain">
+<strong>What is this?</strong> The general ledger system where capitation payments become actual financial postings and warrants. This is where "the money actually moves" — or more precisely, where the system records the obligation to pay. The state (ODM) must separately authorize and fund the actual disbursement through OAKS (Ohio's state accounting system).<br>
+<strong>What does it do?</strong> Receives invoice headers/details/batches from the SSIS pipeline; posts to AP; the state validates and releases payment; funds flow from OAKS to MCPs.<br>
+<strong>What does it read/write?</strong> Writes GL tables: TIVH (invoice headers), TIVD (invoice details/distributions), APBH (AP batches), PIPQ (payment interface queue).
+</div>
+
+<h3>Flexi GL Tables</h3>
+<table>
+<tbody><tr><th>Table</th><th>Purpose</th></tr>
+<tr><td><code>Flexi..TIVH</code></td><td>Transaction Invoice Headers</td></tr>
+<tr><td><code>Flexi..TIVD</code></td><td>Transaction Invoice Details (distribution lines)</td></tr>
+<tr><td><code>Flexi..APBH</code></td><td>Accounts Payable Batch Headers</td></tr>
+<tr><td><code>Flexi..PIPQ</code></td><td>Payment Interface Processing Queue</td></tr>
+<tr><td><code>Flexi..VEND</code></td><td>Vendor master (provider payment setup)</td></tr>
+<tr><td><code>Flexi..ACCT</code></td><td>Chart of Accounts</td></tr>
+<tr><td><code>Flexi..PRSV</code></td><td>Period Service (accounting periods)</td></tr>
+</tbody></table>
+
+<h3>The 2PC (Distributed Commit) Mechanism</h3>
+<p>Inside stored procs: <code>SET XACT_ABORT ON; BEGIN TRANSACTION</code> <span class="tag tag-c">C</span> <span class="evidence">up_hpfin_APILoadTIVH.sql:38-48</span>. DTC promotion is <strong>implicit</strong> when Flexi linked-server tables are accessed within the transaction. <code>fbtc64.exe</code> (Flexi Batch Transaction Control) is referenced at <code>C:\Program Files\Flexi\Bin\fbtc64.exe</code>. <span class="tag tag-c">C</span> <span class="evidence">03_Insert_hpfin_FinancialConfig_forAPI.sql:59</span></p>
+
+<div class="risk">
+<strong>2PC Risk:</strong> Whether MSDTC distributed transactions are actually used (vs. batch file posting) is <span class="tag tag-u">!</span>. If 2PC: partial failure can leave payment in 'INFLEXI' with no corresponding Flexi record (in-doubt transaction). If batch posting: Flexi-side import atomicity is unknown. Either way, this is the <strong>SLA-13 driver</strong> — commit-wait across the database boundary. <span class="tag tag-i">I</span>
+</div>
+
+<h3>External Settlement Boundary (ODM/OAKS)</h3>
+<p><span class="tag tag-e">E</span> The FI computes and stages the payment, but <strong>release and funding are state-controlled and external to the FI boundary</strong>:</p>
+<ol>
+<li>FI calculates capitation → writes vouchers → stages invoices → loads Flexi</li>
+<li><strong>ODM Units validate/release payment</strong> (human/state approval gate)</li>
+<li><strong>OAKS authorizes funds</strong> (Ohio Administrative Knowledge System — state accounting)</li>
+<li>Funds flow → "Pay MCPs"</li>
+</ol>
+<p>The payment status transition that represents the ODM release gate is likely <code>INFLEXI → PAIDREMIT</code> but the actual external authorization mechanism is <span class="tag tag-u">!</span> not visible in source code.</p>
+
+<h3>Payment Hold (Vendor-Level Suppression)</h3>
+<p><span class="tag tag-e">E</span> Product capability: an authorized user can set a "Hold Payment" parameter on the pay-to provider's vendor record. While set, that provider receives NO payments. Because a monthly cap check is one payment per pay-to affiliate (Stage 7 fan-in), a hold on ONE affiliate <strong>silently suppresses that affiliate's ENTIRE monthly capitation disbursement</strong>.</p>
+<p><span class="tag tag-u">!</span> Whether Ohio's cap disbursement path checks the vendor Hold Payment flag, where that check occurs, and whether a held affiliate produces a zeroed/skipped payment vs. an error is <strong>not determinable from available source</strong>.</p>
+
+<h3>Shared payment/paycheck Surface — Non-Cap Actors</h3>
+<table>
+<tbody><tr><th>Actor</th><th>What It Does to payment/paycheck</th><th>Evidence</th></tr>
+<tr><td>PostCap_SplitPayment</td><td>Creates new paymentid records for weekly distribution; UPDATE capvoucher/paycheck with new paymentids</td><td>PostCap_SplitPayments.sql:L139-147</td></tr>
+<tr><td>hpfin_APInvoiceUpdate</td><td>Sets payment.status='INFLEXI'</td><td>02_AddMessageLookupRecords.sql:45-49</td></tr>
+<tr><td>Hpfin_ClaimResolution</td><td>Updates payment (→PAIDREMIT), creates CheckHistory, updates paycheck</td><td>Hpfin_ClaimResolution.dtsx procs</td></tr>
+<tr><td>Export_PostProcess_820</td><td>Reads payment/paycheck for EDI 820 generation</td><td>Master_Agent_Stored_Procedures_ST.sql:1564-1577</td></tr>
+<tr><td>Claims adjudication</td><td>Reads/writes payment for FFS claims</td><td>hpfin_ClaimFundAllocation.dtsx</td></tr>
+<tr><td>Payment Hold (if active)</td><td>Suppresses disbursement</td><td><span class="tag tag-e">E</span> Product capability</td></tr>
+</tbody></table>
+
+<p><strong>Hand-off →</strong> GL posting → ODM release → OAKS funding → disbursement to MCPs.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Stage 13 — EDI / Enrollment Interchange (Inbound Rosters / Outbound Payments)</h2>
+
+<div class="plain">
+<strong>What is this?</strong> How capitation connects to the outside world — inbound member enrollment that feeds the population (Stage 1a), and outbound payment advice (820) that reports what was paid to the MCPs. The "postal system" for enrollment data coming in and payment confirmations going out.<br>
+<strong>What does it do?</strong> Inbound: receives enrollment from Accenture (MSMQ) and other trading partners (834 via Edifecs). Outbound: generates X12 820 premium payment advice to MCPs.<br>
+<strong>What does it read/write?</strong> Inbound writes to enrollment tables in <code>Plandata_Parallel</code>. Outbound reads from payment/paycheck.
+</div>
+
+<h3>Inbound Enrollment — The Transport Resolution</h3>
+<div class="finding">
+<strong>RESOLVED <span class="tag tag-c">C</span>:</strong> The Accenture E&amp;E inbound enrollment feed is consumed via <strong>MSMQ messages (XML format)</strong>, NOT X12 834 file exchange. The endpoint is <code>QCHipaaPostProcessor</code>. Evidence: <code>MQTrigger.cs:22</code>, CEF Interface Catalog confirms single MSMQ inbound interface for enrollment.<br><br>
+<strong>Non-Accenture enrollment (834):</strong> Traditional X12 834 from other trading partners routes through <strong>Edifecs + EDI Gateway</strong> (<code>Import_PreProcess_834</code> agent in <code>sis-inx-edigw</code>). <span class="tag tag-c">C</span><br><br>
+<strong>Summary:</strong> The logical content is enrollment semantics; the physical transport differs by source (Accenture = MSMQ XML; trading partners = X12 834 via Edifecs).
+</div>
+
+<h3>Outbound Payment Advice (820)</h3>
+<p>X12 820 (Premium Payment/Remittance Advice) is generated and exported to MCPs via Deloitte: <span class="tag tag-c">C</span></p>
+<ul>
+<li>Agent: <code>Export_PostProcess_820_OH</code> / <code>Export_PostProcess_820_ST</code> in <code>sis-inx-edigw</code></li>
+<li>Process step: <code>CNCT5010-820E</code>, agentId <code>QPID00000002030</code></li>
+<li>Calls: <code>up_ediagent_820_get_planprovid_by_paymentid</code> to link payment to provider</li>
+<li>File drop: <code>\\hpasstg4t1cot02\QNXTConnectShare\BizTalk\Outbound\820</code></li>
+<li>Flow: QNXT → file drop → DirPollingService → 820Combine → Edifecs X12 engine → VAN → trading partner</li>
+</ul>
+
+<h3>Other Key EDI Interfaces</h3>
+<table>
+<tbody><tr><th>Type</th><th>Direction</th><th>Purpose</th></tr>
+<tr><td>834-C (daily change)</td><td>Inbound</td><td>Daily enrollment changes from trading partners</td></tr>
+<tr><td>834-F (full roster)</td><td>Outbound</td><td>Full member roster to MCPs</td></tr>
+<tr><td>835 (remittance)</td><td>Outbound</td><td>Payment remittance to providers via Deloitte</td></tr>
+<tr><td>ELGIP00005 (file drop)</td><td>Inbound</td><td>Eligibility supplemental files → SSIS → ETLStageDB</td></tr>
+<tr><td>MEMIM00065 (CSV file drop)</td><td>Inbound</td><td>Rate-cell crosswalk files from ODM/Actuarial → <code>E:\ETLInterfaceSourceFilesOH\MEMIM00065\</code></td></tr>
+</tbody></table>
+
+<h3>Single Ingress/Egress Touchpoint</h3>
+<p>All EDI X12 processing routes through <strong>one Edifecs engine instance</strong> — single point of failure. Deloitte/OMES is the external EDI hub for all trading-partner communication. <span class="tag tag-c">C</span></p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h1>Synthesis</h1>
+
+<h2>1. End-to-End Plain-English Narrative (One Monthly Cap Run)</h2>
+
+<div class="plain">
+A monthly capitation run starts when the QNXT administrator (or a scheduled job) submits a request specifying which programs and which month to calculate. The <strong>CAPSubmit</strong> agent in <code>PlanIntegration</code> fans this request out into per-program messages using XSLT. Each per-program message hits <strong>CapData</strong> (which enriches it with rate/config from <code>Plandata_Parallel</code>) and then <strong>CAPGlobal or CapPcp</strong> (which builds a provider list and fans out again, per-provider). Now for each provider, the 7-step engine chain fires inside QFrame: <strong>cBuildCapEnrolls</strong> queries enrollment from <code>Plandata_Parallel</code> (data originally received from Accenture via MSMQ) and pre-allocates a paymentid from <code>QCSIDB.IDSequence</code>. <strong>cBuildCapAffils</strong> resolves which affiliate gets paid by joining members → contracts → cap tables in <code>Plandata_Parallel</code>. <strong>cBuildCapAmount</strong> calculates the base PMPM rate (reading premium invoices). <strong>cCapFundAllocation</strong> runs the 10-dimension scoring SQL against <code>capterm</code> in <code>Plandata_Parallel</code>, selects the winning rate cell (matched=possible rule, tie-break sort), and writes <code>funddetail</code> records. <strong>cCapFundAdjustment</strong> applies cap factors from <code>capfactors</code>/<code>factorvalues</code>/<code>membercondition</code> in <code>Plandata_Parallel</code>. <strong>cStoreCapVoucher</strong> writes <code>capvoucher</code> rows (one per member-cap-line) into <code>Plandata_Parallel</code>. <strong>cCapPayment</strong> sets <code>payment.status='OPEN'</code>, creates a <code>paycheck</code> record. Then <strong>PostCap</strong> stored procs (fund allocation, split payment) run against <code>Plandata_Parallel</code> and write financial attributes to <code>HealthPAS_Common.hpfin_FAAttributesCAP</code>. The SSIS finance pipeline (<code>hpfin_ClaimFundAllocation</code> → <code>hpfin_APInvoiceUpdate</code>) picks up OPEN payments, creates AP invoices, and loads them into <strong>Flexi GL</strong> (TIVH/TIVD/APBH/PIPQ), setting status to INFLEXI. After Flexi confirms posting, <code>Hpfin_ClaimResolution</code> resolves the payment (INFLEXI→PAIDREMIT) and creates check history. Finally, <strong>ODM validates and releases</strong> the payment, <strong>OAKS authorizes state funds</strong>, and the 820 EDI agent generates premium payment advice to the MCPs via Edifecs/Deloitte.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>2. Data-Store Role Table</h2>
+
+<table>
+<tbody><tr><th>Database</th><th>Role</th><th>Cap Read/Write</th><th>Carve-Out Posture</th></tr>
+<tr><td><code>PlanIntegration</code></td><td>Dispatch + Run-State + Audit</td><td>R (config) / W (logs, state)</td><td><strong>INHERIT</strong> — must retain process orchestration</td></tr>
+<tr><td><code>QCSIDB</code></td><td>Engine Coordination + ID Generation</td><td>R/W (IDSequence)</td><td><strong>INHERIT</strong> — COTS engine infrastructure</td></tr>
+<tr><td><code>Plandata_Parallel</code></td><td>Business Output + Reference</td><td>R (enrollment, member, contract, rates) / W (capvoucher, payment, paycheck, funddetail)</td><td><strong>SHARED-DB</strong> — cannot cleanly own; claims + 820 + finance all touch payment/paycheck</td></tr>
+<tr><td><code>HealthPAS_Common</code></td><td>Shared Reference + Finance Staging</td><td>R (crosswalks, ELGIP) / W (hpfin_FAAttributesCAP)</td><td><strong>SHARED-DB</strong> — Ohio custom financial staging; coupled to Flexi pipeline</td></tr>
+<tr><td><code>ETLStageDB</code></td><td>Rate Staging (MEMSW00013)</td><td>R/W (staging tables, crosswalks)</td><td><strong>REPLACE</strong> — could be replaced with a modern rate-load service</td></tr>
+<tr><td><code>Flexi</code></td><td>General Ledger</td><td>W (GL tables via linked server)</td><td><strong>EXTERNAL</strong> — separate financial system; interface boundary</td></tr>
+<tr><td><code>CA_Extensions</code> (act-oh-OHDDI)</td><td>Ohio Custom PostCap Logic</td><td>R (config) / W (via stored procs on Plandata tables)</td><td><strong>RETIRE</strong> — custom procs could be absorbed into new service</td></tr>
+</tbody></table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>3. The Retro/Reconciliation Mechanism</h2>
+
+<div class="plain">
+<strong>Why do the same scopes get re-processed?</strong> Six trigger types detect retroactive changes (Stage 3b): retro enrollment, MCO assignment change, enrollment-restriction change, cap term rate change, contract affiliation change, and cap table change. Each trigger that fires for a past period generates a reconciliation pass that <strong>re-vouchers the affected scope</strong> — writing positive or negative adjustment vouchers. This is why Ohio processes ~71 runs per monthly cycle: 6-7 MCPs × current month + retro lookback months × trigger-type combinations.
+</div>
+
+<h3>Two Distinct Conflict Surfaces</h3>
+<table>
+<tbody><tr><th>Surface</th><th>Where</th><th>Nature</th><th>What Goes Wrong</th></tr>
+<tr><td><strong>Stage 1b — Temporal-Conflict</strong></td><td>MCO-assignment resolution</td><td><em>Data-value</em> conflict (who gets paid)</td><td>Two overlapping-period runs resolve the same member-month to different affiliates → different payees for the same member</td></tr>
+<tr><td><strong>Stage 7 — paymentid Collision</strong></td><td>capvoucher INSERT</td><td><em>Key</em> conflict (duplicate write refused)</td><td>A restart/replay reuses the original paymentid → identical PK → INSERT rejected with PK violation error</td></tr>
+</tbody></table>
+<p><strong>Distinction:</strong> Stage 1b is about <em>correctness</em> (the wrong entity gets paid). Stage 7 is about <em>durability</em> (the write physically fails). Both are products of the retro/reconciliation mechanism but manifest differently.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>4. The FI Boundary</h2>
+
+<table>
+<tbody><tr><th>What the FI (Gainwell) Owns</th><th>What Stays External</th></tr>
+<tr><td>Calculation engine (QFrame + 7-step chain)</td><td>ODM Validate/Release Payment (state approval gate)</td></tr>
+<tr><td>Voucher write (capvoucher → Plandata_Parallel)</td><td>OAKS funds authorization (state accounting)</td></tr>
+<tr><td>Staged payment (payment.status=OPEN → INFLEXI)</td><td>Accenture E&amp;E enrollment ingress (MSMQ)</td></tr>
+<tr><td>Flexi GL posting (TIVH/TIVD/APBH)</td><td>Deloitte/OMES EDI hub (trading-partner communication)</td></tr>
+<tr><td>820 generation + file drop</td><td>Provider-level Payment Hold (if set — suppresses disbursement)</td></tr>
+<tr><td>PostCap processing (fund allocation, split payment)</td><td>PNM/Maximus provider/affiliation feed (mechanism unknown)</td></tr>
+<tr><td>Rate-cell ETL (MEMSW00013)</td><td>ODM actuarial rate-cell files (MEMIM00065 CSV drops)</td></tr>
+</tbody></table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>5. Shared payment/paycheck Surface + Coupling Inventory</h2>
+
+<h3>Non-Cap Actors on payment/paycheck</h3>
+<ol>
+<li><strong>Claims adjudication</strong> — writes payment/paycheck for FFS claims (hpfin_ClaimFundAllocation.dtsx)</li>
+<li><strong>820 Export</strong> — reads payment/paycheck to generate EDI 820 (Export_PostProcess_820)</li>
+<li><strong>Void Payments</strong> — <span class="tag tag-e">E</span> product capability to void/reverse payments</li>
+<li><strong>Manual Check</strong> — <span class="tag tag-e">E</span> product capability for manual payment processing</li>
+<li><strong>Payment Hold</strong> — <span class="tag tag-e">E</span> vendor-level suppression of disbursement</li>
+<li><strong>PostCap_SplitPayment</strong> — creates new paymentid records, reassigns vouchers/paycheck to new IDs</li>
+<li><strong>hpfin_APInvoiceUpdate</strong> — transitions payment.status (OPEN→INFLEXI)</li>
+<li><strong>Hpfin_ClaimResolution</strong> — transitions payment.status (INFLEXI→PAIDREMIT), updates paycheck</li>
+</ol>
+
+<h3>Cap↔Claims Coupling Points</h3>
+<ol>
+<li><strong>Carve-out per-service decision</strong> (Stage 4b, Method 3) — cap engine decides what's in/out of cap per service, entangled with claims pricing</li>
+<li><strong>Shared payment/paycheck tables</strong> — both cap and claims write to the same tables</li>
+<li><strong>Flexi 2PC</strong> — distributed commit couples cap payment to GL across database boundary</li>
+</ol>
+
+<div class="risk">
+<strong>Carve-out ownership question:</strong> These coupling points are evidence that <code>payment</code>/<code>paycheck</code> are NOT cleanly capitation-owned. The cap service cannot take these tables with it as a clean bounded context — it must either write back to a shared store (multi-quarter integration effort) or accept a December-timeline where cap remains coupled to the shared payment substrate.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>6. End-to-End Flow Diagram</h2>
+
+<div class="svg-container">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 820" width="1050" height="820">
+  <!-- Background -->
+  <rect width="1050" height="820" fill="#fafbff" rx="8"></rect>
+  
+  <!-- Title -->
+  <text x="525" y="28" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a237e">Ohio Capitation End-to-End Pipeline — Stages 0→13 with Data Stores</text>
+  
+  <!-- Legend -->
+  <rect x="20" y="40" width="12" height="12" fill="#4caf50" rx="2"></rect>
+  <text x="36" y="50" font-size="9" fill="#333">Confirmed (Ohio code)</text>
+  <rect x="160" y="40" width="12" height="12" fill="#ff9800" rx="2"></rect>
+  <text x="176" y="50" font-size="9" fill="#333">Conflict Surface</text>
+  <rect x="300" y="40" width="12" height="12" fill="#2196f3" rx="2"></rect>
+  <text x="316" y="50" font-size="9" fill="#333">SHARED-DB (can't cleanly own)</text>
+  <rect x="490" y="40" width="12" height="12" fill="#9c27b0" rx="2"></rect>
+  <text x="506" y="50" font-size="9" fill="#333">EXTERNAL</text>
+  <rect x="600" y="40" width="12" height="12" fill="#607d8b" rx="2"></rect>
+  <text x="616" y="50" font-size="9" fill="#333">INHERIT</text>
+  <rect x="700" y="40" width="12" height="12" fill="#e91e63" rx="2"></rect>
+  <text x="716" y="50" font-size="9" fill="#333">REPLACE</text>
+  
+  <!-- STAGE 0: Run Invocation -->
+  <rect x="30" y="70" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="100" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 0</text>
+  <text x="100" y="103" text-anchor="middle" font-size="9" fill="#333">Run Invocation</text>
+  
+  <!-- Arrow 0→1a -->
+  <line x1="170" y1="92" x2="195" y2="92" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 1a: Membership -->
+  <rect x="200" y="70" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="270" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 1a</text>
+  <text x="270" y="103" text-anchor="middle" font-size="9" fill="#333">Membership / Enrolls</text>
+  
+  <!-- Arrow 1a→1b -->
+  <line x1="340" y1="92" x2="365" y2="92" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 1b: MCO Assignment (CONFLICT SURFACE) -->
+  <rect x="370" y="70" width="150" height="44" fill="#fff3e0" stroke="#ff9800" stroke-width="2.5" rx="6"></rect>
+  <text x="445" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#e65100">Stage 1b ⚠</text>
+  <text x="445" y="103" text-anchor="middle" font-size="9" fill="#333">MCO Assignment (Temporal)</text>
+  
+  <!-- Arrow 1b→2 -->
+  <line x1="520" y1="92" x2="545" y2="92" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 2: Rate Sweep -->
+  <rect x="550" y="70" width="130" height="44" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="6"></rect>
+  <text x="615" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#880e4f">Stage 2</text>
+  <text x="615" y="103" text-anchor="middle" font-size="9" fill="#333">Rate Sweep (SSIS)</text>
+  
+  <!-- Arrow 2→3 -->
+  <line x1="680" y1="92" x2="705" y2="92" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 3: Member Conditions -->
+  <rect x="710" y="70" width="130" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="775" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 3</text>
+  <text x="775" y="103" text-anchor="middle" font-size="9" fill="#333">Member Conditions</text>
+  
+  <!-- Arrow 3→3b -->
+  <line x1="840" y1="92" x2="865" y2="92" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 3b: Reconciliation -->
+  <rect x="870" y="70" width="150" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="945" y="88" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 3b</text>
+  <text x="945" y="103" text-anchor="middle" font-size="9" fill="#333">Recon Triggers (6 types)</text>
+  
+  <!-- Row 2: Stages 4, 4b, 5, 6 -->
+  <!-- Arrow down from row 1 -->
+  <path d="M 945 114 L 945 140 L 100 140 L 100 165" stroke="#546e7f" stroke-width="1.5" fill="none" marker-end="url(#arrow)"></path>
+  
+  <!-- STAGE 4: Cap Factor/Term -->
+  <rect x="30" y="170" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="100" y="188" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 4</text>
+  <text x="100" y="203" text-anchor="middle" font-size="9" fill="#333">Cap Factor / Cap Term</text>
+  
+  <!-- Arrow 4→4b -->
+  <line x1="170" y1="192" x2="195" y2="192" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 4b: 6 Methods -->
+  <rect x="200" y="170" width="150" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="275" y="188" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 4b</text>
+  <text x="275" y="203" text-anchor="middle" font-size="9" fill="#333">6 Calc Methodologies</text>
+  
+  <!-- Arrow 4b→5 -->
+  <line x1="350" y1="192" x2="375" y2="192" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 5: Affiliations -->
+  <rect x="380" y="170" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="450" y="188" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 5</text>
+  <text x="450" y="203" text-anchor="middle" font-size="9" fill="#333">Affiliations (MCO→Rate)</text>
+  
+  <!-- Arrow 5→6 -->
+  <line x1="520" y1="192" x2="545" y2="192" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 6: QFrame Engine -->
+  <rect x="550" y="160" width="200" height="56" fill="#e0f2f1" stroke="#00897b" stroke-width="2" rx="6"></rect>
+  <text x="650" y="180" text-anchor="middle" font-size="10" font-weight="bold" fill="#004d40">Stage 6 — QFrame Engine</text>
+  <text x="650" y="194" text-anchor="middle" font-size="9" fill="#333">7-Step Inner Chain</text>
+  <text x="650" y="207" text-anchor="middle" font-size="8" fill="#546e7f">Fan-out: Hub → AppSvrs → ExecUnits</text>
+  
+  <!-- Arrow 6→7 -->
+  <line x1="750" y1="192" x2="775" y2="192" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 7: Write (CONFLICT SURFACE) -->
+  <rect x="780" y="160" width="160" height="56" fill="#fff3e0" stroke="#ff9800" stroke-width="2.5" rx="6"></rect>
+  <text x="860" y="180" text-anchor="middle" font-size="10" font-weight="bold" fill="#e65100">Stage 7 ⚠</text>
+  <text x="860" y="194" text-anchor="middle" font-size="9" fill="#333">Plandata_Parallel WRITE</text>
+  <text x="860" y="207" text-anchor="middle" font-size="8" fill="#e65100">paymentid Collision Site</text>
+  
+  <!-- Row 3: Stages 8, 9, 10, 11, 12, 13 -->
+  <path d="M 860 216 L 860 240 L 100 240 L 100 265" stroke="#546e7f" stroke-width="1.5" fill="none" marker-end="url(#arrow)"></path>
+  
+  <!-- STAGE 8: PlanIntegration -->
+  <rect x="30" y="270" width="130" height="44" fill="#eceff1" stroke="#607d8b" stroke-width="1.5" rx="6"></rect>
+  <text x="95" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#37474f">Stage 8</text>
+  <text x="95" y="303" text-anchor="middle" font-size="9" fill="#333">PlanIntegration</text>
+  
+  <line x1="160" y1="292" x2="185" y2="292" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 9: QCSIDB -->
+  <rect x="190" y="270" width="110" height="44" fill="#eceff1" stroke="#607d8b" stroke-width="1.5" rx="6"></rect>
+  <text x="245" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#37474f">Stage 9</text>
+  <text x="245" y="303" text-anchor="middle" font-size="9" fill="#333">QCSIDB</text>
+  
+  <line x1="300" y1="292" x2="325" y2="292" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 10: HealthPAS_Common -->
+  <rect x="330" y="270" width="140" height="44" fill="#e3f2fd" stroke="#2196f3" stroke-width="1.5" rx="6"></rect>
+  <text x="400" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#0d47a1">Stage 10</text>
+  <text x="400" y="303" text-anchor="middle" font-size="9" fill="#333">HealthPAS_Common</text>
+  
+  <line x1="470" y1="292" x2="495" y2="292" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 11: Finance SSIS -->
+  <rect x="500" y="270" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="570" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 11</text>
+  <text x="570" y="303" text-anchor="middle" font-size="9" fill="#333">Finance SSIS Pipeline</text>
+  
+  <line x1="640" y1="292" x2="665" y2="292" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 12: Flexi GL -->
+  <rect x="670" y="270" width="140" height="44" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5" rx="6"></rect>
+  <text x="740" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a148c">Stage 12</text>
+  <text x="740" y="303" text-anchor="middle" font-size="9" fill="#333">Flexi GL + ODM/OAKS</text>
+  
+  <line x1="810" y1="292" x2="835" y2="292" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  
+  <!-- STAGE 13: EDI -->
+  <rect x="840" y="270" width="140" height="44" fill="#e8eaf6" stroke="#3949ab" stroke-width="1.5" rx="6"></rect>
+  <text x="910" y="288" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a237e">Stage 13</text>
+  <text x="910" y="303" text-anchor="middle" font-size="9" fill="#333">EDI / 820 / MSMQ</text>
+  
+  <!-- ═══ DATA STORES (below pipeline) ═══ -->
+  <text x="525" y="355" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a237e">— Data Stores —</text>
+  
+  <!-- PlanIntegration DB -->
+  <rect x="30" y="370" width="140" height="50" fill="#eceff1" stroke="#607d8b" stroke-width="1.5" rx="4"></rect>
+  <text x="100" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#37474f">PlanIntegration</text>
+  <text x="100" y="403" text-anchor="middle" font-size="8" fill="#546e7f">process, agent, processstep</text>
+  <text x="100" y="414" text-anchor="middle" font-size="8" fill="#546e7f">processstate (2B rows)</text>
+  
+  <!-- QCSIDB -->
+  <rect x="190" y="370" width="120" height="50" fill="#eceff1" stroke="#607d8b" stroke-width="1.5" rx="4"></rect>
+  <text x="250" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#37474f">QCSIDB</text>
+  <text x="250" y="403" text-anchor="middle" font-size="8" fill="#546e7f">IDSequence</text>
+  <text x="250" y="414" text-anchor="middle" font-size="8" fill="#546e7f">spQ_IDSeq</text>
+  
+  <!-- Plandata_Parallel -->
+  <rect x="330" y="370" width="200" height="62" fill="#e3f2fd" stroke="#2196f3" stroke-width="2" rx="4"></rect>
+  <text x="430" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1">Plandata_Parallel</text>
+  <text x="430" y="403" text-anchor="middle" font-size="8" fill="#546e7f">capvoucher, payment, paycheck</text>
+  <text x="430" y="414" text-anchor="middle" font-size="8" fill="#546e7f">enrollment, member, capterm</text>
+  <text x="430" y="425" text-anchor="middle" font-size="8" fill="#546e7f">affiliation, contract, funddetail</text>
+  
+  <!-- HealthPAS_Common -->
+  <rect x="550" y="370" width="160" height="50" fill="#e3f2fd" stroke="#2196f3" stroke-width="1.5" rx="4"></rect>
+  <text x="630" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#0d47a1">HealthPAS_Common</text>
+  <text x="630" y="403" text-anchor="middle" font-size="8" fill="#546e7f">hpfin_FAAttributesCAP</text>
+  <text x="630" y="414" text-anchor="middle" font-size="8" fill="#546e7f">MEMIM00065 crosswalks</text>
+  
+  <!-- ETLStageDB -->
+  <rect x="730" y="370" width="130" height="50" fill="#fce4ec" stroke="#e91e63" stroke-width="1.5" rx="4"></rect>
+  <text x="795" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#880e4f">ETLStageDB</text>
+  <text x="795" y="403" text-anchor="middle" font-size="8" fill="#546e7f">MEMSW00013_* staging</text>
+  <text x="795" y="414" text-anchor="middle" font-size="8" fill="#546e7f">Rate-cell sweeps</text>
+  
+  <!-- Flexi -->
+  <rect x="880" y="370" width="130" height="50" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1.5" rx="4"></rect>
+  <text x="945" y="390" text-anchor="middle" font-size="9" font-weight="bold" fill="#4a148c">Flexi (GL)</text>
+  <text x="945" y="403" text-anchor="middle" font-size="8" fill="#546e7f">TIVH, TIVD, APBH, PIPQ</text>
+  <text x="945" y="414" text-anchor="middle" font-size="8" fill="#546e7f">VEND, ACCT</text>
+  
+  <!-- ═══ READ/WRITE ARROWS (stages to stores) ═══ -->
+  <!-- Stage 0 → PlanIntegration (R config, W logs) -->
+  <line x1="95" y1="114" x2="95" y2="368" stroke="#607d8b" stroke-width="1" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 1a → Plandata (R enrollment) -->
+  <line x1="270" y1="114" x2="400" y2="368" stroke="#2196f3" stroke-width="1" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 1a → QCSIDB (R IDSequence) -->
+  <line x1="250" y1="114" x2="250" y2="368" stroke="#607d8b" stroke-width="1" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 2 → ETLStageDB (R/W staging) -->
+  <line x1="615" y1="114" x2="795" y2="368" stroke="#e91e63" stroke-width="1" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 6 → Plandata (R rates, enrollment) -->
+  <line x1="620" y1="216" x2="460" y2="368" stroke="#2196f3" stroke-width="1.2" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 7 → Plandata (W capvoucher, payment) -->
+  <line x1="860" y1="216" x2="480" y2="368" stroke="#ff9800" stroke-width="1.5"></line>
+  
+  <!-- Stage 11 → HealthPAS_Common (W hpfin) -->
+  <line x1="570" y1="314" x2="620" y2="368" stroke="#2196f3" stroke-width="1" stroke-dasharray="4,3"></line>
+  
+  <!-- Stage 12 → Flexi (W GL) -->
+  <line x1="740" y1="314" x2="940" y2="368" stroke="#9c27b0" stroke-width="1.5"></line>
+  
+  <!-- ═══ Fan-In annotation ═══ -->
+  <rect x="30" y="460" width="480" height="70" fill="#fff8e1" stroke="#f9a825" stroke-width="1" rx="4"></rect>
+  <text x="270" y="478" text-anchor="middle" font-size="10" font-weight="bold" fill="#f57f17">Stage 7 — Fan-In (Many Vouchers → One Payment)</text>
+  <text x="270" y="494" text-anchor="middle" font-size="9" fill="#333">N member cap lines (capvoucher rows) aggregate into ONE payment per pay-to affiliate.</text>
+  <text x="270" y="508" text-anchor="middle" font-size="9" fill="#333">All N vouchers share the affiliate's paymentid. The 13-column PK keeps them distinct.</text>
+  <text x="270" y="522" text-anchor="middle" font-size="9" fill="#e65100">A restart reusing that paymentid = PK collision on re-insert.</text>
+  
+  <!-- 2PC annotation -->
+  <rect x="540" y="460" width="470" height="70" fill="#f3e5f5" stroke="#9c27b0" stroke-width="1" rx="4"></rect>
+  <text x="775" y="478" text-anchor="middle" font-size="10" font-weight="bold" fill="#4a148c">Stage 12 — Flexi 2PC (Distributed Commit)</text>
+  <text x="775" y="494" text-anchor="middle" font-size="9" fill="#333">hpfin_APInvoiceUpdate writes Plandata_Parallel + Flexi (linked server) in one txn.</text>
+  <text x="775" y="508" text-anchor="middle" font-size="9" fill="#333">SET XACT_ABORT ON; BEGIN TRANSACTION — DTC promotes on cross-DB access.</text>
+  <text x="775" y="522" text-anchor="middle" font-size="9" fill="#e65100">Partial failure → in-doubt transaction (SLA-13 driver).</text>
+  
+  <!-- ═══ External Boundary ═══ -->
+  <rect x="30" y="560" width="980" height="50" fill="#efebe9" stroke="#795548" stroke-width="1" stroke-dasharray="6,3" rx="4"></rect>
+  <text x="525" y="578" text-anchor="middle" font-size="10" font-weight="bold" fill="#4e342e">External Boundary (NOT FI-owned)</text>
+  <text x="525" y="596" text-anchor="middle" font-size="9" fill="#333">ODM Validate/Release | OAKS Fund Authorization | Accenture E&amp;E (MSMQ) | Deloitte EDI Hub | PNM/Maximus Providers</text>
+  
+  <!-- ═══ Payment Status Flow ═══ -->
+  <text x="525" y="640" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a237e">— Payment Status Lifecycle —</text>
+  
+  <rect x="150" y="660" width="100" height="34" fill="#c8e6c9" stroke="#4caf50" stroke-width="1.5" rx="16"></rect>
+  <text x="200" y="681" text-anchor="middle" font-size="10" font-weight="bold" fill="#2e7d32">OPEN</text>
+  
+  <line x1="250" y1="677" x2="340" y2="677" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  <text x="295" y="670" text-anchor="middle" font-size="8" fill="#546e7f">AP Invoice</text>
+  
+  <rect x="345" y="660" width="120" height="34" fill="#fff9c4" stroke="#f9a825" stroke-width="1.5" rx="16"></rect>
+  <text x="405" y="681" text-anchor="middle" font-size="10" font-weight="bold" fill="#f57f17">INFLEXI</text>
+  
+  <line x1="465" y1="677" x2="555" y2="677" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  <text x="510" y="670" text-anchor="middle" font-size="8" fill="#546e7f">Claim Resolution</text>
+  
+  <rect x="560" y="660" width="130" height="34" fill="#bbdefb" stroke="#2196f3" stroke-width="1.5" rx="16"></rect>
+  <text x="625" y="681" text-anchor="middle" font-size="10" font-weight="bold" fill="#1565c0">PAIDREMIT</text>
+  
+  <line x1="690" y1="677" x2="760" y2="677" stroke="#546e7f" stroke-width="1.5" marker-end="url(#arrow)"></line>
+  <text x="725" y="670" text-anchor="middle" font-size="8" fill="#546e7f">ODM Release</text>
+  
+  <rect x="765" y="660" width="130" height="34" fill="#e1bee7" stroke="#9c27b0" stroke-width="1.5" rx="16"></rect>
+  <text x="830" y="681" text-anchor="middle" font-size="10" font-weight="bold" fill="#6a1b9a">DISBURSED</text>
+  
+  <!-- ═══ Key Metrics ═══ -->
+  <text x="525" y="730" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a237e">— Key Metrics —</text>
+  <text x="200" y="755" text-anchor="middle" font-size="9" fill="#333">~71 runs/month (program×period)</text>
+  <text x="430" y="755" text-anchor="middle" font-size="9" fill="#333">6-7 MCPs × retro months</text>
+  <text x="650" y="755" text-anchor="middle" font-size="9" fill="#333">13-column PK on capvoucher</text>
+  <text x="870" y="755" text-anchor="middle" font-size="9" fill="#333">2B processstate rows</text>
+  
+  <text x="200" y="775" text-anchor="middle" font-size="9" fill="#333">50+ tables touched</text>
+  <text x="430" y="775" text-anchor="middle" font-size="9" fill="#333">10-dimension scoring SQL</text>
+  <text x="650" y="775" text-anchor="middle" font-size="9" fill="#333">Age in MONTHS (1320 sentinel)</text>
+  <text x="870" y="775" text-anchor="middle" font-size="9" fill="#333">Zero serialization guards</text>
+  
+  <!-- Arrow marker definition -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#546e7f"></path>
+    </marker>
+  </defs>
+</svg>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>Gaps / Could-Not-See</h2>
+
+<table>
+<tbody><tr><th>Item</th><th>Why Unknown</th><th>What Would Resolve It</th></tr>
+<tr><td>Factor composition formula (additive vs multiplicative order)</td><td>Logic in compiled <code>cCapFundAdjustment</code> VB.NET — method body not fully visible</td><td>Onshore code read of the compiled DLL or full source</td></tr>
+<tr><td>MCO-assignment temporal resolution (segmented vs point-in-time)</td><td><code>cBuildCapAffils</code> date predicate binding in compiled code</td><td>Onshore code read or execution trace</td></tr>
+<tr><td>Production QFrame grid topology (host counts)</td><td>Infrastructure config, not in source repos</td><td>Ops documentation or infra inventory</td></tr>
+<tr><td>Payment Hold vendor flag check on cap path</td><td>Product capability; Ohio implementation not in available source</td><td>QNXT admin UI investigation or code read</td></tr>
+<tr><td>FFS-comparison rates in Ohio's rate tables</td><td>No rate-type discriminator column visible in schema</td><td>Rate table data inspection (onshore)</td></tr>
+<tr><td>Exact MSDTC configuration (2PC vs batch posting)</td><td>DTC config is runtime infrastructure, not in source</td><td>Server-level DTC configuration review</td></tr>
+<tr><td>PNM/Maximus provider feed mechanism</td><td>No consumer code for PNM inbound found in workspace</td><td>Integration documentation or trace</td></tr>
+<tr><td>Current live MCP roster (post-Next Generation program)</td><td>Config data in DB, not source code</td><td>Query <code>program</code>/<code>programcap</code> tables on live system</td></tr>
+<tr><td>ODM release gate implementation (status transition trigger)</td><td>External state process, not in FI code</td><td>ODM operational documentation</td></tr>
+</tbody></table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<footer>
+Generated by GitHub Copilot — Gainwell Ohio CEF Architecture Assessment — 2026-07-10
+</footer>
+
+
+
+</body></html>
