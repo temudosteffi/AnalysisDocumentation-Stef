@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QFramework / QEnterprise — Capitation Execution Flow v2 (Message-ID Routing, Code-Evidenced)</title>
+<style>
+  :root{
+    --bg:#fcfdff; --panel:#ffffff; --ink:#1b2430; --muted:#5a6775; --line:#e6ebf1;
+    --accent:#5a3fc0; --accent-soft:#f1edfb; --blue:#1d6fe0; --blue-soft:#eaf2fd;
+    --green:#1f8b4c; --green-soft:#e8f6ee; --amber:#b06a08; --amber-soft:#fcf2e3;
+    --red:#c2362f; --red-soft:#fdeeed; --code:#f5f6f9; --codeink:#2a2152;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:28px 36px;background:linear-gradient(135deg,#f3effc,#fcfdff);border-bottom:1px solid var(--line)}
+  header h1{margin:0 0 6px;font-size:23px;color:#34275e}
+  header p{margin:0;color:var(--muted);max-width:900px}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 36px 80px}
+  h2{margin:40px 0 14px;font-size:20px;color:#34275e;border-left:5px solid var(--accent);padding-left:12px}
+  h3{margin:24px 0 8px;font-size:16px;color:#4a3a86}
+  p{margin:10px 0}
+  .lead{color:var(--muted)}
+  code,pre{font-family:"Cascadia Code",Consolas,"Courier New",monospace}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow:auto;font-size:12.5px;line-height:1.5;color:var(--codeink)}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:var(--codeink)}
+  .path{display:inline-block;background:#eef0f6;color:#45506a;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;font-family:"Cascadia Code",Consolas,monospace;margin:2px 0;word-break:break-all}
+  .mono{font-family:"Cascadia Code",Consolas,monospace}
+  .tag{display:inline-block;padding:1px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .t-purple{background:var(--accent-soft);color:var(--accent)}
+  .t-blue{background:var(--blue-soft);color:var(--blue)}
+  .t-green{background:var(--green-soft);color:var(--green)}
+  .t-amber{background:var(--amber-soft);color:var(--amber)}
+  .t-red{background:var(--red-soft);color:var(--red)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#f2f0fa;color:#34275e}
+  tr:nth-child(even) td{background:#fafbfe}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 20px;margin:16px 0;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin:18px 0}
+  .tile{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .tile h4{margin:0 0 6px;font-size:14px;color:#34275e}
+  .tile .big{font-size:17px;font-weight:700;color:#4a3a86}
+  .tile .mini,.mini{color:var(--muted);font-size:12px}
+  .flow{display:flex;flex-direction:column;gap:0;margin:18px 0}
+  .step{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:13px 18px;position:relative;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .step .n{position:absolute;left:-14px;top:13px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 0 0 3px var(--bg)}
+  .step h4{margin:0 0 4px;font-size:15px;color:#2e2350}
+  .arrow{align-self:center;color:var(--accent);font-size:20px;margin:2px 0}
+  .callout{background:#f6f7fb;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:14px 0}
+  .callout.key{background:var(--green-soft);border-color:#c6e7d2}
+  .callout.warn{background:var(--amber-soft);border-color:#f0dcb9}
+  .callout.id{background:var(--accent-soft);border-color:#ddd2f4}
+  ul.tight{margin:8px 0;padding-left:22px}
+  ul.tight li{margin:4px 0}
+  .toc{columns:2;column-gap:28px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 22px;margin:18px 0}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  .hl{color:#b5460b;font-weight:600}.hl2{color:#1f8b4c;font-weight:600}.hl3{color:#1d6fe0;font-weight:600}
+  footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding:18px 36px;max-width:1120px;margin:0 auto}
+  .stage-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .badge{display:inline-block;background:#eef0f6;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:11px;font-family:"Cascadia Code",Consolas,monospace;color:#45506a;margin:1px}
+</style>
+</head>
+<body>
+<header>
+  <h1>QFramework / QEnterprise — Capitation Execution Flow <span style="color:var(--accent)">v2</span></h1>
+  <p>Focus of this version: <strong>how a message/transaction is identified, picked, and routed to a specific Execution Unit</strong>, and how that EU uses the ID to retrieve the payload from the Message Store and process the work. Every claim is cited from source under <span class="mono">mms-cms-cef/components/QFrame</span>.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="callout id">
+    <strong>The one idea to hold onto:</strong> the hub never sends the data. It sends a <strong>message ID string</strong> (the <span class="mono">QISMessageId</span>). The EU receives that ID, <em>takes ownership of that exact row</em> in the Message Store, and loads the payload from the database by that ID. Identification happens on three keys: the <span class="badge">QISMessageId</span> (which record), the <span class="badge">LogType</span> (which EU can handle it), and <span class="badge">ownership / QnxtServerId</span> (which server owns it right now).
+  </div>
+
+  <div class="toc">
+    <a href="#map">0. Identifiers &amp; components at a glance</a><br>
+    <a href="#setup">1. SETUP — hub learns LogTypes, EUs register</a><br>
+    <a href="#intake">2. INTAKE — message gets an ID &amp; is stored</a><br>
+    <a href="#identify">3. IDENTIFY — pick the right EU (LogType match)</a><br>
+    <a href="#send">4. SEND — only the QISMessageId crosses the wire</a><br>
+    <a href="#receive">5. RECEIVE — EU loads payload by ID (take ownership)</a><br>
+    <a href="#process">6. PROCESS — engine runs the capitation agent</a><br>
+    <a href="#complete">7. COMPLETE — remove by ID, states, retries</a><br>
+    <a href="#idtable">8. How message IDs are identified (summary)</a><br>
+    <a href="#files">9. Evidence index</a>
+  </div>
+
+  <h2 id="map">0. Identifiers &amp; Components at a Glance</h2>
+  <div class="grid">
+    <div class="tile"><h4>QISMessageId</h4><div class="big">the record key</div><div class="mini">a string ID (Message Store <span class="mono">message.messageid</span>, <span class="mono">char(36)</span>). This is what is sent to the EU.</div></div>
+    <div class="tile"><h4>LogType</h4><div class="big">the routing key</div><div class="mini">e.g. <span class="mono">ADV_CAP_PROC</span>. Decides <em>which</em> EU is allowed to process the message.</div></div>
+    <div class="tile"><h4>QnxtServerId / ownership</h4><div class="big">the claim key</div><div class="mini">stamps which server owns the row so two servers never grab the same message.</div></div>
+    <div class="tile"><h4>EU address (URI + port)</h4><div class="big">the destination</div><div class="mini"><span class="mono">RemotingURI</span> + <span class="mono">RemotingPort</span> — how the hub reaches the chosen EU.</div></div>
+  </div>
+
+  <h3>The identifiers moving through the pipeline</h3>
+<pre>
+ client ── message + LogType ──▶  DISTRIBUTION HUB
+                                   │  1. PersistMessage → gets QISMessageId, saved in Message Store (state = DistributionHubCache)
+                                   │  2. aMessage.Message = null           ◀ drop the payload from memory (claim-check)
+                                   │  3. route by LogType → QueueReader[LogType]
+                                   │  4. match LogType → an ACTIVE EU (AcceptedMessageTypeCol) ; round-robin ; honor MaxOutstandingRequests
+                                   │  5. GetRemotingRef(URI:port) ; state → Transit
+                                   ▼  BeginInvoke( QISMessageId )           ◀ ONLY the id is sent
+                              EXECUTION UNIT
+                                   │  6. loadMessageObjectFromDB(QISMessageId)
+                                   │     → TakeOwnershipOfMessageAndGetMessageInfo(id)   ◀ claim + fetch payload by id
+                                   │  7. state → Executing ; run on thread pool
+                                   ▼
+                        MessageProcessorEngine → CapProgramAgent (ADV_CAP_PROC)
+                                   │  8. success → RemoveMessage(QISMessageId) ; state → Complete
+</pre>
+
+  <!-- ===================== 1 SETUP ===================== -->
+  <h2 id="setup">1. SETUP — The Hub Learns LogTypes &amp; the EUs Register</h2>
+  <div class="stage-head"><span class="tag t-purple">Step 1</span><span class="mini">Distribution Hub/MessagPort.cs · Main.cs</span></div>
+
+  <h3>1.1 The hub builds one queue per LogType — read from the database</h3>
+  <p>At startup the hub asks the Message Store which process <em>LogTypes</em> exist (the <span class="mono">messagetype</span> table) and creates one <span class="mono">QueueReader</span> per type. This is the master list of routable message types.</p>
+  <div class="path">QFrame/Infrastructure/Common/Src/WindowsService/Distribution Hub/MessagPort.cs — static QISDistributionHub()</div>
+<pre>
+// one QueueReader per message type that the DH will handle,
+// read directly from the messagetype table in the message store database
+DataTable dt = QISDistributionHubService.QIS.MessageStore.GetProcessLogTypes();
+if (dt.Rows.Count == 0)
+    throw new Exception("Distribution hub is not configured with any process log types in message store database.");
+
+LogTypes = new string[dt.Rows.Count];
+for (int i = 0; i &lt; dt.Rows.Count; i++)
+{
+    LogTypes[i] = dt.Rows[i][0].ToString().Trim();
+    QueueReaderCol.Add(LogTypes[i], new QueueReader(LogTypes[i]));   // keyed by LogType
+}
+</pre>
+
+  <h3>1.2 Each EU registers which LogTypes it accepts + its address</h3>
+  <p>For every EU, the hub reads <span class="mono">QISConfig.xml</span> and records: the <strong>LogTypes it accepts</strong> (into <span class="mono">AcceptedMessageTypeCol</span>), the <strong>connect method</strong> (Remoting TCP/HTTP), and the EU's <strong>port + URI</strong>. That URI/port is the address the hub will dial later.</p>
+  <div class="path">.../Distribution Hub/Main.cs — EU load loop</div>
+<pre>
+// which process log types can this EU process
+foreach (XmlNode aMessage in EUConfig.SelectNodes("//Messages/Message"))
+    aUnit.AcceptedMessageTypeCol.Add(((XmlElement)aMessage).GetAttribute("LogType"), "ACCEPT");
+
+switch (aNode.SelectSingleNode("@ConnectMethod").Value)
+{
+  case "REMOTING":
+    switch (aNode.SelectSingleNode("@ConnectChannel").Value)
+    {
+      case "TCP":
+        aUnit.ConnectMethod = QISConnectMethod.REMOTING_TCP;
+        aUnit.RemotingPort  = Convert.ToInt32(EUConfig.SelectSingleNode("//ExecutionUnit/@TCP_PORT").Value);
+        aUnit.RemotingURI   = EUConfig.SelectSingleNode("//ExecutionUnit/@URI").Value;   break;
+      case "HTTP":
+        aUnit.ConnectMethod = QISConnectMethod.REMOTING_HTTP;
+        aUnit.RemotingPort  = Convert.ToInt32(EUConfig.SelectSingleNode("//ExecutionUnit/@HTTP_PORT").Value);
+        aUnit.RemotingURI   = EUConfig.SelectSingleNode("//ExecutionUnit/@URI").Value;   break;
+    }
+}
+aUnit.StartHeartBeat();                 // liveness monitor → sets Active / Dead
+aUnit.ArrayIndex = ExecutionUnits.Count;
+lock (ExecutionUnits) { ExecutionUnits.Add(aUnit); }   // the EU registry (round-robin list)
+</pre>
+  <div class="callout">After setup the hub holds: a <span class="mono">QueueReaderCol</span> keyed by LogType, and an <span class="mono">ExecutionUnits</span> list where each EU knows <em>which LogTypes it accepts</em> and <em>how to be reached</em> (URI:port).</div>
+
+  <!-- ===================== 2 INTAKE ===================== -->
+  <h2 id="intake">2. INTAKE — A Message Arrives, Gets an ID, and Is Stored</h2>
+  <div class="stage-head"><span class="tag t-blue">Step 2</span><span class="mini">Distribution Hub/MessagPort.cs</span></div>
+
+  <p>A client calls the hub's remoting endpoint <span class="mono">IQISDistributionHub.ApplicationMessage(...)</span>. The hub persists the message to the Message Store — this is where the <span class="mono">QISMessageId</span> becomes the durable key — then <strong>drops the payload from memory</strong> and routes the lightweight message object (now just metadata + ID) to the matching per-LogType queue.</p>
+  <div class="path">.../Distribution Hub/MessagPort.cs — SubmitToQueue()</div>
+<pre>
+internal void SubmitToQueue(CQISMessage aMessage, bool ThrowError)
+{
+    // 1) persist the full message (payload) to the Message Store with a state
+    QISDistributionHubService.QIS.MessageStore.PersistMessage(aMessage, QISMessageState.DistributionHubCache);
+
+    // 2) the in-memory copy no longer needs the payload — only the id/metadata travels now
+    aMessage.Message = null;                                   // ◀ claim-check begins here
+
+    // 3) hand the message to the queue for its LogType
+    ((QueueReader)QueueReaderCol[aMessage.LogType]).RouteMessage(aMessage);
+    Interlocked.Increment(ref QISDistributionHubService.QIS.QueueTx);
+}
+</pre>
+  <div class="callout id"><strong>Where the ID comes from:</strong> the identifier is the Message Store key <span class="mono">message.messageid</span> (a <span class="mono">char(36)</span> value), surfaced on the in-memory object as <span class="mono">aMessage.QISMessageId</span>. From this point on, <em>that string is the message</em> — everything else references it.</div>
+
+  <!-- ===================== 3 IDENTIFY ===================== -->
+  <h2 id="identify">3. IDENTIFY — Pick the Right Execution Unit</h2>
+  <div class="stage-head"><span class="tag t-purple">Step 3</span><span class="mini">Distribution Hub/MessagPort.cs — QueueReader.DoReader()</span></div>
+
+  <p>The queue reader for a LogType dequeues a message and must choose an EU. Two gates decide identification: <strong>(a)</strong> the EU must accept this LogType, and <strong>(b)</strong> the EU must be <em>active</em>. The hub round-robins (<span class="mono">CurrentUnit</span>) so load spreads across all capable EUs.</p>
+  <div class="path">.../Distribution Hub/MessagPort.cs — QueueReader.DoReader()</div>
+<pre>
+// (a) make sure at least one EU can consume this LogType, else release it back to the store
+bool foundEU = false; int searchUnit = 0;
+while (!foundEU)
+{
+    QISExecutionUnit unit = (QISExecutionUnit)QIS.ExecutionUnits[searchUnit];
+    if (unit.AcceptedMessageTypeCol.ContainsKey(aMessage.LogType)) { foundEU = true; break; }   // ◀ LogType match
+    if (++searchUnit &gt;= QIS.ExecutionUnits.Count)
+    {   // nobody can handle it → return to Message Store, release ownership
+        QIS.MessageStore.ResubmitMessage(aMessage.QISMessageId, false);
+        break;
+    }
+}
+
+// (b) round-robin to the next ACTIVE, capable EU
+QISExecutionUnit aUnit = (QISExecutionUnit)QIS.ExecutionUnits[CurrentUnit];
+foundActiveEU = aUnit.Active;                                   // ◀ liveness gate (heartbeat)
+if (!aUnit.AcceptedMessageTypeCol.ContainsKey(aMessage.LogType)) { CurrentUnit++; /* try next */ }
+...
+if (aUnit.RouteMessage(aMessage)) { /* handed to that EU's send queue */ }
+</pre>
+
+  <div class="callout warn"><strong>Back-pressure:</strong> each EU has <span class="mono">MaxOutstandingRequests</span> (code default <span class="mono">2</span>, set per-EU in config). If an EU already has that many in flight (<span class="mono">m_outstanding &gt; m_maxoutstanding</span>), the hub skips it and tries the next — so a busy EU is never overloaded.</div>
+
+  <!-- ===================== 4 SEND ===================== -->
+  <h2 id="send">4. SEND — Only the QISMessageId Crosses the Wire</h2>
+  <div class="stage-head"><span class="tag t-blue">Step 4</span><span class="mini">Distribution Hub/ExecutionUnit.cs — RemotingRequestState.StartRequest()</span></div>
+
+  <p>The hub gets a live remoting reference to the chosen EU (dialing its <span class="mono">RemotingURI</span>:<span class="mono">RemotingPort</span>), marks the message <span class="mono">Transit</span> in the store, and asynchronously invokes the EU's <span class="mono">ApplicationMessage</span> passing <strong>only <span class="mono">Data.QISMessageId</span></strong>.</p>
+  <div class="path">.../Distribution Hub/ExecutionUnit.cs — RemotingRequestState.StartRequest()</div>
+<pre>
+IQISExecutionUnit aUnit = ((QISExecutionUnit)QIS.ExecutionUnits[ParentKey]).GetRemotingRef();  // connect to EU URI:port
+AMD = new ApplicationMessageDelegate(aUnit.ApplicationMessage);
+
+QIS.MessageStore.StateChangeSingleMessage(Data.QISMessageId, QISMessageState.Transit);         // mark in-flight
+Result = AMD.BeginInvoke(Data.QISMessageId, out AsyncResponse, new AsyncCallback(GetResponse), this);
+//                        ▲ the ONLY thing sent to the EU is the message-id string
+// on any transport error → QIS.MainHub.SubmitToQueue(Data);  (re-queue for another EU)
+</pre>
+
+  <!-- ===================== 5 RECEIVE ===================== -->
+  <h2 id="receive">5. RECEIVE — The EU Loads the Payload by ID (Takes Ownership)</h2>
+  <div class="stage-head"><span class="tag t-green">Step 5</span><span class="mini">Execution Unit/MessagePort.cs</span></div>
+
+  <p>The EU exposes a remoting object. Its <span class="mono">ApplicationMessage(string Request, …)</span> receives the ID. The method's own XML doc comment states the contract: <em>"Unique message id that points to the record in message store database."</em> It then loads that record by ID, validates the environment, flips state to <span class="mono">Executing</span>, and queues the work on a thread pool.</p>
+  <div class="path">Execution Unit/MessagePort.cs — QISExecutionUnit.ApplicationMessage(string Request, …)</div>
+<pre>
+/// &lt;param name="Request"&gt;Unique message id that points to the record in message store database&lt;/param&gt;
+public bool ApplicationMessage(string Request, out string Response)
+{
+    // fetch the whole message (payload) from the Message Store using the id
+    CQISMessage msgObject = loadMessageObjectFromDB(Request);
+
+    // ... validate the environment the message belongs to ...
+
+    Processed.Add(msgObject.QISMessageId, msgObject.QISMessageId);
+    QIS.MessageStore.StateChangeSingleMessage(msgObject.QISMessageId, QISMessageState.Executing);   // state → Executing
+
+    m_pool.ProcessItem(new ThreadStart((new Worker(msgObject)).ProcessTX));   // run the work on a pool thread
+    Response = "PROCESSING";
+    return true;
+}
+</pre>
+
+  <h3>5.1 The fetch-by-ID itself (claim + load in one call)</h3>
+  <p>This is the literal "retrieve the payload from the message store" by ID. The method <span class="mono">TakeOwnershipOfMessageAndGetMessageInfo(msgId)</span> both <strong>claims ownership</strong> of that row and <strong>returns its data</strong>; the row is then turned into the message object (payload included).</p>
+  <div class="path">Execution Unit/MessagePort.cs — loadMessageObjectFromDB()</div>
+<pre>
+private CQISMessage loadMessageObjectFromDB(string msgId)
+{
+    DataTable dt = QISExecutionUnitService.QIS.MessageStore.TakeOwnershipOfMessageAndGetMessageInfo(msgId);  // claim + fetch by id
+    if (dt.Rows.Count == 0)
+        throw new Exception("Message with id: " + msgId + " does not exist in message store");
+    return CQISMessageHelper.CreateFromDataRow(dt.Rows[0]);     // DataRow → message object (payload)
+}
+</pre>
+
+  <div class="callout key"><strong>Answer to "how are messages identified / picked at the EU":</strong> the EU is handed the <span class="mono">QISMessageId</span> string over remoting. It calls <span class="mono">TakeOwnershipOfMessageAndGetMessageInfo(id)</span>, which looks the record up by that exact id in the Message Store, <em>takes ownership</em> of it, and returns the row — from which the payload is rebuilt. No scanning, no guessing: a direct key lookup on the id the hub chose.</div>
+
+  <!-- ===================== 6 PROCESS ===================== -->
+  <h2 id="process">6. PROCESS — The Engine Runs the Capitation Agent</h2>
+  <div class="stage-head"><span class="tag t-amber">Step 6</span><span class="mini">Execution Unit/MessagePort.cs — Worker.ProcessTX() · QCSI Process Execution</span></div>
+
+  <p>The thread-pool worker selects the message's environment, logs <span class="mono">ERS_EXECUTE</span>, and runs the QFramework engine over the message body. The engine looks up the process for the message's <span class="mono">LogType</span> (e.g. <span class="mono">ADV_CAP_PROC</span>) and invokes the capitation agent.</p>
+  <div class="path">Execution Unit/MessagePort.cs — Worker.ProcessTX()</div>
+<pre>
+session = QISExecutionUnitService.QIS.GetSession();
+session.SelectEnv(m_message.EnvId.ToString(), "plandata");
+QIS.ProcLog.StateChangeTX(m_message.DetailId, m_message.EnvId, "ERS_EXECUTE",
+                          "QEnterprise Execution Unit Started Processing Message", ref Err, session);
+
+MessageProcessorEngine engine = new MessageProcessorEngine();
+engine.ProcessRequest(session, m_message.Message);              // ◀ runs the agent pipeline
+if (engine.errorDescription.Length &gt; 0) throw new Exception("Execution error: " + engine.errorDescription);
+</pre>
+  <div class="path">QCSI Process Execution/MessageProcessorEngine.cs — ProcessRequest()</div>
+<pre>
+m_transactionMessage = (QFrameTransactionType) CUtility.GetObject(tranMsg, typeof(QFrameTransactionType));
+m_processManager.Initialize(session, m_transactionMessage.Process.LogType);   // LogType = ADV_CAP_PROC / ADV_CAP_BATCH
+ProcessExecutionHost host = new ProcessExecutionHost();
+host.Execute(m_transactionMessage, session);                                   // walks the step → CapProgramAgent
+</pre>
+  <div class="path">components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProgramAgent.cs</div>
+<pre>
+protected override string ProcessMessage(IQcsiSession session, string message)
+{
+    CapSubmitRequestMessageType reqInfo =
+        (CapSubmitRequestMessageType)CUtility.GetObject(message, typeof(CapSubmitRequestMessageType));
+    Q.ServiceComponents.ICapProviderActivity cap =
+        new CapProviderActivity(session, reqInfo.headerId, reqInfo.detailId);
+    cap.BuildProgramCapitation(message);        // builds provider/PCP lists, stages enrollment batches
+}
+</pre>
+  <p class="mini">The capitation activity stages enrollment payloads (XML) into the <span class="mono">capmessagequeue</span> work table in <span class="mono">PlanData_Parallel</span> in batches (≈500), via procs like <span class="mono">spQ_BuildGlobalCapMessage</span> / <span class="mono">spQ_BuildPCPCapMessage</span>.</p>
+
+  <!-- ===================== 7 COMPLETE ===================== -->
+  <h2 id="complete">7. COMPLETE — Remove by ID, States &amp; Retries</h2>
+  <div class="stage-head"><span class="tag t-red">Step 7</span><span class="mini">Execution Unit/MessagePort.cs — Worker.ProcessTX()</span></div>
+<pre>
+QISExecutionUnitService.QIS.MessageStore.RemoveMessage(m_message.QISMessageId);     // ◀ ack: delete by id
+QIS.ProcLog.StopLogTX(m_message.HeaderId, m_message.DetailId, m_message.EnvId, Error, Status, StopMsg, ...);
+Interlocked.Increment(ref QIS.CompleteTx);
+// on exception inside the agent:
+QIS.MessageStore.StateChangeSingleMessage(m_message.QISMessageId, QISMessageState.Error);   // mark Error by id
+</pre>
+
+  <h3>7.1 State track (all keyed by the message id)</h3>
+<pre>
+ submit → PersistMessage      StartRequest        ApplicationMessage       Worker.ProcessTX        RemoveMessage
+────────▶ DistributionHubCache ──────▶ Transit ──────▶ Executing ──────────▶ (work runs) ──────────▶ (row deleted / Complete)
+                                  │                                                   │
+          no capable EU ─────────┴── ResubmitMessage(id,false) (re-queue)            └── error → Error(by id)
+</pre>
+
+  <table>
+    <tr><th>Situation</th><th>Action (by message id)</th><th>Evidence</th></tr>
+    <tr><td>No EU accepts the LogType</td><td><span class="mono">ResubmitMessage(QISMessageId, false)</span> — back to store, release ownership</td><td>MessagPort.cs (QueueReader)</td></tr>
+    <tr><td>Transport error / timeout to EU</td><td><span class="mono">MainHub.SubmitToQueue(Data)</span> — re-queue for another EU</td><td>ExecutionUnit.cs (StartRequest / PullbackRequest)</td></tr>
+    <tr><td>Agent throws</td><td><span class="mono">StateChangeSingleMessage(QISMessageId, Error)</span></td><td>Execution Unit/MessagePort.cs (Worker)</td></tr>
+    <tr><td>Success</td><td><span class="mono">RemoveMessage(QISMessageId)</span> + <span class="mono">StopLogTX</span></td><td>Execution Unit/MessagePort.cs (Worker)</td></tr>
+  </table>
+
+  <!-- ===================== 8 ID TABLE ===================== -->
+  <h2 id="idtable">8. How Message IDs Are Identified &amp; Routed — Summary</h2>
+  <table>
+    <tr><th>Question</th><th>Answer (from code)</th></tr>
+    <tr><td>What is the message's identity?</td><td>The <span class="mono">QISMessageId</span> string = the Message Store key <span class="mono">message.messageid</span> (<span class="mono">char(36)</span>), created when the hub calls <span class="mono">PersistMessage</span>.</td></tr>
+    <tr><td>How does the hub decide which EU gets it?</td><td>By <strong>LogType</strong>: <span class="mono">aUnit.AcceptedMessageTypeCol.ContainsKey(aMessage.LogType)</span>, among <strong>Active</strong> EUs, chosen <strong>round-robin</strong> (<span class="mono">CurrentUnit</span>), skipping any EU at its <span class="mono">MaxOutstandingRequests</span>.</td></tr>
+    <tr><td>How is the EU reached?</td><td>The hub dials the EU's <span class="mono">RemotingURI</span> + <span class="mono">RemotingPort</span> via <span class="mono">GetRemotingRef()</span> (TCP or HTTP remoting).</td></tr>
+    <tr><td>What is actually sent to the EU?</td><td>Only the id: <span class="mono">AMD.BeginInvoke(Data.QISMessageId, …)</span>. The payload is <em>not</em> sent (it was dropped from memory at intake).</td></tr>
+    <tr><td>How does the EU get the payload?</td><td><span class="mono">loadMessageObjectFromDB(id)</span> → <span class="mono">TakeOwnershipOfMessageAndGetMessageInfo(id)</span> — a direct key lookup that also claims ownership, then <span class="mono">CQISMessageHelper.CreateFromDataRow</span> rebuilds the payload.</td></tr>
+    <tr><td>How are duplicates prevented?</td><td>Ownership: a server stamps the row (<span class="mono">QnxtServerId</span>) and advances its state (<span class="mono">Transit → Executing</span>); another server/DH ignores rows it does not own.</td></tr>
+    <tr><td>How does the EU signal done?</td><td><span class="mono">RemoveMessage(QISMessageId)</span> deletes the row (ack); failures use <span class="mono">StateChangeSingleMessage(id, Error)</span> or re-queue.</td></tr>
+  </table>
+
+  <!-- ===================== 9 FILES ===================== -->
+  <h2 id="files">9. Evidence Index</h2>
+  <table>
+    <tr><th>Concern</th><th>File / object</th></tr>
+    <tr><td>Hub builds LogType queues from DB; intake &amp; SubmitToQueue</td><td><span class="path">QFrame/Infrastructure/Common/Src/WindowsService/Distribution Hub/MessagPort.cs</span></td></tr>
+    <tr><td>EU registration (AcceptedMessageTypeCol, URI/port), registry</td><td><span class="path">QFrame/Infrastructure/Common/Src/WindowsService/Distribution Hub/Main.cs</span></td></tr>
+    <tr><td>Pick EU, connect, send QISMessageId, MaxOutstandingRequests</td><td><span class="path">QFrame/Infrastructure/Common/Src/WindowsService/Distribution Hub/ExecutionUnit.cs</span></td></tr>
+    <tr><td>EU remoting entry; load-by-id; take ownership; process</td><td><span class="path">QFrame/Infrastructure/Common/Src/WindowsService/Execution Unit/MessagePort.cs</span></td></tr>
+    <tr><td>EU host object (QISMain, MessageStore, session pool)</td><td><span class="path">QFrame/Infrastructure/Common/Src/WindowsService/Execution Unit/Main.cs</span></td></tr>
+    <tr><td>QFrame engine walks process steps → agent</td><td><span class="path">QFrame/Infrastructure/Common/Src/QCSI Process Execution/MessageProcessorEngine.cs</span></td></tr>
+    <tr><td>Message Store claim/select/state SQL &amp; MessageState enum</td><td><span class="path">QFrame/Infrastructure/Common/Src/QCSI Message Store/MessageStore.cs</span></td></tr>
+    <tr><td>Capitation agent</td><td><span class="path">components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProgramAgent.cs</span></td></tr>
+    <tr><td>Capitation work-item table &amp; enqueue procs</td><td><span class="path">components/db/mssql/plandata_parallel/Table/dbo.capmessagequeue.Table.sql</span> · <span class="path">.../StoredProcedure/dbo.spQ_BuildGlobalCapMessage.StoredProcedure.sql</span></td></tr>
+  </table>
+
+  <div class="callout id">
+    <strong>In one sentence:</strong> the hub stores the payload, keeps only the <span class="mono">QISMessageId</span>, routes it to an <strong>active EU that accepts its <span class="mono">LogType</span></strong> (round-robin, respecting <span class="mono">MaxOutstandingRequests</span>) over remoting, and the EU uses that id to <strong>take ownership of and load the exact record</strong> from the Message Store, run the capitation agent, then <strong>remove the record by id</strong> when done.
+  </div>
+
+</div>
+
+<footer>
+  QFramework Execution Flow v2 — message-ID routing, generated from source inspection of <span class="mono">mms-cms-cef</span> (QFrame / QEnterprise). Class names, method names, XML config attributes, SQL object names and state values were read directly from the files in Section&nbsp;9; nothing is assumed.
+</footer>
+</body>
+</html>

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QFramework — What a Message ID Is, How It's Chosen, and What It Returns</title>
+<style>
+  :root{
+    --bg:#fcfdff; --panel:#ffffff; --ink:#1b2430; --muted:#5a6775; --line:#e6ebf1;
+    --accent:#3f6fd0; --accent-soft:#eaf1fc; --purple:#6b46c1; --purple-soft:#f1ecfb;
+    --green:#1f8b4c; --green-soft:#e8f6ee; --amber:#b06a08; --amber-soft:#fcf2e3;
+    --red:#c2362f; --red-soft:#fdeeed; --code:#f5f6f9; --codeink:#243049;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 "Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  header{padding:28px 36px;background:linear-gradient(135deg,#eaf1fc,#fcfdff);border-bottom:1px solid var(--line)}
+  header h1{margin:0 0 6px;font-size:23px;color:#28406e}
+  header p{margin:0;color:var(--muted);max-width:900px}
+  .wrap{max-width:1060px;margin:0 auto;padding:26px 36px 80px}
+  h2{margin:40px 0 14px;font-size:20px;color:#28406e;border-left:5px solid var(--accent);padding-left:12px}
+  h3{margin:22px 0 8px;font-size:16px;color:#345091}
+  p{margin:10px 0}
+  .lead{color:var(--muted);font-size:16px}
+  code,pre{font-family:"Cascadia Code",Consolas,"Courier New",monospace}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:13px 15px;overflow:auto;font-size:12.5px;line-height:1.5;color:var(--codeink)}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:var(--codeink)}
+  .path{display:inline-block;background:#eef1f7;color:#45506a;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px;font-family:"Cascadia Code",Consolas,monospace;margin:2px 0;word-break:break-all}
+  .mono{font-family:"Cascadia Code",Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:#eef2fb;color:#28406e}
+  tr:nth-child(even) td{background:#fafbfe}
+  .q{background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:11px;padding:16px 20px;margin:20px 0;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+  .q .qh{font-size:17px;font-weight:700;color:#28406e;margin:0 0 4px}
+  .q .ans{background:var(--accent-soft);border:1px solid #cfdef6;border-radius:8px;padding:10px 14px;margin:10px 0}
+  .q .ans b{color:#28406e}
+  .layers{display:flex;flex-direction:column;gap:0;margin:16px 0}
+  .layer{border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:6px 0;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .layer.l1{background:var(--purple-soft);border-color:#ddd0f3}
+  .layer.l2{background:var(--accent-soft);border-color:#cfdef6}
+  .layer.l3{background:var(--green-soft);border-color:#c6e7d2}
+  .layer h4{margin:0 0 3px;font-size:14px}
+  .layer small{color:var(--muted)}
+  .down{align-self:center;color:var(--muted);font-size:18px}
+  .callout{background:#f6f7fb;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:14px 0}
+  .callout.key{background:var(--green-soft);border-color:#c6e7d2}
+  .callout.warn{background:var(--amber-soft);border-color:#f0dcb9}
+  ul.tight{margin:8px 0;padding-left:22px}
+  ul.tight li{margin:4px 0}
+  .badge{display:inline-block;background:#eef1f7;border:1px solid var(--line);border-radius:6px;padding:1px 7px;font-size:11px;font-family:"Cascadia Code",Consolas,monospace;color:#45506a;margin:1px}
+  .toc{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 22px;margin:18px 0}
+  .toc a{color:var(--accent);text-decoration:none;margin-right:16px;font-size:14px;white-space:nowrap}
+  .toc a:hover{text-decoration:underline}
+  .hl{color:#b5460b;font-weight:600}.hl2{color:#1f8b4c;font-weight:600}
+  footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding:18px 36px;max-width:1060px;margin:0 auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>QFramework Message IDs — What They Are, How They're Chosen, What They Return</h1>
+  <p>Plain-English answers to three questions about the QEnterprise capitation flow, each backed by code in <span class="mono">mms-cms-cef/components/QFrame</span> and the capitation agent. Nothing is assumed.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="toc">
+    <a href="#q1">Q1 · Member or transaction?</a>
+    <a href="#layers">The 3 layers of identity</a>
+    <a href="#q2">Q2 · Which ID goes to the hub?</a>
+    <a href="#q3">Q3 · One record or a set?</a>
+    <a href="#cheat">Cheat sheet</a>
+  </div>
+
+  <!-- ============ Q1 ============ -->
+  <div class="q" id="q1">
+    <p class="qh">Q1 — Are these message IDs assigned to a member, or to a transaction?</p>
+    <div class="ans"><b>A transaction (a unit of work), not a member.</b> A QEnterprise message ID (<span class="mono">QISMessageId</span> = the Message Store key <span class="mono">message.messageid</span>, a <span class="mono">char(36)</span> value) identifies one <em>transaction message</em> — a serialized <span class="mono">QFrameTransactionType</span>. Member information (<span class="mono">memid</span>, <span class="mono">enrollid</span>, dob…) is <em>data carried inside</em> the message, never the message's identity.</div>
+  </div>
+
+  <p>The proof is in what the message deserializes into. The execution engine turns the message body into a transaction object and runs it by its <span class="mono">LogType</span> — there is no member key involved in identifying the message:</p>
+  <div class="path">QFrame/Infrastructure/Common/Src/QCSI Process Execution/MessageProcessorEngine.cs</div>
+<pre>
+m_transactionMessage = (QFrameTransactionType) CUtility.GetObject(tranMsg, typeof(QFrameTransactionType));
+m_processManager.Initialize(session, m_transactionMessage.Process.LogType);   // identified by transaction + LogType
+host.Execute(m_transactionMessage, session);
+</pre>
+  <p>For capitation, the first message is a <strong>program-level submit</strong> (<span class="mono">CapSubmitRequestMessageType</span>) — it describes a Program and capitation settings, not a person:</p>
+  <div class="path">components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProgramAgent.cs</div>
+<pre>
+CapSubmitRequestMessageType reqInfo =
+    (CapSubmitRequestMessageType)CUtility.GetObject(message, typeof(CapSubmitRequestMessageType));
+// reqInfo.Program.Id, reqInfo.Capitation.* … → a program run, not a member
+cap.BuildProgramCapitation(message);
+</pre>
+
+  <h3 id="layers">The three layers of identity (why this is confusing)</h3>
+  <p>Capitation has <strong>three different “ids” at three levels</strong>. Only the top one is the QEnterprise message ID.</p>
+  <div class="layers">
+    <div class="layer l1">
+      <h4>① Transaction message &nbsp;<span class="badge">QISMessageId — char(36)</span></h4>
+      <small>The QEnterprise message. One per unit of work (e.g. a “Submit Program Capitation” request, LogType <span class="mono">ADV_CAP_PROC</span>). This is what the hub sends to an Execution Unit.</small>
+    </div>
+    <div class="down">▼ the agent fans this out into…</div>
+    <div class="layer l2">
+      <h4>② Provider messages &nbsp;<span class="badge">CapProviderRequestMessageType[]</span></h4>
+      <small>One message <em>per provider/affiliate</em>. The agent builds a provider list and submits an array of these downstream — each becomes its own QEnterprise message with its own <span class="mono">QISMessageId</span>.</small>
+    </div>
+    <div class="down">▼ which stage member-level rows into…</div>
+    <div class="layer l3">
+      <h4>③ Enrollment work-items &nbsp;<span class="badge">capmessagequeue.messageid — a counter</span></h4>
+      <small>One row <em>per member enrollment</em> (<span class="mono">memid</span>, <span class="mono">enrollid</span>, dob…). Here <span class="mono">messageid</span> is just a sequential number within a batch (a <span class="mono">zint</span> counter), paired with <span class="mono">capmessagequeueid</span> — <strong>not</strong> the QEnterprise GUID.</small>
+    </div>
+  </div>
+  <p>Each provider message is submitted back through QEnterprise by a proxy — confirming that a provider (work unit), not a member, becomes a message:</p>
+  <div class="path">components/QNXT/ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProviderActivity.cs</div>
+<pre>
+CapProviderRequestMessageType[] provMessages = ConvertToProvMessages(dt, message, recondate, reviewdate, advreconrun);
+Q.Proxy.CapProviderProxy myCap = new Q.Proxy.CapProviderProxy(this.Session);
+myCap.ProcessMessage(provMessages);        // each provider → its own downstream message
+</pre>
+  <div class="callout warn"><strong>Watch the name collision:</strong> the word “messageid” appears in two places with different meanings — the QEnterprise <span class="mono">message.messageid</span> (<span class="mono">char(36)</span>, a transaction key) and the capitation <span class="mono">capmessagequeue.messageid</span> (a per-batch counter at the member/enrollment level). They are not the same thing.</div>
+
+  <!-- ============ Q2 ============ -->
+  <div class="q" id="q2">
+    <p class="qh">Q2 — How is it decided which message ID is sent to the hub?</p>
+    <div class="ans"><b>The ID is system-generated when the message is stored, and selection is by LogType + priority + ownership — not by business choice.</b> A submitter/agent creates a message; it is written to the Message Store and gets its <span class="mono">char(36)</span> id automatically. From there, messages are handed out based on <em>what type they are</em>, <em>their priority</em>, and <em>which server currently owns them</em>.</div>
+  </div>
+
+  <h3>2.1 The ID is minted by the database, not chosen</h3>
+  <p>When a message is inserted, SQL Server returns the new id — the application never picks it:</p>
+  <div class="path">QFrame/Infrastructure/Common/Src/QCSI Message Store/StoreMessage.cs</div>
+<pre>
+sql = "Insert INTO message (messagetext) output inserted.messageid VALUES(@messagetext)";  // DB mints the id
+messageid = DbUtil.ExecuteScalar(paramoj, sql);
+// then a MessageHeader row records StateId = Queued(0), LogType, Priority, etc.
+</pre>
+
+  <h3>2.2 Which queued messages get picked — priority, type, ownership</h3>
+  <p>A server claims a batch of the <strong>oldest/highest-priority unclaimed</strong> messages whose <span class="mono">LogType</span> it is mapped to handle, and stamps them with its own <span class="mono">QnxtServerId</span>. That claim is what decides “which ids go out next.”</p>
+  <div class="path">QFrame/Infrastructure/Common/Src/QCSI Message Store/MessageStore.cs — MarkMessages()</div>
+<pre>
+"Update MessageHeader set QnxtServerid = @qnxtserverid, Stateid = @stateid, statechgdate = getdate() "
++ "where messageid in ("
++ "  Select top " + config.SelectBatchSize.IntegerValue + " mh.MessageId "
++ "  FROM MessageHeader mh INNER JOIN MessageMap mm ON mh.logtype = mm.logtype AND mm.templateid = @templateid "
++ "  WHERE QnxtServerid IN (@qnxtserverid, 0) AND stateid = 0 "      // 0 = Queued / unowned
++ "  order by mh.priority desc, mm.priority desc)";                  // ◀ priority decides the order
+</pre>
+  <p>On the hub side, the choice of <em>which EU</em> receives a given id is then made purely by <strong>LogType match</strong> among active workers (round-robin, respecting each EU's limit):</p>
+  <div class="path">.../Distribution Hub/MessagPort.cs</div>
+<pre>
+if (unit.AcceptedMessageTypeCol.ContainsKey(aMessage.LogType)) { foundEU = true; }   // LogType decides the EU
+// ... round-robin across active EUs, skip any EU already at MaxOutstandingRequests ...
+</pre>
+  <div class="callout"><strong>So the “decision” is three filters, not a manual pick:</strong> <span class="badge">state = Queued(0)</span> → <span class="badge">LogType mapped to this server/EU</span> → <span class="badge">highest priority first</span>. The id value itself is irrelevant to selection; it's just the key that rides along.</div>
+
+  <!-- ============ Q3 ============ -->
+  <div class="q" id="q3">
+    <p class="qh">Q3 — When data is retrieved from a message ID, is it a single record or a set?</p>
+    <div class="ans"><b>A single message record per id — but that one record's payload can describe many members, and the member-level work is deliberately processed in sets (batches of 500).</b> One <span class="mono">QISMessageId</span> → exactly one row in the Message Store → one payload. The “set” appears <em>inside</em> the payload and at the enrollment-queue layer, not at the id lookup.</div>
+  </div>
+
+  <h3>3.1 Fetch by one id returns exactly one record</h3>
+  <p>The EU looks the id up directly; zero rows is an error, and it reads <span class="mono">Rows[0]</span> — a single record:</p>
+  <div class="path">QFrame/Infrastructure/Common/Src/WindowsService/Execution Unit/MessagePort.cs — loadMessageObjectFromDB()</div>
+<pre>
+DataTable dt = QIS.MessageStore.TakeOwnershipOfMessageAndGetMessageInfo(msgId);   // key lookup by id
+if (dt.Rows.Count == 0)
+    throw new Exception("Message with id: " + msgId + " does not exist in message store");
+return CQISMessageHelper.CreateFromDataRow(dt.Rows[0]);     // ◀ ONE row → one message/payload
+</pre>
+
+  <h3>3.2 …but one payload can represent many members, processed in sets of 500</h3>
+  <p>A single provider-capitation message can cover tens of thousands of enrollments. Rather than handle 100,000+ at once, the capitation proc writes them into <span class="mono">capmessagequeue</span> in <strong>batches of 500</strong> so the program can pull a “manageable set” at a time. The proc's own comment says exactly this:</p>
+  <div class="path">components/db/mssql/plandata_parallel/StoredProcedure/dbo.spQ_BuildGlobalCapMessage.StoredProcedure.sql</div>
+<pre>
+--inserts cap messages for global enrollments into the capmessagequeue table
+--where the cap program can retrieve a manageable set of messages instead of 100K+ at one time
+DECLARE @batchsize zint = 500
+...
+-- a cursor walks every eligible ENROLLMENT (one row per member enrollment) …
+OPEN BuildCapEnrollmentMessages
+FETCH NEXT FROM BuildCapEnrollmentMessages INTO @Rank, @enrollid, @planid, @memid, ...
+...
+-- … and every 500 enrollments it rolls to a new detail id / batch
+IF @batchmsgcount >= @batchsize + 1 AND @PreRank <> @Rank BEGIN ... SET @batchmsgcount = 1 END
+</pre>
+  <div class="callout key"><strong>Two different “reads,” two different shapes:</strong>
+    <ul class="tight">
+      <li><strong>By QEnterprise message id</strong> → <span class="hl2">one record</span> (one transaction/payload). <span class="mono">TakeOwnershipOfMessageAndGetMessageInfo(id)</span> returns a single row.</li>
+      <li><strong>By the message service sweep / capitation queue</strong> → <span class="hl">a set</span>. <span class="mono">MarkMessages</span> claims <span class="mono">TOP N</span> messages; <span class="mono">capmessagequeue</span> holds enrollments in 500-row batches per <span class="mono">capmessagequeueid</span>.</li>
+    </ul>
+  </div>
+
+  <!-- ============ CHEAT SHEET ============ -->
+  <h2 id="cheat">Cheat sheet</h2>
+  <table>
+    <tr><th>Question</th><th>Short answer</th><th>Key evidence</th></tr>
+    <tr>
+      <td>Is a message ID per member or per transaction?</td>
+      <td><b>Per transaction / unit of work.</b> Member data lives inside the payload.</td>
+      <td><span class="mono">QFrameTransactionType</span>; <span class="mono">CapSubmitRequestMessageType</span>; <span class="mono">CapProviderRequestMessageType[]</span></td>
+    </tr>
+    <tr>
+      <td>Who assigns the ID?</td>
+      <td><b>SQL Server</b>, on insert (<span class="mono">output inserted.messageid</span>), as a <span class="mono">char(36)</span> key.</td>
+      <td><span class="mono">StoreMessage.InsertMessage()</span></td>
+    </tr>
+    <tr>
+      <td>How is it decided which ID goes out?</td>
+      <td><b>state=Queued → LogType mapped to server/EU → highest priority first</b> (plus round-robin &amp; EU limits). Not a manual pick.</td>
+      <td><span class="mono">MarkMessages()</span>; <span class="mono">AcceptedMessageTypeCol.ContainsKey(LogType)</span></td>
+    </tr>
+    <tr>
+      <td>Fetch by a given ID → one or many?</td>
+      <td><b>One record</b> (one payload). The payload may list many members.</td>
+      <td><span class="mono">loadMessageObjectFromDB()</span> → <span class="mono">Rows[0]</span></td>
+    </tr>
+    <tr>
+      <td>Where does the “set” happen?</td>
+      <td><b>At the sweep &amp; the enrollment queue</b> — <span class="mono">TOP N</span> claims and <span class="mono">capmessagequeue</span> batches of 500.</td>
+      <td><span class="mono">MarkMessages (TOP N)</span>; <span class="mono">spQ_BuildGlobalCapMessage (@batchsize=500)</span></td>
+    </tr>
+  </table>
+
+  <div class="callout key">
+    <strong>In one line:</strong> a message ID names a <span class="hl2">transaction</span> (not a member); it is <span class="hl2">database-generated</span> and selected for dispatch by <span class="hl2">type + priority + ownership</span>; looking it up returns <span class="hl2">one record</span>, while the many members it affects are handled in <span class="hl">batches of 500</span> downstream.
+  </div>
+
+</div>
+
+<footer>
+  Answers derived from source inspection of <span class="mono">mms-cms-cef</span> (QFrame / QEnterprise &amp; the Capitation agent). Class names, SQL, and proc comments quoted above were read directly from the repository files cited on each panel.
+</footer>
+</body>
+</html>
