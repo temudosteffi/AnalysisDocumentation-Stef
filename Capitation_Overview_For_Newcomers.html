@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capitation — A Newcomer's Overview</title>
+<style>
+  :root{
+    --bg:#f4f6fb; --card:#ffffff; --ink:#1f2933; --muted:#5b6672;
+    --line:#e1e6eb; --accent:#2563eb; --accent2:#0f766e;
+    --weekly:#dbeafe; --weeklyln:#2563eb; --withhold:#fef3c7; --withholdln:#d97706;
+    --code:#0f172a; --codeink:#e2e8f0; --pill:#eef2ff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.6;}
+  header{background:linear-gradient(135deg,#1e3a8a,#0f766e);color:#fff;
+    padding:38px 44px;box-shadow:0 2px 12px rgba(0,0,0,.18);}
+  header h1{margin:0 0 8px;font-size:28px;}
+  header p{margin:0;opacity:.92;font-size:14.5px;max-width:820px;}
+  header .chip{display:inline-block;background:#fbbf24;color:#78350f;font-weight:700;
+    font-size:12px;padding:2px 10px;border-radius:20px;margin-top:10px;}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 24px 90px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:24px 28px;margin:22px 0;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+  h2{font-size:21px;margin:0 0 6px;color:var(--accent);
+    border-left:5px solid var(--accent);padding-left:12px;}
+  h2 .num{display:inline-block;background:var(--accent);color:#fff;border-radius:6px;
+    font-size:13px;padding:1px 9px;margin-right:8px;vertical-align:middle;}
+  h3{font-size:16px;margin:20px 0 8px;color:var(--accent2);}
+  p{margin:8px 0 12px;font-size:14.8px;}
+  p.desc{color:var(--muted);}
+  table{border-collapse:collapse;width:100%;font-size:13px;margin:10px 0;}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
+  th{background:#f1f5f9;font-weight:600;color:#334155;}
+  tr:nth-child(even) td{background:#f8fafc;}
+  code,.mono{font-family:"Cascadia Code",Consolas,monospace;font-size:12.5px;
+    background:#eef2ff;color:#3730a3;padding:1px 6px;border-radius:4px;}
+  pre{background:var(--code);color:var(--codeink);border-radius:8px;padding:14px 16px;
+    overflow:auto;font-size:12.6px;line-height:1.55;margin:10px 0;}
+  pre code{background:none;color:inherit;padding:0;}
+  pre .kw{color:#7dd3fc;} pre .cm{color:#86efac;} pre .st{color:#fca5a5;}
+  .pill{display:inline-block;background:var(--pill);color:#3730a3;border-radius:6px;
+    padding:1px 8px;font-size:12.5px;font-family:monospace;margin:1px 2px;}
+  .callout{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:13px 16px;margin:14px 0;font-size:14px;}
+  .callout.warn{background:#fef2f2;border-color:#fecaca;}
+  .callout.good{background:#f0fdf4;border-color:#bbf7d0;}
+  .callout.note{background:#fffbeb;border-color:#fde68a;}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.4px;padding:2px 9px;border-radius:20px;text-transform:uppercase;}
+  .tag.weekly{background:var(--weekly);color:#1e40af;border:1px solid var(--weeklyln);}
+  .tag.withhold{background:var(--withhold);color:#92400e;border:1px solid var(--withholdln);}
+  .toc{columns:2;font-size:14.3px;}
+  .toc a{color:var(--accent);text-decoration:none;}
+  .toc a:hover{text-decoration:underline;}
+  ol.steps,ul.plain{margin:8px 0;padding-left:22px;}
+  ol.steps li,ul.plain li{margin:6px 0;font-size:14.5px;}
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin:14px 0;}
+  .flow .box{flex:1;min-width:160px;background:#f8fafc;border:1px solid var(--line);
+    border-radius:10px;padding:12px 14px;font-size:13px;}
+  .flow .box b{color:var(--accent2);display:block;margin-bottom:4px;font-size:13.5px;}
+  .flow .arrow{align-self:center;color:var(--accent2);font-size:22px;}
+  .kvs{font-size:13px;}
+  .kvs td:first-child{font-weight:600;color:#334155;width:230px;white-space:nowrap;}
+  footer{color:var(--muted);font-size:12.6px;text-align:center;padding:22px;}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.8px;color:var(--muted);margin-top:10px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .sw{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid #cbd5e1;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Capitation — A Newcomer's Overview</h1>
+  <p>A plain-English introduction to what capitation is, how a capitation payment is built in the Ohio FI / CEF
+     system, and the rules the process applies. Written for people new to the domain.</p>
+  <span class="chip">Start here • No prior knowledge assumed</span>
+</header>
+
+<div class="wrap">
+
+  <!-- TOC -->
+  <div class="card">
+    <h3 style="margin-top:0">Contents</h3>
+    <div class="toc">
+      <a href="#s1">1. What is capitation?</a><br>
+      <a href="#s2">2. Capitation vs. fee-for-service</a><br>
+      <a href="#s3">3. Key terms (glossary)</a><br>
+      <a href="#s4">4. The end-to-end flow</a><br>
+      <a href="#s5">5. Funds: weekly vs. withhold</a><br>
+      <a href="#s6">6. The rules applied by the process</a><br>
+      <a href="#s7">7. A worked example</a><br>
+      <a href="#s8">8. Where this lives in the code</a>
+    </div>
+  </div>
+
+  <!-- 1 -->
+  <div class="card" id="s1">
+    <h2><span class="num">1</span>What is capitation?</h2>
+    <p><b>Capitation</b> is a way of paying a healthcare provider a <b>fixed amount for each enrolled member,
+       per month</b> — regardless of how many services that member actually uses. The word comes from
+       <i>capita</i> ("per head"): the provider is paid "per member" for agreeing to care for them.</p>
+    <p>The fixed monthly rate is called <b>PMPM</b> — <b>Per Member, Per Month</b>. If a provider is capitated
+       for 1,000 members at $25 PMPM, they receive <b>1,000 × $25 = $25,000</b> that month, whether those
+       members visit zero times or fifty times.</p>
+    <div class="callout good">
+      <b>Why it exists:</b> capitation moves financial risk to the provider and rewards keeping members healthy
+      and costs predictable, instead of rewarding high service volume.
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="card" id="s2">
+    <h2><span class="num">2</span>Capitation vs. fee-for-service</h2>
+    <table>
+      <tr><th>&nbsp;</th><th>Fee-for-Service</th><th>Capitation</th></tr>
+      <tr><td><b>What triggers payment</b></td><td>Each service / claim rendered</td><td>Member enrollment (per head)</td></tr>
+      <tr><td><b>Amount</b></td><td>Varies with volume of care</td><td>Fixed PMPM rate</td></tr>
+      <tr><td><b>Who holds the risk</b></td><td>The payer / health plan</td><td>The provider</td></tr>
+      <tr><td><b>Incentive</b></td><td>Do more services</td><td>Keep members healthy &amp; costs stable</td></tr>
+      <tr><td><b>Example</b></td><td>4 visits → plan pays for 4 visits</td><td>$25/month whether 0 or 10 visits</td></tr>
+    </table>
+  </div>
+
+  <!-- 3 -->
+  <div class="card" id="s3">
+    <h2><span class="num">3</span>Key terms (glossary)</h2>
+    <table class="kvs">
+      <tr><td>PMPM</td><td>Per Member, Per Month — the fixed capitation rate paid for each enrolled member.</td></tr>
+      <tr><td>Member / Enrollee (<code>EnrollID</code>)</td><td>A person enrolled with the plan and assigned to a provider.</td></tr>
+      <tr><td>Provider (<code>ProvID</code>)</td><td>The doctor, group, or entity receiving the capitation payment.</td></tr>
+      <tr><td>CapVoucher</td><td>One capitation line <b>per member, per fund</b> — the detailed "who and how much" record. Many of these roll up into one payment.</td></tr>
+      <tr><td>Payment (<code>PaymentID</code>)</td><td>The provider-level record that holds the lump-sum amount owed, built from many CapVoucher lines.</td></tr>
+      <tr><td>PayCheck</td><td>Fund-level detail attached to a payment.</td></tr>
+      <tr><td>Fund (<code>FundID</code>)</td><td>A bucket of money a cap amount is allocated to. Funds are either <b>weekly</b> (paid out) or <b>withhold</b> (held back).</td></tr>
+      <tr><td>Withhold</td><td>A portion of the capitation intentionally held back (e.g., for quality or reconciliation) and released later.</td></tr>
+      <tr><td>Method (<code>CAPFactors</code>)</td><td>The capitation calculation method the process targets.</td></tr>
+    </table>
+  </div>
+
+  <!-- 4 -->
+  <div class="card" id="s4">
+    <h2><span class="num">4</span>The end-to-end flow</h2>
+    <p class="desc">At a high level, capitation moves from member-level detail, up into a single provider payment,
+       and then back out into separate trackable payments:</p>
+    <div class="flow">
+      <div class="box"><b>1. Capitation run</b>Calculates a <b>CapVoucher line per member, per fund</b> (the PMPM owed).</div>
+      <div class="arrow">▶</div>
+      <div class="box"><b>2. Fan-in</b>Many CapVoucher lines roll up into <b>one</b> provider <code>Payment</code> (the lump sum).</div>
+      <div class="arrow">▶</div>
+      <div class="box"><b>3. Split (PostCap)</b><code>PostCap_SplitPayment</code> sums lines per fund and splits the one payment into <b>one payment per fund</b>.</div>
+      <div class="arrow">▶</div>
+      <div class="box"><b>4. Release</b>Weekly funds are paid on schedule; withhold funds are held back.</div>
+    </div>
+    <div class="callout">
+      The <b>read side</b> of this data (looking up the CapVouchers behind a payment) is surfaced through the
+      Ohio FI web services as a <code>PaymentInquiry</code> that returns a list of <code>CapVoucher</code> lines
+      for a given <code>PaymentID</code> — the classic "one payment, many voucher lines" fan-in.
+    </div>
+  </div>
+
+  <!-- 5 -->
+  <div class="card" id="s5">
+    <h2><span class="num">5</span>Funds: weekly vs. withhold</h2>
+    <p>Each member's capitation is allocated across up to <b>6 funds</b>. Three are <b>weekly</b> funds and three
+       are <b>withhold</b> funds. This is what lets the plan pay part of the money out over the weeks of the month
+       while holding another part back.</p>
+    <table>
+      <tr><th>Fund slot</th><th>Example FundID</th><th>Type</th><th>Resulting status</th><th>Meaning</th></tr>
+      <tr><td>Fund 1</td><td class="mono">MSCDMQ000000002</td><td><span class="tag weekly">Weekly</span></td><td><code>OPEN</code></td><td>Released on a weekly schedule</td></tr>
+      <tr><td>Fund 2</td><td class="mono">MSCDMQ000000003</td><td><span class="tag weekly">Weekly</span></td><td><code>OPEN</code></td><td>Released on a weekly schedule</td></tr>
+      <tr><td>Fund 3</td><td class="mono">MSCDMQ000000004</td><td><span class="tag weekly">Weekly</span></td><td><code>OPEN</code></td><td>Released on a weekly schedule</td></tr>
+      <tr><td>Fund 4</td><td class="mono">WITHLD000000002</td><td><span class="tag withhold">Withhold</span></td><td><code>WITHHOLD</code></td><td>Held back, released later</td></tr>
+      <tr><td>Fund 5</td><td class="mono">WITHLD000000003</td><td><span class="tag withhold">Withhold</span></td><td><code>WITHHOLD</code></td><td>Held back, released later</td></tr>
+      <tr><td>Fund 6</td><td class="mono">WITHLD000000004</td><td><span class="tag withhold">Withhold</span></td><td><code>WITHHOLD</code></td><td>Held back, released later</td></tr>
+    </table>
+    <div class="callout note">
+      <b>"6" is a maximum, not a fixed number.</b> A payment has up to 6 <i>distinct</i> funds (3 weekly + 3 withhold).
+      A given member may have fewer, depending on how their rate-cell / cap-factor allocation works.
+    </div>
+  </div>
+
+  <!-- 6 -->
+  <div class="card" id="s6">
+    <h2><span class="num">6</span>The rules applied by the process</h2>
+    <p class="desc">After the capitation run, the <code>dbo.PostCap_SplitPayment</code> stored procedure splits the
+       single lump-sum payment. These are the rules it follows:</p>
+    <ol class="steps">
+      <li><b>Read configuration.</b> The 6 FundIDs, the target <code>Method</code> (<code>CAPFactors</code>), and
+          each fund's week label are read from configuration (a delimited string in <code>CLM_SP_VariableValues</code>).</li>
+      <li><b>Qualifying rule — which payments split.</b> A payment is split <b>only if</b> it is:
+        <ul class="plain">
+          <li><code>PayType = 'CAP'</code> (it is a capitation payment),</li>
+          <li><code>Status = 'OPEN'</code>,</li>
+          <li>on the configured <code>Method</code>, and</li>
+          <li>contains <b>at least one weekly fund (Fund 1–3)</b> <u>and</u> <b>at least one withhold fund (Fund 4–6)</b>.</li>
+        </ul>
+        If a payment has only weekly or only withhold funds, it is <b>not</b> split.</li>
+      <li><b>Collapse rule — sum per fund.</b> All the CapVoucher lines for a payment are aggregated with
+          <code>SUM(CAPAmount) GROUP BY FundID</code>. Many member-level lines collapse into one amount per fund
+          (up to 6 rows).</li>
+      <li><b>Keep-first rule.</b> The <b>first</b> fund keeps the <b>original</b> <code>PaymentID</code>; the
+          procedure just corrects its amount down to that fund's total and stamps its week label.</li>
+      <li><b>Mint-new rule.</b> For <b>every other fund</b>, a <b>new</b> <code>PaymentID</code> is generated, and
+          that fund's <code>CapVoucher</code> / <code>PayCheck</code> / <code>CapAdjustment</code> rows are
+          re-pointed to the new payment.</li>
+      <li><b>Status rule.</b> Weekly funds (1–3) → <code>OPEN</code>; withhold funds (4–6) → <code>WITHHOLD</code>.</li>
+    </ol>
+    <div class="callout good">
+      <b>Net effect:</b> one lump-sum capitation payment becomes several tracked payments — one per fund — so each
+      weekly portion can be released on its own schedule and the withhold portions can be held back.
+    </div>
+  </div>
+
+  <!-- 7 -->
+  <div class="card" id="s7">
+    <h2><span class="num">7</span>A worked example</h2>
+    <p>Provider <span class="pill">PRV01</span> has <b>2 members</b> (<span class="pill">M001</span>,
+       <span class="pill">M002</span>), each contributing <b>$500 per fund across 6 funds</b>. That is
+       <b>2 members × 6 funds = 12 CapVoucher lines</b>, totalling <b>$6,000</b> in a single payment
+       <span class="pill">P0001</span>.</p>
+
+    <h3>Before — one payment of $6,000</h3>
+    <table>
+      <tr><th>PaymentID</th><th>ProvID</th><th>AmountPaid</th><th>PayType</th><th>Status</th></tr>
+      <tr><td>P0001</td><td>PRV01</td><td>6000.00</td><td>CAP</td><td>OPEN</td></tr>
+    </table>
+
+    <h3>Collapse — 12 lines summed to 6 funds</h3>
+    <table>
+      <tr><th>FundID</th><th>Type</th><th>Summed amount (M001 + M002)</th></tr>
+      <tr><td class="mono">MSCDMQ000000002</td><td><span class="tag weekly">Weekly</span></td><td>1000.00</td></tr>
+      <tr><td class="mono">MSCDMQ000000003</td><td><span class="tag weekly">Weekly</span></td><td>1000.00</td></tr>
+      <tr><td class="mono">MSCDMQ000000004</td><td><span class="tag weekly">Weekly</span></td><td>1000.00</td></tr>
+      <tr><td class="mono">WITHLD000000002</td><td><span class="tag withhold">Withhold</span></td><td>1000.00</td></tr>
+      <tr><td class="mono">WITHLD000000003</td><td><span class="tag withhold">Withhold</span></td><td>1000.00</td></tr>
+      <tr><td class="mono">WITHLD000000004</td><td><span class="tag withhold">Withhold</span></td><td>1000.00</td></tr>
+    </table>
+
+    <h3>After — one payment per fund</h3>
+    <table>
+      <tr><th>PaymentID</th><th>FundID</th><th>AmountPaid</th><th>Status</th><th>Note</th></tr>
+      <tr><td>P0001</td><td class="mono">MSCDMQ000000002</td><td>1000.00</td><td>OPEN</td><td>Original payment, amount corrected (keep-first rule)</td></tr>
+      <tr><td>P0002 (new)</td><td class="mono">MSCDMQ000000003</td><td>1000.00</td><td>OPEN</td><td>New PaymentID (mint-new rule)</td></tr>
+      <tr><td>P0003 (new)</td><td class="mono">MSCDMQ000000004</td><td>1000.00</td><td>OPEN</td><td>New PaymentID</td></tr>
+      <tr><td>P0004 (new)</td><td class="mono">WITHLD000000002</td><td>1000.00</td><td>WITHHOLD</td><td>Held back</td></tr>
+      <tr><td>P0005 (new)</td><td class="mono">WITHLD000000003</td><td>1000.00</td><td>WITHHOLD</td><td>Held back</td></tr>
+      <tr><td>P0006 (new)</td><td class="mono">WITHLD000000004</td><td>1000.00</td><td>WITHHOLD</td><td>Held back</td></tr>
+    </table>
+
+    <h3>The qualifying query (simplified)</h3>
+    <pre><span class="cm">-- A payment splits only if it has BOTH a weekly fund AND a withhold fund</span>
+<span class="kw">SELECT DISTINCT</span> p.PaymentID
+<span class="kw">FROM</span> Payment p <span class="kw">JOIN</span> CapVoucher cv <span class="kw">ON</span> cv.paymentid = p.paymentid
+<span class="kw">WHERE</span> p.PayType = <span class="st">'CAP'</span> <span class="kw">AND</span> p.Status = <span class="st">'OPEN'</span>
+  <span class="kw">AND</span> cv.Method = @Method
+  <span class="kw">AND</span> cv.FundID <span class="kw">IN</span> (@Fund1, @Fund2, @Fund3)            <span class="cm">-- a weekly fund</span>
+  <span class="kw">AND EXISTS</span> (<span class="kw">SELECT</span> * <span class="kw">FROM</span> CapVoucher cv2
+              <span class="kw">WHERE</span> cv2.FundID <span class="kw">IN</span> (@Fund4,@Fund5,@Fund6) <span class="cm">-- and a withhold fund</span>
+                <span class="kw">AND</span> cv.paymentid = cv2.paymentid);</pre>
+  </div>
+
+  <!-- 8 -->
+  <div class="card" id="s8">
+    <h2><span class="num">8</span>Where this lives in the code</h2>
+    <table>
+      <tr><th>Piece</th><th>What it is</th></tr>
+      <tr><td><code>dbo.PostCap_SplitPayment</code></td><td>Stored procedure (DB: <code>CA_Extensions</code>) that runs right after the capitation run and performs the split.</td></tr>
+      <tr><td>PostCap_SplitPayments_Workbook_v2.html</td><td>A detailed, step-by-step before/after data workbook of the split procedure (same folder as this file).</td></tr>
+      <tr><td><code>PaymentInquiry</code> (Ohio FI web services)</td><td>The read path that returns the list of <code>CapVoucher</code> lines behind a <code>PaymentID</code>.</td></tr>
+      <tr><td><code>CapVoucher</code>, <code>Payment</code>, <code>PayCheck</code>, <code>CapAdjustment</code></td><td>The core tables involved in capitation payment detail and splitting.</td></tr>
+    </table>
+    <div class="callout note">
+      <b>Next step for learning:</b> open the <code>PostCap_SplitPayments_Workbook_v2.html</code> in this folder to
+      walk through the exact table data at every step of the split.
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--weekly)"></span> Weekly fund → OPEN (paid out)</span>
+      <span><span class="sw" style="background:var(--withhold)"></span> Withhold fund → WITHHOLD (held back)</span>
+    </div>
+  </div>
+
+  <footer>
+    Capitation — A Newcomer's Overview &nbsp;•&nbsp; Ohio FI / CEF &nbsp;•&nbsp; Companion to PostCap_SplitPayments_Workbook_v2.html
+  </footer>
+
+</div>
+</body>
+</html>
