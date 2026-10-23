@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capitation — C1 System Context Diagram</title>
+<style>
+  :root{ --bg:#f0f2f6; --ink:#1b2430; --muted:#5b6672; --line:#dde3ec; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.55;}
+  header{background:linear-gradient(135deg,#17315f,#0f766e);color:#fff;padding:26px 40px;}
+  header h1{margin:0 0 6px;font-size:23px;}
+  header p{margin:0;opacity:.92;font-size:13.5px;max-width:960px;}
+  .wrap{max-width:1560px;margin:0 auto;padding:22px 20px 70px;}
+  .diagram{background:#fcfdff;border:1px solid var(--line);border-radius:12px;
+    padding:10px;margin:16px 0;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow-x:auto;}
+  svg{display:block;width:100%;height:auto;min-width:1180px;}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;font-size:12.6px;color:var(--muted);
+    padding:6px 10px 2px;}
+  .legend span{display:inline-flex;align-items:center;gap:7px;}
+  .sw{width:26px;height:15px;border-radius:3px;display:inline-block;border:2px solid;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 22px;margin:16px 0;}
+  h2{font-size:17px;margin:0 0 10px;color:#16407a;border-left:5px solid #16407a;padding-left:11px;}
+  table{border-collapse:collapse;width:100%;font-size:12.4px;}
+  th,td{border:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top;}
+  th{background:#f1f5f9;font-weight:600;color:#334155;}
+  tr:nth-child(even) td{background:#f8fafc;}
+  code{font-family:Consolas,monospace;font-size:11.4px;background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;}
+  .path{font-family:Consolas,monospace;font-size:11px;color:#1d4ed8;word-break:break-all;}
+  footer{color:var(--muted);font-size:12px;text-align:center;padding:20px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Capitation — C1 System Context Diagram</h1>
+  <p>C4 Level 1 (System Context) for the complete capitation end-to-end process — from the operator trigger through
+     calculation, fund split, financial disbursement, GL posting, 835 remittance, reporting, and payment inquiry.
+     Every system shown is backed by located source-code / SQL / rules evidence (see the table below).</p>
+</header>
+
+<div class="wrap">
+
+  <div class="diagram">
+    <div class="legend">
+      <span><span class="sw" style="border-color:#2e7d32;background:#eef7ee"></span> Person (actor)</span>
+      <span><span class="sw" style="border-color:#16407a;background:#e9f0fa"></span> System in focus</span>
+      <span><span class="sw" style="border-color:#8a3a2a;background:#f8efe9"></span> External software system</span>
+      <span><span class="sw" style="border-color:#6a4b8a;background:#f2eef8"></span> Data store</span>
+      <span>— — ▶ relationship (labelled)</span>
+    </div>
+
+    <svg viewBox="0 0 1480 1040" role="img" aria-label="Capitation C1 System Context diagram">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#5b6672"/>
+        </marker>
+        <style>
+          .box{rx:10;ry:10;stroke-width:2.5;}
+          .person{fill:#eef7ee;stroke:#2e7d32;}
+          .focus{fill:#e9f0fa;stroke:#16407a;}
+          .ext{fill:#f8efe9;stroke:#8a3a2a;}
+          .db{fill:#f2eef8;stroke:#6a4b8a;}
+          .ttl{font:700 15px "Segoe UI",Arial;}
+          .tP{fill:#1b5e20;} .tF{fill:#16407a;} .tE{fill:#7a2e2e;} .tD{fill:#4a2e6a;}
+          .tag{font:italic 10.5px "Segoe UI",Arial;fill:#6b7682;}
+          .desc{font:11px "Segoe UI",Arial;fill:#3a4652;}
+          .rel{font:11px "Segoe UI",Arial;fill:#2f3a46;paint-order:stroke;stroke:#fcfdff;stroke-width:3.2px;stroke-linejoin:round;}
+          .edge{stroke:#5b6672;stroke-width:1.6;stroke-dasharray:6 5;fill:none;}
+          .head{fill:#eef7ee;stroke:#2e7d32;stroke-width:2.5;}
+        </style>
+      </defs>
+
+      <!-- ================= EDGES (drawn first, under boxes) ================= -->
+      <!-- 1 Finance Operator -> QNXT Cap -->
+      <path class="edge" marker-end="url(#arrow)" d="M180,220 L222,348"/>
+      <text class="rel" x="70" y="290">Initiates capitation</text>
+      <text class="rel" x="70" y="304">payment runs using</text>
+
+      <!-- 2 QNXT Cap -> Plandata DB -->
+      <path class="edge" marker-end="url(#arrow)" d="M230,512 L230,616"/>
+      <text class="rel" x="242" y="568">Writes payments &amp;</text>
+      <text class="rel" x="242" y="582">cap vouchers to</text>
+
+      <!-- 3 QNXT Cap -> OH Financial Core -->
+      <path class="edge" marker-end="url(#arrow)" d="M362,432 L466,440"/>
+      <text class="rel" x="372" y="410">Hands finalized</text>
+      <text class="rel" x="372" y="424">cap payments to</text>
+
+      <!-- 4 OH Financial Core -> Corticon -->
+      <path class="edge" marker-end="url(#arrow)" d="M600,358 L597,244"/>
+      <text class="rel" x="610" y="300">Applies GL &amp; fund-</text>
+      <text class="rel" x="610" y="314">allocation rules from</text>
+
+      <!-- 5 OH Financial Core -> Flexi GL -->
+      <path class="edge" marker-end="url(#arrow)" d="M732,440 L836,435"/>
+      <text class="rel" x="742" y="414">Posts cap invoices</text>
+      <text class="rel" x="742" y="428">/ journals to</text>
+
+      <!-- 6 OH Financial Core -> OH FI Reporting -->
+      <path class="edge" marker-end="url(#arrow)" d="M588,522 L588,626"/>
+      <text class="rel" x="452" y="576">Provides cap &amp;</text>
+      <text class="rel" x="452" y="590">GL data to</text>
+
+      <!-- 7 OH Financial Core -> EDI Gateway -->
+      <path class="edge" marker-end="url(#arrow)" d="M660,522 L930,628"/>
+      <text class="rel" x="712" y="566">Sends cap payment</text>
+      <text class="rel" x="712" y="580">data to</text>
+
+      <!-- 8 Plandata DB -> OH FI Reporting -->
+      <path class="edge" marker-end="url(#arrow)" d="M362,700 L466,704"/>
+      <text class="rel" x="366" y="680">Supplies capvoucher</text>
+      <text class="rel" x="366" y="694">data to</text>
+
+      <!-- 9 EDI Gateway -> Provider/Trading Partner -->
+      <path class="edge" marker-end="url(#arrow)" d="M1092,672 L1312,256"/>
+      <text class="rel" x="1108" y="470">Sends 835 remittance</text>
+      <text class="rel" x="1108" y="484">advice to</text>
+
+      <!-- 10 Provider -> Ohio FI Web Services -->
+      <path class="edge" marker-end="url(#arrow)" d="M1208,170 L1094,166"/>
+      <text class="rel" x="1096" y="150" text-anchor="end">Inquires cap payment</text>
+      <text class="rel" x="1096" y="164" text-anchor="end">details using</text>
+
+      <!-- 11 IVR Caller -> Ohio FI Web Services -->
+      <path class="edge" marker-end="url(#arrow)" d="M1208,430 L1092,198"/>
+      <text class="rel" x="1100" y="320">Checks cap payment</text>
+      <text class="rel" x="1100" y="334">status using</text>
+
+      <!-- 12 Ohio FI Web Services -> MyHealthPAS -->
+      <path class="edge" marker-end="url(#arrow)" d="M990,242 L1262,626"/>
+      <text class="rel" x="1060" y="430">Retrieves cap voucher</text>
+      <text class="rel" x="1060" y="444">details from</text>
+
+      <!-- ================= PERSONS ================= -->
+      <!-- A Finance Operator -->
+      <rect class="box person" x="70" y="60" width="220" height="162"/>
+      <circle class="head" cx="180" cy="92" r="15"/>
+      <path class="head" d="M158,128 a22,20 0 0,1 44,0" fill="#eef7ee"/>
+      <text class="ttl tP" x="180" y="150" text-anchor="middle">Finance Operator</text>
+      <text class="tag" x="180" y="166" text-anchor="middle">[Person]</text>
+      <text class="desc" x="180" y="186" text-anchor="middle">Finance / cap ops user who</text>
+      <text class="desc" x="180" y="200" text-anchor="middle">launches capitation runs in</text>
+      <text class="desc" x="180" y="214" text-anchor="middle">QNXT Payment Manager.</text>
+
+      <!-- J Provider / Trading Partner -->
+      <rect class="box person" x="1208" y="88" width="214" height="164"/>
+      <circle class="head" cx="1315" cy="120" r="15"/>
+      <path class="head" d="M1293,156 a22,20 0 0,1 44,0" fill="#eef7ee"/>
+      <text class="ttl tP" x="1315" y="178" text-anchor="middle">Provider /</text>
+      <text class="ttl tP" x="1315" y="194" text-anchor="middle">Trading Partner</text>
+      <text class="tag" x="1315" y="210" text-anchor="middle">[Person]</text>
+      <text class="desc" x="1315" y="228" text-anchor="middle">Receives capitation 835</text>
+      <text class="desc" x="1315" y="242" text-anchor="middle">remittance; inquires payments.</text>
+
+      <!-- K IVR Caller -->
+      <rect class="box person" x="1208" y="356" width="214" height="158"/>
+      <circle class="head" cx="1315" cy="388" r="15"/>
+      <path class="head" d="M1293,424 a22,20 0 0,1 44,0" fill="#eef7ee"/>
+      <text class="ttl tP" x="1315" y="446" text-anchor="middle">IVR Caller</text>
+      <text class="tag" x="1315" y="462" text-anchor="middle">[Person]</text>
+      <text class="desc" x="1315" y="482" text-anchor="middle">Provider calling the IVR line</text>
+      <text class="desc" x="1315" y="496" text-anchor="middle">to check capitation</text>
+      <text class="desc" x="1315" y="510" text-anchor="middle">payment status.</text>
+
+      <!-- ================= FOCUS SYSTEM ================= -->
+      <rect class="box focus" x="100" y="348" width="262" height="164"/>
+      <text class="ttl tF" x="231" y="382" text-anchor="middle">QNXT Capitation</text>
+      <text class="ttl tF" x="231" y="400" text-anchor="middle">Processing System</text>
+      <text class="tag" x="231" y="416" text-anchor="middle">[Software System — in focus]</text>
+      <text class="desc" x="231" y="436" text-anchor="middle">Triggers, calculates, splits &amp;</text>
+      <text class="desc" x="231" y="450" text-anchor="middle">finalizes capitation payments</text>
+      <text class="desc" x="231" y="464" text-anchor="middle">(PMPM → provider payment,</text>
+      <text class="desc" x="231" y="478" text-anchor="middle">split per fund) via QFrame</text>
+      <text class="desc" x="231" y="492" text-anchor="middle">agents, Hub &amp; Execution Unit.</text>
+
+      <!-- ================= DATA STORE ================= -->
+      <rect class="box db" x="100" y="620" width="262" height="156"/>
+      <text class="ttl tD" x="231" y="652" text-anchor="middle">QNXT / Plandata</text>
+      <text class="ttl tD" x="231" y="670" text-anchor="middle">Database</text>
+      <text class="tag" x="231" y="686" text-anchor="middle">[Data store]</text>
+      <text class="desc" x="231" y="706" text-anchor="middle">System of record for</text>
+      <text class="desc" x="231" y="720" text-anchor="middle">payment, capvoucher,</text>
+      <text class="desc" x="231" y="734" text-anchor="middle">paycheck, capadjustment.</text>
+
+      <!-- ================= EXTERNAL SYSTEMS ================= -->
+      <!-- D Corticon -->
+      <rect class="box ext" x="470" y="90" width="256" height="152"/>
+      <text class="ttl tE" x="598" y="122" text-anchor="middle">Corticon Rules</text>
+      <text class="ttl tE" x="598" y="140" text-anchor="middle">Engine</text>
+      <text class="tag" x="598" y="156" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="598" y="176" text-anchor="middle">FinanceMatrix / Capitation</text>
+      <text class="desc" x="598" y="190" text-anchor="middle">rules mapping payments to</text>
+      <text class="desc" x="598" y="204" text-anchor="middle">GL accounts &amp; fund groups.</text>
+
+      <!-- E OH Financial Core -->
+      <rect class="box ext" x="470" y="360" width="262" height="162"/>
+      <text class="ttl tE" x="601" y="392" text-anchor="middle">OH Financial Core</text>
+      <text class="tag" x="601" y="408" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="601" y="428" text-anchor="middle">Loads 835 cap payments,</text>
+      <text class="desc" x="601" y="442" text-anchor="middle">allocates funds, creates AP</text>
+      <text class="desc" x="601" y="456" text-anchor="middle">vouchers, disburses (check/</text>
+      <text class="desc" x="601" y="470" text-anchor="middle">ACH) &amp; feeds GL posting.</text>
+
+      <!-- F OH FI Reporting -->
+      <rect class="box ext" x="470" y="630" width="256" height="150"/>
+      <text class="ttl tE" x="598" y="662" text-anchor="middle">OH FI Reporting</text>
+      <text class="tag" x="598" y="678" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="598" y="698" text-anchor="middle">SSRS capitation cycle totals,</text>
+      <text class="desc" x="598" y="712" text-anchor="middle">cap list, GL journal detail</text>
+      <text class="desc" x="598" y="726" text-anchor="middle">&amp; check register reports.</text>
+
+      <!-- G Flexi GL -->
+      <rect class="box ext" x="836" y="360" width="256" height="150"/>
+      <text class="ttl tE" x="964" y="392" text-anchor="middle">Flexi —</text>
+      <text class="ttl tE" x="964" y="410" text-anchor="middle">General Ledger</text>
+      <text class="tag" x="964" y="426" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="964" y="446" text-anchor="middle">External GL / accounting</text>
+      <text class="desc" x="964" y="460" text-anchor="middle">system that capitation</text>
+      <text class="desc" x="964" y="474" text-anchor="middle">invoices are posted to.</text>
+
+      <!-- H EDI Gateway -->
+      <rect class="box ext" x="836" y="630" width="256" height="150"/>
+      <text class="ttl tE" x="964" y="662" text-anchor="middle">EDI Gateway</text>
+      <text class="tag" x="964" y="678" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="964" y="698" text-anchor="middle">Generates 835 remittance for</text>
+      <text class="desc" x="964" y="712" text-anchor="middle">non-claim (capitation) payments</text>
+      <text class="desc" x="964" y="726" text-anchor="middle">&amp; 820 premium to partners.</text>
+
+      <!-- I Ohio FI Web Services -->
+      <rect class="box ext" x="836" y="90" width="256" height="152"/>
+      <text class="ttl tE" x="964" y="122" text-anchor="middle">Ohio FI</text>
+      <text class="ttl tE" x="964" y="140" text-anchor="middle">Web Services</text>
+      <text class="tag" x="964" y="156" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="964" y="176" text-anchor="middle">Payment-inquiry read path</text>
+      <text class="desc" x="964" y="190" text-anchor="middle">(CapVoucher) for portal, IVR</text>
+      <text class="desc" x="964" y="204" text-anchor="middle">&amp; trading-partner channels.</text>
+
+      <!-- L MyHealthPAS back-end -->
+      <rect class="box ext" x="1160" y="628" width="252" height="152"/>
+      <text class="ttl tE" x="1286" y="660" text-anchor="middle">MyHealthPAS</text>
+      <text class="ttl tE" x="1286" y="678" text-anchor="middle">Back-end</text>
+      <text class="tag" x="1286" y="694" text-anchor="middle">[Software System]</text>
+      <text class="desc" x="1286" y="714" text-anchor="middle">External WCF back-end that</text>
+      <text class="desc" x="1286" y="728" text-anchor="middle">returns the capitation</text>
+      <text class="desc" x="1286" y="742" text-anchor="middle">voucher payment data.</text>
+
+    </svg>
+  </div>
+
+  <!-- EVIDENCE TABLE -->
+  <div class="card">
+    <h2>Evidence — each box backed by located source</h2>
+    <table>
+      <tr><th style="width:21%">System / Actor</th><th style="width:11%">C4 type</th><th>Primary code / SQL / rules evidence</th><th style="width:15%">Repo</th></tr>
+      <tr><td><b>Finance Operator</b></td><td>Person</td><td>Launches wizard <span class="path">components/QNXT/UI/.../QPaymentManager/CreateCAPPaymentsWiz.aspx</span><span class="path">components/QNXT/UI/PaymentManagerQ/Src/UI/CPayMgrUI.cs</span></td><td class="path">mms-cms-cef</td></tr>
+      <tr><td><b>QNXT Capitation Processing System</b></td><td>System (focus)</td><td><span class="path">Proxies/Payment/Src/QCSI Payment Proxy/CapSubmitProxy.cs</span><span class="path">ASCs/Capitation/Src/QCSI ASC CapitationSetup/CapProgramAgent.cs · CapProviderActivity.cs</span><span class="path">Agents/Capitation/Src/BuildCapEnrolls · AllocateCapFunds · StoreCapVoucher · FinalizeCapPayment</span><span class="path">QFrame/.../WindowsService/Distribution Hub/DistributionHub.cs · Execution Unit</span><span class="path">CA_Extensions/ASCs/Capitation/.../PostCapitationSplitPaymentAgent.cs · PostCapitationFundAllocationAgent.cs</span></td><td class="path">mms-cms-cef</td></tr>
+      <tr><td><b>QNXT / Plandata Database</b></td><td>Data store</td><td>Tables <code>payment</code>, <code>capvoucher</code>, <code>paycheck</code>, <code>capadjustment</code>; referenced as <code>Plandata_Parallel.dbo.capvoucher</code></td><td class="path">mms-cms-cef / Plandata</td></tr>
+      <tr><td><b>Corticon Rules Engine</b></td><td>System</td><td><span class="path">RuleSheet/FinanceMatrix/FinanceMatrix.ers · RuleSheet/PayablesMatrix/PayablesMatrix.ers</span><span class="path">.../OH_Financial_Rule_Project/RuleSheet/CAP/Capitation.ers</span></td><td class="path">finance-corticon-businessrules / mms-bolton-fin-ohio</td></tr>
+      <tr><td><b>OH Financial Core</b></td><td>System</td><td><span class="path">db/mssql/md/stored-procedures/up_hpfin_PRMCap835LoadPayment.sql · up_hpfin_CFACapAdjFundAlloc.sql · up_Hpfin_DPCreateAPInvoices.sql</span><span class="path">packages/md/Hpfin_PayFileExport.dtsx · Hpfin_ClaimFundAllocation.dtsx</span><span class="path">OH Financial Core/.../up_hpfin_APVGetVendorBuyPayLocation.sql</span></td><td class="path">mms-bolton-fin-ohio / fin-hist-ohio</td></tr>
+      <tr><td><b>Flexi — General Ledger</b></td><td>System</td><td><span class="path">up_hpfin_GetInvoicesToAddToFlexi.sql</span> · FinancialDataService endpoint (FIWebSvc appsettings)</td><td class="path">fin-hist-ohio / act-OH-FIWebSvc</td></tr>
+      <tr><td><b>EDI Gateway</b></td><td>System</td><td><span class="path">components/CustomApps/EDITools_DXC/5.2 .NET 4.8/NonClaim835Generator/Src/</span> (835 for capitation/interest); 820 premium transfer (ansible IaC)</td><td class="path">sis-inx-edigw</td></tr>
+      <tr><td><b>OH FI Reporting</b></td><td>System</td><td><span class="path">Financial/FINRP00001 - MCO Monthly Capitation Payment Cycle Totals/</span><span class="path">Financial/FINRP00001L - Capitation List/ · FINRP00083 - General Ledger Journal Detail by Account/</span></td><td class="path">OH_FI_Reporting</td></tr>
+      <tr><td><b>Ohio FI Web Services</b></td><td>System</td><td><span class="path">src/Gainwell.FI.SOAPService/.../ModularServices/FinanceServiceController.cs (GetPaymentDetails)</span><span class="path">.../Gainwell.HPO.SOAPIVRService/HPOSOAPIVRService.cs · MyHealthPAS.SOAP.Proxy/ProxyService.cs</span></td><td class="path">act-OH-FIWebSvc</td></tr>
+      <tr><td><b>MyHealthPAS Back-end</b></td><td>System</td><td><span class="path">.../Connected Services/MHPServices/Reference.cs (MHPServicesClient.GetPaymentDetails)</span> · endpoint <code>MHPServices.svc</code> (appsettings.json)</td><td class="path">act-OH-FIWebSvc (external)</td></tr>
+      <tr><td><b>Provider / Trading Partner &amp; IVR Caller</b></td><td>Person</td><td>Consumers of 835 remittance &amp; PaymentInquiry (EDI Gateway ERA agreements; HPO IVR <code>PaymentInquiry()</code>)</td><td class="path">sis-inx-edigw / act-OH-FIWebSvc</td></tr>
+    </table>
+  </div>
+
+  <footer>
+    Capitation — C1 System Context (C4 Level 1) &nbsp;•&nbsp; CEF / Ohio FI &nbsp;•&nbsp; Generated 2026-10-23 &nbsp;•&nbsp; Styled after the provided template; all systems evidence-based
+  </footer>
+
+</div>
+</body>
+</html>
